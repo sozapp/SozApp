@@ -5,6 +5,7 @@ import {
   savePlanProgress,
 } from '@/constants/storage';
 import { colors, fonts, borderRadius } from '@/constants/theme';
+import { usePremium } from '@/hooks/usePremium';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
@@ -37,6 +38,7 @@ export default function PlansScreen() {
   const isDark = colorScheme === 'dark';
   const theme = isDark ? colors.dark : colors.light;
   const router = useRouter();
+  const { isPremium } = usePremium();
   const [progressByPlanId, setProgressByPlanId] = useState<Record<string, PlanProgress | null>>({});
 
   const loadProgress = useCallback(async () => {
@@ -113,6 +115,11 @@ export default function PlansScreen() {
               key={plan.id}
               style={[styles.card, { backgroundColor: theme.surface }]}
             >
+              {!isPremium && (
+                <View style={styles.cardLockWrap}>
+                  <Text style={styles.cardLock}>🔒</Text>
+                </View>
+              )}
               <Text style={[styles.planTitle, { color: theme.text }]}>{plan.title}</Text>
               <Text style={[styles.planDesc, { color: theme.textMuted }]}>
                 {plan.description}
@@ -138,7 +145,13 @@ export default function PlansScreen() {
                   styles.continueBtn,
                   { opacity: pressed ? 0.9 : 1 },
                 ]}
-                onPress={() => handleStartOrContinue(plan)}
+                onPress={() => {
+                  if (!isPremium) {
+                    router.push('/paywall');
+                    return;
+                  }
+                  handleStartOrContinue(plan);
+                }}
               >
                 <Text style={styles.continueBtnText}>
                   {progress == null ? 'Başla' : 'Devam Et'}
@@ -177,6 +190,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 20,
     marginBottom: 16,
+    position: 'relative',
+  },
+  cardLockWrap: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 1,
+  },
+  cardLock: {
+    fontSize: 18,
   },
   planTitle: {
     fontFamily: fonts.medium,

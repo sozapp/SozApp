@@ -1,8 +1,10 @@
 import {
   getVerseRefFromVerseId,
   getVerseTextByVerseId,
-} from '@/constants/bible';
+} from '@/constants/bible-index';
+import { FREE_LIMITS } from '@/constants/premium';
 import { colors, fonts } from '@/constants/theme';
+import { usePremium } from '@/hooks/usePremium';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
@@ -23,8 +25,8 @@ type NotesMap = Record<string, string>;
 type HighlightsMap = Record<string, string>;
 
 export default function NotesScreen() {
-  // 1. Tüm hook'lar — herhangi bir return veya if'ten ÖNCE
   const colorScheme = useColorScheme();
+  const { isPremium } = usePremium();
   const [activeTab, setActiveTab] = useState<'notes' | 'highlights'>('notes');
   const [notes, setNotes] = useState<NotesMap>({});
   const [highlights, setHighlights] = useState<HighlightsMap>({});
@@ -66,12 +68,17 @@ export default function NotesScreen() {
   const theme = isDark ? colors.dark : colors.light;
   const noteEntries = Object.entries(notes);
   const highlightEntries = Object.entries(highlights);
+  const atNotesLimit = !isPremium && noteEntries.length >= FREE_LIMITS.notesLimit;
 
-  // 3. Return — en sonda
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>Notlarım</Text>
+        {atNotesLimit && (
+          <Text style={[styles.limitWarning, { color: theme.textMuted }]}>
+            5/5 not kullanıldı · Premium ile sınırsız
+          </Text>
+        )}
       </View>
 
       <View style={[styles.tabRow, { borderBottomColor: theme.textMuted }]}>
@@ -210,6 +217,11 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: fonts.thin,
     fontSize: 32,
+  },
+  limitWarning: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    marginTop: 4,
   },
   tabRow: {
     flexDirection: 'row',

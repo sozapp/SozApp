@@ -1,5 +1,9 @@
-import { johnChapters } from '@/constants/bible';
+import { newTestament } from '@/constants/new-testament';
+import { bookList, getBookIndex } from '@/constants/bible-index';
+import { sampleChapter1878 } from '@/constants/bible-1878';
+import { FREE_LIMITS } from '@/constants/premium';
 import { colors, fonts } from '@/constants/theme';
+import { usePremium } from '@/hooks/usePremium';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -14,8 +18,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import type { Verse } from '@/constants/bible';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+
+type VerseItem = { number: number; text: string };
 
 const MIN_FONT_SIZE = 16;
 const MAX_FONT_SIZE = 22;
@@ -33,25 +38,60 @@ function getVerseId(book: string, chapterNumber: number, verseNumber: number): s
 
 const CHAPTER_NAV_COLOR = '#C4956A';
 
+const DEFAULT_BOOK_INDEX = 3; // Yuhanna
+
 export default function ReadScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? colors.dark : colors.light;
-  const [currentChapter, setCurrentChapter] = useState(0); // 0 = john1, ... 20 = john21
+  const [bookIndex, setBookIndex] = useState(DEFAULT_BOOK_INDEX);
+  const [chapterIndexInBook, setChapterIndexInBook] = useState(0);
+  const [bookPickerVisible, setBookPickerVisible] = useState(false);
   const [fontSize, setFontSize] = useState(18);
-  const [selectedVerse, setSelectedVerse] = useState<Verse | null>(null);
+  const [selectedVerse, setSelectedVerse] = useState<VerseItem | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [highlights, setHighlights] = useState<Highlights>({});
   const [notes, setNotes] = useState<Notes>({});
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
+  const [compareMode, setCompareMode] = useState(false);
+  const { isPremium } = usePremium();
   const router = useRouter();
+  const params = useLocalSearchParams<{ bookId?: string; chapter?: string }>();
   const flatListRef = useRef<FlatList>(null);
 
-  const chapter = johnChapters[currentChapter];
-  const isFirstChapter = currentChapter === 0;
-  const isLastChapter = currentChapter === johnChapters.length - 1;
+  const currentBook = newTestament[bookIndex];
+  const currentChapterData = currentBook.chapters[chapterIndexInBook];
+  const chapter = {
+    book: currentBook.name,
+    chapterNumber: currentChapterData.chapter,
+    verses: currentChapterData.verses.map((v) => ({ number: v.verse, text: v.text })),
+  };
+  const isFirstChapter = bookIndex === 0 && chapterIndexInBook === 0;
+  const isLastChapter =
+    bookIndex === newTestament.length - 1 &&
+    chapterIndexInBook === currentBook.chapters.length - 1;
+
+  useEffect(() => {
+    const { bookId, chapter: chapterParam } = params;
+    if (bookId != null) {
+      const bIdx = getBookIndex(bookId);
+      if (bIdx >= 0) {
+        setBookIndex(bIdx);
+        if (chapterParam != null) {
+          const ch = parseInt(chapterParam, 10);
+          if (!Number.isNaN(ch) && ch >= 1 && ch <= newTestament[bIdx].chapters.length) {
+            setChapterIndexInBook(ch - 1);
+          } else {
+            setChapterIndexInBook(0);
+          }
+        } else {
+          setChapterIndexInBook(0);
+        }
+      }
+    }
+  }, [params.bookId, params.chapter]);
 
   const loadStored = useCallback(async () => {
     try {
@@ -78,9 +118,27 @@ export default function ReadScreen() {
 
   useEffect(() => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
-  }, [currentChapter]);
+  }, [bookIndex, chapterIndexInBook]);
 
-  const handleLongPress = (verse: Verse) => {
+  const goPrevChapter = () => {
+    if (chapterIndexInBook > 0) {
+      setChapterIndexInBook((c) => c - 1);
+    } else if (bookIndex > 0) {
+      setBookIndex((b) => b - 1);
+      setChapterIndexInBook(newTestament[bookIndex - 1].chapters.length - 1);
+    }
+  };
+
+  const goNextChapter = () => {
+    if (chapterIndexInBook < currentBook.chapters.length - 1) {
+      setChapterIndexInBook((c) => c + 1);
+    } else if (bookIndex < newTestament.length - 1) {
+      setBookIndex((b) => b + 1);
+      setChapterIndexInBook(0);
+    }
+  };
+
+  const handleLongPress = (verse: VerseItem) => {
     setSelectedVerse(verse);
     setShowColorPicker(false);
     setShowNoteInput(false);
@@ -127,6 +185,11 @@ export default function ReadScreen() {
     if (!selectedVerse) return;
     const id = getVerseId(chapter.book, chapter.chapterNumber, selectedVerse.number);
     const trimmed = noteDraft.trim();
+    const isNewNote = !(id in notes) && Boolean(trimmed);
+    if (!isPremium && isNewNote && Object.keys(notes).length >= FREE_LIMITS.notesLimit) {
+      router.push('/paywall');
+      return;
+    }
     const next = trimmed ? { ...notes, [id]: trimmed } : { ...notes };
     if (!trimmed) delete next[id];
     saveNotes(next);
@@ -153,11 +216,17 @@ export default function ReadScreen() {
   const decreaseFont = () => setFontSize((s) => Math.max(MIN_FONT_SIZE, s - 2));
   const increaseFont = () => setFontSize((s) => Math.min(MAX_FONT_SIZE, s + 2));
 
-  const renderVerse = ({ item }: { item: Verse }) => {
+  const showCompare = compareMode && currentBook.id === 'joh' && chapter.chapterNumber === 3;
+  const getVerse1878 = useCallback((verseNumber: number) => {
+    return sampleChapter1878.verses.find((v) => v.number === verseNumber)?.text ?? null;
+  }, []);
+
+  const renderVerse = ({ item }: { item: VerseItem }) => {
     const verseId = getVerseId(chapter.book, chapter.chapterNumber, item.number);
     const highlightColor = highlights[verseId];
     const hasNote = Boolean(notes[verseId]);
     const isSelected = selectedVerse?.number === item.number;
+    const text1878 = showCompare ? getVerse1878(item.number) : null;
 
     return (
       <Pressable
@@ -173,18 +242,33 @@ export default function ReadScreen() {
           <Text style={styles.verseNumber}>{item.number}</Text>
           {hasNote && <Text style={styles.noteIcon}>📝</Text>}
         </View>
-        <Text
-          style={[
-            styles.verseText,
-            {
-              color: theme.text,
-              fontSize,
-              lineHeight: fontSize * 1.8,
-            },
-          ]}
-        >
-          {item.text}
-        </Text>
+        <View style={styles.verseTextBlock}>
+          <Text
+            style={[
+              styles.verseText,
+              {
+                color: theme.text,
+                fontSize,
+                lineHeight: fontSize * 1.8,
+              },
+            ]}
+          >
+            {item.text}
+          </Text>
+          {text1878 != null && (
+            <>
+              <View style={styles.compareDivider} />
+              <Text
+                style={[
+                  styles.verseText1878,
+                  { color: theme.textMuted },
+                ]}
+              >
+                {text1878}
+              </Text>
+            </>
+          )}
+        </View>
       </Pressable>
     );
   };
@@ -199,18 +283,31 @@ export default function ReadScreen() {
       <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: colors.accentBorder }]}>
         <View style={styles.headerLeft}>
           <Pressable
-            onPress={() => setCurrentChapter((c) => c - 1)}
+            onPress={goPrevChapter}
             disabled={isFirstChapter}
             style={[styles.chapterNavBtn, isFirstChapter && styles.chapterNavBtnDisabled]}
             hitSlop={8}
           >
             <Ionicons name="chevron-back" size={24} color={CHAPTER_NAV_COLOR} />
           </Pressable>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>
-            Yuhanna · {currentChapter + 1}. Bölüm
-          </Text>
           <Pressable
-            onPress={() => setCurrentChapter((c) => c + 1)}
+            style={styles.headerTitleBlock}
+            onPress={() => setBookPickerVisible(true)}
+          >
+            <Text style={[styles.headerTitle, { color: theme.text }]}>
+              {currentBook.name} · {chapterIndexInBook + 1}. Bölüm
+            </Text>
+            <Text
+              style={[
+                styles.headerTranslationLabel,
+                compareMode ? { color: CHAPTER_NAV_COLOR } : { color: theme.textMuted },
+              ]}
+            >
+              {compareMode ? '2001 · 1878 Karşılaştırma' : 'Kutsal Kitap 2001'}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={goNextChapter}
             disabled={isLastChapter}
             style={[styles.chapterNavBtn, isLastChapter && styles.chapterNavBtnDisabled]}
             hitSlop={8}
@@ -219,6 +316,20 @@ export default function ReadScreen() {
           </Pressable>
         </View>
         <View style={styles.fontControls}>
+          <Pressable onPress={() => router.push('/search')} style={styles.compareBtn} hitSlop={8}>
+            <Ionicons name="search" size={22} color={theme.textMuted} />
+          </Pressable>
+          <Pressable
+            onPress={() => setCompareMode((c) => !c)}
+            style={styles.compareBtn}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="swap-horizontal"
+              size={22}
+              color={compareMode ? CHAPTER_NAV_COLOR : theme.textMuted}
+            />
+          </Pressable>
           <Pressable onPress={decreaseFont} style={styles.fontBtn} hitSlop={8}>
             <Text style={[styles.fontBtnText, { color: theme.text }]}>A−</Text>
           </Pressable>
@@ -327,6 +438,53 @@ export default function ReadScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal
+        visible={bookPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBookPickerVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setBookPickerVisible(false)}
+        >
+          <Pressable
+            style={[styles.bookPickerContent, { backgroundColor: theme.surface }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[styles.bookPickerTitle, { color: theme.text }]}>
+              Kitap seç
+            </Text>
+            <FlatList
+              data={bookList}
+              keyExtractor={(item) => item.id}
+              style={styles.bookPickerList}
+              renderItem={({ item, index }) => (
+                <Pressable
+                  style={[
+                    styles.bookPickerRow,
+                    { borderBottomColor: colors.accentBorder },
+                    index === bookIndex && { backgroundColor: colors.accentBadgeBg },
+                  ]}
+                  onPress={() => {
+                    setBookIndex(index);
+                    setChapterIndexInBook(0);
+                    setBookPickerVisible(false);
+                  }}
+                >
+                  <Text style={[styles.bookPickerName, { color: theme.text }]}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.bookPickerChapters, { color: theme.textMuted }]}>
+                    {item.chapterCount} bölüm
+                  </Text>
+                </Pressable>
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -356,10 +514,21 @@ const styles = StyleSheet.create({
   chapterNavBtnDisabled: {
     opacity: 0.3,
   },
+  headerTitleBlock: {
+    flex: 1,
+  },
   headerTitle: {
     fontFamily: fonts.medium,
     fontSize: 18,
-    flex: 1,
+  },
+  headerTranslationLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 10,
+    marginTop: 2,
+  },
+  compareBtn: {
+    padding: 4,
+    marginRight: 4,
   },
   fontControls: {
     flexDirection: 'row',
@@ -380,10 +549,10 @@ const styles = StyleSheet.create({
   },
   verseRow: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: 4,
     paddingVertical: 10,
     marginBottom: 4,
-    alignItems: 'flex-start',
-    paddingHorizontal: 6,
     borderRadius: 6,
   },
   verseRowSelected: {
@@ -403,13 +572,31 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 12,
     color: colors.accent,
+    width: 32,
+    paddingTop: 3,
+    flexShrink: 0,
   },
   noteIcon: {
     fontSize: 12,
   },
+  verseTextBlock: {
+    flex: 1,
+  },
   verseText: {
     fontFamily: fonts.regular,
     flex: 1,
+    paddingRight: 16,
+    lineHeight: 28,
+  },
+  compareDivider: {
+    height: 0.5,
+    backgroundColor: 'rgba(196,149,106,0.3)',
+    marginVertical: 8,
+  },
+  verseText1878: {
+    fontFamily: fonts.italic,
+    fontSize: 14,
+    lineHeight: 20,
   },
   modalOverlay: {
     flex: 1,
@@ -486,6 +673,36 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+  },
+  bookPickerContent: {
+    borderRadius: 20,
+    padding: 16,
+    maxHeight: '80%',
+    marginHorizontal: 24,
+  },
+  bookPickerTitle: {
+    fontFamily: fonts.medium,
+    fontSize: 18,
+    marginBottom: 12,
+  },
+  bookPickerList: {
+    maxHeight: 400,
+  },
+  bookPickerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderBottomWidth: 0.5,
+  },
+  bookPickerName: {
+    fontFamily: fonts.regular,
+    fontSize: 16,
+  },
+  bookPickerChapters: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
   },
   colorCircleSelected: {
     borderWidth: 3,

@@ -1,4 +1,5 @@
 import { colors, fonts } from '@/constants/theme';
+import { usePremium } from '@/hooks/usePremium';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -25,9 +26,12 @@ const CARD_PADDING = 24;
 const CARD_WIDTH = SCREEN_WIDTH - CARD_PADDING * 2;
 const CARD_HEIGHT = SCREEN_HEIGHT * 0.55;
 
+const FREE_THEME_INDEX = 0;
+
 export default function ShareCardScreen() {
   const params = useLocalSearchParams<{ text?: string; ref?: string }>();
   const router = useRouter();
+  const { isPremium } = usePremium();
   const viewShotRef = useRef<ViewShot>(null);
   const [themeIndex, setThemeIndex] = useState(0);
   const [sharing, setSharing] = useState(false);
@@ -120,17 +124,33 @@ export default function ShareCardScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.themeRow}
         >
-          {CARD_THEMES.map((t, i) => (
-            <Pressable
-              key={t.id}
-              style={[
-                styles.themeCircle,
-                { backgroundColor: t.bg },
-                themeIndex === i && styles.themeCircleSelected,
-              ]}
-              onPress={() => setThemeIndex(i)}
-            />
-          ))}
+          {CARD_THEMES.map((t, i) => {
+            const isPremiumTheme = i > FREE_THEME_INDEX;
+            const locked = !isPremium && isPremiumTheme;
+            return (
+              <Pressable
+                key={t.id}
+                style={[
+                  styles.themeCircleWrap,
+                  themeIndex === i && styles.themeCircleSelected,
+                ]}
+                onPress={() => {
+                  if (locked) {
+                    router.push('/paywall');
+                    return;
+                  }
+                  setThemeIndex(i);
+                }}
+              >
+                <View style={[styles.themeCircle, { backgroundColor: t.bg }]} />
+                {locked && (
+                  <View style={styles.themeLockOverlay}>
+                    <Text style={styles.themeLockIcon}>🔒</Text>
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
         </ScrollView>
 
         <Pressable
@@ -261,14 +281,36 @@ const styles = StyleSheet.create({
     marginBottom: 28,
     paddingRight: CARD_PADDING,
   },
-  themeCircle: {
+  themeCircleWrap: {
     width: 32,
     height: 32,
     borderRadius: 16,
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   themeCircleSelected: {
     borderWidth: 2.5,
     borderColor: colors.accent,
+  },
+  themeCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+  },
+  themeLockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  themeLockIcon: {
+    fontSize: 14,
   },
   shareButton: {
     backgroundColor: colors.accent,

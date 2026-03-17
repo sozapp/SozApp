@@ -1,6 +1,7 @@
 import { plans } from '@/constants/plans';
 import { getPlanProgress } from '@/constants/storage';
 import { colors, fonts, borderRadius } from '@/constants/theme';
+import { usePremium } from '@/hooks/usePremium';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -31,6 +32,7 @@ export default function HomeScreen() {
   const isDark = colorScheme === 'dark';
   const theme = isDark ? colors.dark : colors.light;
   const router = useRouter();
+  const { isPremium } = usePremium();
   const [isDarkMode, setIsDarkMode] = useState(isDark);
   const [planProgress, setPlanProgress] = useState<PlanProgress | null>(null);
 
@@ -69,13 +71,34 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <Text style={[styles.logo, { color: effectiveTheme.text }]}>Söz</Text>
-          <Pressable onPress={toggleTheme} style={styles.themeToggle} hitSlop={12}>
-            <Ionicons
-              name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
-              size={24}
-              color={effectiveTheme.text}
-            />
-          </Pressable>
+          <View style={styles.headerRight}>
+            {!isPremium && (
+              <Pressable
+                onPress={() => router.push('/paywall')}
+                style={styles.proBadge}
+                hitSlop={8}
+              >
+                <Text style={styles.proBadgeText}>PRO</Text>
+              </Pressable>
+            )}
+            <Pressable onPress={() => router.push('/search')} style={styles.searchBtn} hitSlop={8}>
+              <Ionicons name="search" size={22} color={colors.accent} />
+            </Pressable>
+            <Pressable
+              onPress={() => router.push('/notification-settings')}
+              style={styles.searchBtn}
+              hitSlop={8}
+            >
+              <Ionicons name="notifications-outline" size={22} color={colors.accent} />
+            </Pressable>
+            <Pressable onPress={toggleTheme} style={styles.themeToggle} hitSlop={12}>
+              <Ionicons
+                name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
+                size={24}
+                color={effectiveTheme.text}
+              />
+            </Pressable>
+          </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: effectiveTheme.surface, borderLeftColor: colors.accent }]}>
@@ -162,6 +185,28 @@ const styles = StyleSheet.create({
     fontFamily: fonts.thin,
     fontSize: 42,
     letterSpacing: -1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  searchBtn: {
+    padding: 4,
+  },
+  proBadge: {
+    backgroundColor: 'rgba(196,149,80,0.12)',
+    borderWidth: 0.5,
+    borderColor: 'rgba(196,149,80,0.4)',
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  proBadgeText: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
+    letterSpacing: 1.65,
+    color: '#C4956A',
   },
   themeToggle: {
     padding: 4,
