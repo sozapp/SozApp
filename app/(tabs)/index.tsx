@@ -1,98 +1,211 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { plans } from '@/constants/plans';
+import { getPlanProgress } from '@/constants/storage';
+import { colors, fonts, borderRadius } from '@/constants/theme';
+import { useFocusEffect } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useColorScheme,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import type { PlanProgress } from '@/constants/storage';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const DEFAULT_PLAN_ID = 'yeni-ahit-30';
+
+function getCurrentDay(progress: PlanProgress | null, totalDays: number): number {
+  if (progress == null) return 1;
+  const start = new Date(progress.startDate).getTime();
+  const now = Date.now();
+  const dayIndex = Math.floor((now - start) / 86400000);
+  return Math.min(totalDays, Math.max(1, dayIndex + 1));
+}
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const theme = isDark ? colors.dark : colors.light;
+  const router = useRouter();
+  const [isDarkMode, setIsDarkMode] = useState(isDark);
+  const [planProgress, setPlanProgress] = useState<PlanProgress | null>(null);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const loadProgress = useCallback(async () => {
+    try {
+      const p = await getPlanProgress(DEFAULT_PLAN_ID);
+      setPlanProgress(p);
+    } catch (_) {
+      setPlanProgress(null);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProgress();
+    }, [loadProgress])
+  );
+
+  const toggleTheme = () => setIsDarkMode((prev) => !prev);
+  const effectiveTheme = isDarkMode ? colors.dark : colors.light;
+
+  const plan = plans.find((p) => p.id === DEFAULT_PLAN_ID);
+  const completedCount = planProgress?.completedDays?.length ?? 0;
+  const totalDays = plan?.totalDays ?? 30;
+  const percent = totalDays > 0 ? (completedCount / totalDays) * 100 : 0;
+  const currentDay = getCurrentDay(planProgress, totalDays);
+  const todayRef = plan?.days.find((d) => d.day === currentDay)?.reference ?? 'Yuhanna 3';
+  const streak = planProgress?.streak ?? 0;
+
+  return (
+    <SafeAreaView style={[styles.safe, { backgroundColor: effectiveTheme.background }]} edges={['top']}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Text style={[styles.logo, { color: effectiveTheme.text }]}>Söz</Text>
+          <Pressable onPress={toggleTheme} style={styles.themeToggle} hitSlop={12}>
+            <Ionicons
+              name={isDarkMode ? 'sunny-outline' : 'moon-outline'}
+              size={24}
+              color={effectiveTheme.text}
+            />
+          </Pressable>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: effectiveTheme.surface, borderLeftColor: colors.accent }]}>
+          <Text style={[styles.cardLabel, { color: effectiveTheme.textMuted }]}>Günün Ayeti</Text>
+          <Text style={[styles.verseText, { color: effectiveTheme.text }]}>
+            «Çünkü Tanrı dünyayı o kadar çok sevdi ki, biricik Oğlu'nu verdi. Öyle ki, O'na iman edenlerin hiçbiri mahvolmasın, hepsi sonsuz yaşama kavuşsun.» — Yuhanna 3:16
+          </Text>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: effectiveTheme.surface }]}>
+          <Text style={[styles.cardTitle, { color: effectiveTheme.text }]}>Okuma Planı</Text>
+          <Text style={[styles.planLabel, { color: effectiveTheme.text }]}>
+            {plan?.title ?? 'Yeni Ahit 30 Günde'}
+          </Text>
+          <View style={[styles.progressBg, { backgroundColor: effectiveTheme.textMuted }]}>
+            <View style={[styles.progressFill, { width: `${percent}%` }]} />
+          </View>
+          <View style={styles.planMeta}>
+            <Text style={[styles.todayLabel, { color: effectiveTheme.textMuted }]}>
+              Bugün: {todayRef}
+            </Text>
+            {streak > 0 && (
+              <Text style={[styles.streakLabel, { color: colors.accent }]}>
+                🔥 {streak} gün seri
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.readButton,
+            { opacity: pressed ? 0.9 : 1 },
+          ]}
+          onPress={() => router.push('/(tabs)/read')}
+        >
+          <Text style={styles.readButtonText}>{todayRef} →</Text>
+        </Pressable>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  safe: {
+    flex: 1,
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    paddingVertical: 16,
   },
-  stepContainer: {
-    gap: 8,
+  logo: {
+    fontFamily: fonts.thin,
+    fontSize: 38,
+  },
+  themeToggle: {
+    padding: 4,
+  },
+  card: {
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+  },
+  cardLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  verseText: {
+    fontFamily: fonts.italic,
+    fontSize: 16,
+    lineHeight: 26,
+  },
+  cardTitle: {
+    fontFamily: fonts.medium,
+    fontSize: 16,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  planLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  progressBg: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+  },
+  planMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  todayLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+  },
+  streakLabel: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+  },
+  readButton: {
+    backgroundColor: colors.accent,
+    borderRadius: borderRadius.button,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  readButtonText: {
+    fontFamily: fonts.medium,
+    fontSize: 16,
+    color: '#fff',
   },
 });
