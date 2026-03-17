@@ -145,12 +145,14 @@ export default function ReadScreen() {
     const verseId = getVerseId(sampleChapter.book, sampleChapter.chapterNumber, item.number);
     const highlightColor = highlights[verseId];
     const hasNote = Boolean(notes[verseId]);
+    const isSelected = selectedVerse?.number === item.number;
 
     return (
       <Pressable
         style={[
           styles.verseRow,
           highlightColor != null && { backgroundColor: highlightColor },
+          isSelected && styles.verseRowSelected,
         ]}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={400}
@@ -182,7 +184,7 @@ export default function ReadScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
-      <View style={[styles.header, { borderBottomColor: theme.textMuted }]}>
+      <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: colors.accentBorder }]}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {sampleChapter.book} · {sampleChapter.chapterNumber}. Bölüm
         </Text>
@@ -243,7 +245,7 @@ export default function ReadScreen() {
                         style={[styles.noteInputBtn, { backgroundColor: colors.accent }]}
                         onPress={handleSaveNote}
                       >
-                        <Text style={[styles.modalBtnText, { color: '#fff' }]}>Kaydet</Text>
+                        <Text style={[styles.modalBtnText, { color: colors.white }]}>Kaydet</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -267,25 +269,25 @@ export default function ReadScreen() {
                 ) : (
                   <View style={styles.modalActions}>
                     <Pressable
-                      style={[styles.modalBtn, { backgroundColor: theme.textMuted }]}
+                      style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
                       onPress={() => { setShowNoteInput(true); setShowColorPicker(false); }}
                     >
                       <Ionicons name="create-outline" size={20} color={theme.text} />
                       <Text style={[styles.modalBtnText, { color: theme.text }]}>Not Ekle</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.modalBtn, { backgroundColor: theme.textMuted }]}
+                      style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
                       onPress={() => { setShowColorPicker(true); setShowNoteInput(false); }}
                     >
                       <Ionicons name="brush-outline" size={20} color={theme.text} />
                       <Text style={[styles.modalBtnText, { color: theme.text }]}>Vurgula</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.modalBtn, { backgroundColor: theme.textMuted }]}
+                      style={[styles.modalBtn, styles.modalBtnAccent]}
                       onPress={handleShare}
                     >
-                      <Ionicons name="share-outline" size={20} color={theme.text} />
-                      <Text style={[styles.modalBtnText, { color: theme.text }]}>Paylaş</Text>
+                      <Ionicons name="share-outline" size={20} color={colors.white} />
+                      <Text style={[styles.modalBtnText, { color: colors.white }]}>Paylaş</Text>
                     </Pressable>
                   </View>
                 )}
@@ -307,8 +309,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 0.5,
   },
   headerTitle: {
     fontFamily: fonts.medium,
@@ -333,18 +336,24 @@ const styles = StyleSheet.create({
   },
   verseRow: {
     flexDirection: 'row',
-    marginBottom: 14,
+    paddingVertical: 10,
+    marginBottom: 4,
     alignItems: 'flex-start',
-    paddingVertical: 4,
     paddingHorizontal: 6,
     borderRadius: 6,
   },
+  verseRowSelected: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+  },
   verseNumberRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    width: 32,
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    minWidth: 32,
     marginRight: 8,
     gap: 4,
+    paddingTop: 3,
   },
   verseNumber: {
     fontFamily: fonts.regular,
@@ -360,13 +369,13 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'center',
     padding: 24,
   },
   modalContent: {
-    borderRadius: 10,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
   },
   modalVerse: {
     fontFamily: fonts.italic,
@@ -375,18 +384,21 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
+    flexDirection: 'column',
+    gap: 10,
   },
   modalBtn: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    width: '100%',
+  },
+  modalBtnSurface: {},
+  modalBtnAccent: {
+    backgroundColor: colors.accent,
   },
   modalBtnText: {
     fontFamily: fonts.regular,

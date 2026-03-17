@@ -129,8 +129,8 @@ export default function PlansScreen() {
                 {completedCount} / {plan.totalDays} gün tamamlandı
               </Text>
               {streak > 0 && (
-                <View style={[styles.streakBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.streakText}>🔥 {streak} günlük seri</Text>
+                <View style={[styles.streakBadge, { backgroundColor: colors.accentBadgeBg, borderColor: colors.accentBadgeBorder }]}>
+                  <Text style={[styles.streakText, { color: colors.accent }]}>🔥 {streak} günlük seri</Text>
                 </View>
               )}
               <Pressable
@@ -174,8 +174,8 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: 14,
+    padding: 20,
     marginBottom: 16,
   },
   planTitle: {
@@ -205,25 +205,26 @@ const styles = StyleSheet.create({
   },
   streakBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 0.5,
     marginBottom: 12,
   },
   streakText: {
     fontFamily: fonts.medium,
     fontSize: 13,
-    color: '#fff',
   },
   continueBtn: {
     backgroundColor: colors.accent,
     borderRadius: borderRadius.button,
-    paddingVertical: 12,
+    paddingVertical: 16,
     alignItems: 'center',
+    width: '100%',
   },
   continueBtnText: {
     fontFamily: fonts.medium,
     fontSize: 15,
-    color: '#fff',
+    color: colors.white,
   },
 });

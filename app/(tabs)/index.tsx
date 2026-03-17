@@ -79,13 +79,13 @@ export default function HomeScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: effectiveTheme.surface, borderLeftColor: colors.accent }]}>
-          <Text style={[styles.cardLabel, { color: effectiveTheme.textMuted }]}>Günün Ayeti</Text>
+          <Text style={[styles.cardLabel, { color: colors.accent }]}>Günün Ayeti</Text>
           <Text style={[styles.verseText, { color: effectiveTheme.text }]}>
             «Çünkü Tanrı dünyayı o kadar çok sevdi ki, biricik Oğlu'nu verdi. Öyle ki, O'na iman edenlerin hiçbiri mahvolmasın, hepsi sonsuz yaşama kavuşsun.» — Yuhanna 3:16
           </Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: effectiveTheme.surface }]}>
+        <View style={[styles.card, styles.cardNoBorder, { backgroundColor: effectiveTheme.surface }]}>
           <Text style={[styles.cardTitle, { color: effectiveTheme.text }]}>Okuma Planı</Text>
           <Text style={[styles.planLabel, { color: effectiveTheme.text }]}>
             {plan?.title ?? 'Yeni Ahit 30 Günde'}
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingBottom: 32,
   },
   header: {
@@ -138,23 +138,27 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontFamily: fonts.thin,
-    fontSize: 38,
+    fontSize: 42,
+    letterSpacing: -1,
   },
   themeToggle: {
     padding: 4,
   },
   card: {
-    borderRadius: 10,
+    borderRadius: 14,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     borderLeftWidth: 4,
+  },
+  cardNoBorder: {
+    borderLeftWidth: 0,
   },
   cardLabel: {
     fontFamily: fonts.regular,
-    fontSize: 12,
+    fontSize: 10,
     marginBottom: 6,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 3.2,
   },
   verseText: {
     fontFamily: fonts.italic,
@@ -199,13 +203,14 @@ const styles = StyleSheet.create({
   readButton: {
     backgroundColor: colors.accent,
     borderRadius: borderRadius.button,
-    paddingVertical: 14,
+    paddingVertical: 18,
     alignItems: 'center',
     marginTop: 8,
   },
   readButtonText: {
     fontFamily: fonts.medium,
-    fontSize: 16,
-    color: '#fff',
+    fontSize: 17,
+    letterSpacing: 0.85,
+    color: colors.white,
   },
 });

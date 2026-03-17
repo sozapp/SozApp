@@ -79,14 +79,28 @@ export default function NotesScreen() {
           style={styles.tab}
           onPress={() => setActiveTab('notes')}
         >
-          <Text style={[styles.tabText, { color: theme.text }]}>Notlar</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'notes' ? { color: colors.accent } : { color: theme.textMuted },
+            ]}
+          >
+            Notlar
+          </Text>
           {activeTab === 'notes' && <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />}
         </Pressable>
         <Pressable
           style={styles.tab}
           onPress={() => setActiveTab('highlights')}
         >
-          <Text style={[styles.tabText, { color: theme.text }]}>Vurgular</Text>
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'highlights' ? { color: colors.accent } : { color: theme.textMuted },
+            ]}
+          >
+            Vurgular
+          </Text>
           {activeTab === 'highlights' && <View style={[styles.tabUnderline, { backgroundColor: colors.accent }]} />}
         </Pressable>
       </View>
@@ -204,7 +218,7 @@ const styles = StyleSheet.create({
   },
   tab: {
     paddingVertical: 12,
-    marginRight: 24,
+    marginRight: 32,
   },
   tabText: {
     fontFamily: fonts.regular,
@@ -237,6 +251,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     marginBottom: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
   },
   noteCardHeader: {
     flexDirection: 'row',
@@ -273,7 +289,7 @@ const styles = StyleSheet.create({
   },
   highlightCard: {
     borderRadius: 10,
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     padding: 16,
     marginBottom: 14,
   },

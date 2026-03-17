@@ -12,6 +12,14 @@ export const colors = {
     textMuted: 'rgba(26,18,8,0.5)',
   },
   accent: '#C4956A',
+  white: '#fff',
+  overlay: 'rgba(0,0,0,0.6)',
+  accentBorder: 'rgba(196,149,106,0.2)',
+  accentBadgeBg: 'rgba(196,149,106,0.12)',
+  accentBadgeBorder: 'rgba(196,149,106,0.3)',
+  accentCornerOpacity: 0.4,
+  accentCorner: 'rgba(196,149,106,0.4)',
+  watermarkOpacity: 0.35,
 };
 export const fonts = {
   thin: 'CormorantGaramond_300Light',
@@ -19,4 +27,4 @@ export const fonts = {
   medium: 'CormorantGaramond_500Medium',
   italic: 'CormorantGaramond_400Regular_Italic',
 };
-export const borderRadius = { card: 10, button: 8 };
+export const borderRadius = { card: 14, button: 12 };

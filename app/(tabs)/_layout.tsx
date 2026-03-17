@@ -67,7 +67,9 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="share-card"
-        options={{ href: null }}
+        options={{
+          href: null,
+        }}
       />
     </Tabs>
   );

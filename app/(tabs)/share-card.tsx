@@ -20,11 +20,10 @@ const CARD_THEMES = [
   { id: 'krem', name: 'Krem', bg: '#F5F0E8', text: '#1A1208' },
 ] as const;
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_PADDING = 24;
 const CARD_WIDTH = SCREEN_WIDTH - CARD_PADDING * 2;
-const CARD_ASPECT = 1.2;
-const CARD_HEIGHT = CARD_WIDTH * (1 / CARD_ASPECT);
+const CARD_HEIGHT = SCREEN_HEIGHT * 0.55;
 
 export default function ShareCardScreen() {
   const params = useLocalSearchParams<{ text?: string; ref?: string }>();
@@ -144,7 +143,7 @@ export default function ShareCardScreen() {
           </Text>
         </Pressable>
 
-        <Text style={[styles.watermark, { color: colors.dark.textMuted }]}>
+        <Text style={[styles.watermark, { color: colors.dark.textMuted, opacity: colors.watermarkOpacity }]}>
           Söz uygulamasıyla oluşturuldu
         </Text>
       </ScrollView>
@@ -153,7 +152,7 @@ export default function ShareCardScreen() {
 }
 
 const cornerSize = 20;
-const cornerBorder = 2;
+const cornerBorder = 1;
 
 const styles = StyleSheet.create({
   screen: {
@@ -221,7 +220,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: cornerSize,
     height: cornerSize,
-    borderColor: colors.accent,
+    borderColor: colors.accentCorner,
   },
   cornerTL: {
     top: 0,
@@ -263,12 +262,12 @@ const styles = StyleSheet.create({
     paddingRight: CARD_PADDING,
   },
   themeCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   themeCircleSelected: {
-    borderWidth: 3,
+    borderWidth: 2.5,
     borderColor: colors.accent,
   },
   shareButton: {
@@ -284,7 +283,7 @@ const styles = StyleSheet.create({
   shareButtonText: {
     fontFamily: fonts.medium,
     fontSize: 16,
-    color: '#fff',
+    color: colors.white,
   },
   watermark: {
     fontFamily: fonts.regular,
