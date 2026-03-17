@@ -114,6 +114,15 @@ export default function HomeScreen() {
         >
           <Text style={styles.readButtonText}>{todayRef} →</Text>
         </Pressable>
+
+        <View style={styles.footer}>
+          <Pressable onPress={() => router.push('/privacy-policy')}>
+            <Text style={[styles.footerLink, { color: effectiveTheme.textMuted }]}>
+              Gizlilik Politikası
+            </Text>
+          </Pressable>
+          <Text style={[styles.footerVersion, { color: effectiveTheme.textMuted }]}>v1.0.0</Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -129,6 +138,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingBottom: 32,
+  },
+  footer: {
+    marginTop: 32,
+    alignItems: 'center',
+    gap: 6,
+  },
+  footerLink: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+  },
+  footerVersion: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
   },
   header: {
     flexDirection: 'row',

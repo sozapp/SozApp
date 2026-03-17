@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#111109"/>
+  <!-- Geometric S: top curve -->
+  <path
+    d="M675 275 C675 275 325 275 325 512 C325 749 675 749 675 749"
+    fill="none"
+    stroke="#C4956A"
+    stroke-width="40"
+    stroke-linecap="round"
+  />
+  <!-- Top line -->
+  <line x1="325" y1="275" x2="675" y2="275" stroke="#C4956A" stroke-width="40" stroke-linecap="round"/>
+  <!-- Bottom line -->
+  <line x1="325" y1="749" x2="675" y2="749" stroke="#C4956A" stroke-width="40" stroke-linecap="round"/>
+  <!-- Center dot -->
+  <circle cx="512" cy="512" r="50" fill="#C4956A"/>
+</svg>

@@ -1,8 +1,8 @@
-import { sampleChapter } from '@/constants/bible';
+import { johnChapters } from '@/constants/bible';
 import { colors, fonts } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -31,10 +31,13 @@ function getVerseId(book: string, chapterNumber: number, verseNumber: number): s
   return `${book}-${chapterNumber}-${verseNumber}`;
 }
 
+const CHAPTER_NAV_COLOR = '#C4956A';
+
 export default function ReadScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? colors.dark : colors.light;
+  const [currentChapter, setCurrentChapter] = useState(0); // 0 = john1, ... 20 = john21
   const [fontSize, setFontSize] = useState(18);
   const [selectedVerse, setSelectedVerse] = useState<Verse | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -44,6 +47,11 @@ export default function ReadScreen() {
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
   const router = useRouter();
+  const flatListRef = useRef<FlatList>(null);
+
+  const chapter = johnChapters[currentChapter];
+  const isFirstChapter = currentChapter === 0;
+  const isLastChapter = currentChapter === johnChapters.length - 1;
 
   const loadStored = useCallback(async () => {
     try {
@@ -68,11 +76,15 @@ export default function ReadScreen() {
     loadStored();
   }, [loadStored]);
 
+  useEffect(() => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [currentChapter]);
+
   const handleLongPress = (verse: Verse) => {
     setSelectedVerse(verse);
     setShowColorPicker(false);
     setShowNoteInput(false);
-    const id = getVerseId(sampleChapter.book, sampleChapter.chapterNumber, verse.number);
+    const id = getVerseId(chapter.book, chapter.chapterNumber, verse.number);
     setNoteDraft(notes[id] ?? '');
     setModalVisible(true);
   };
@@ -105,7 +117,7 @@ export default function ReadScreen() {
 
   const handleHighlightColor = (color: string) => {
     if (!selectedVerse) return;
-    const id = getVerseId(sampleChapter.book, sampleChapter.chapterNumber, selectedVerse.number);
+    const id = getVerseId(chapter.book, chapter.chapterNumber, selectedVerse.number);
     const next = { ...highlights, [id]: color };
     saveHighlights(next);
     setShowColorPicker(false);
@@ -113,7 +125,7 @@ export default function ReadScreen() {
 
   const handleSaveNote = () => {
     if (!selectedVerse) return;
-    const id = getVerseId(sampleChapter.book, sampleChapter.chapterNumber, selectedVerse.number);
+    const id = getVerseId(chapter.book, chapter.chapterNumber, selectedVerse.number);
     const trimmed = noteDraft.trim();
     const next = trimmed ? { ...notes, [id]: trimmed } : { ...notes };
     if (!trimmed) delete next[id];
@@ -124,8 +136,8 @@ export default function ReadScreen() {
 
   const handleShare = () => {
     if (!selectedVerse) return;
-    const book = sampleChapter.book;
-    const ch = sampleChapter.chapterNumber;
+    const book = chapter.book;
+    const ch = chapter.chapterNumber;
     const num = selectedVerse.number;
     closeModal();
     router.push({
@@ -142,7 +154,7 @@ export default function ReadScreen() {
   const increaseFont = () => setFontSize((s) => Math.min(MAX_FONT_SIZE, s + 2));
 
   const renderVerse = ({ item }: { item: Verse }) => {
-    const verseId = getVerseId(sampleChapter.book, sampleChapter.chapterNumber, item.number);
+    const verseId = getVerseId(chapter.book, chapter.chapterNumber, item.number);
     const highlightColor = highlights[verseId];
     const hasNote = Boolean(notes[verseId]);
     const isSelected = selectedVerse?.number === item.number;
@@ -178,16 +190,34 @@ export default function ReadScreen() {
   };
 
   const selectedVerseId = selectedVerse
-    ? getVerseId(sampleChapter.book, sampleChapter.chapterNumber, selectedVerse.number)
+    ? getVerseId(chapter.book, chapter.chapterNumber, selectedVerse.number)
     : null;
   const selectedHighlight = selectedVerseId ? highlights[selectedVerseId] : undefined;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: theme.background, borderBottomColor: colors.accentBorder }]}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          {sampleChapter.book} · {sampleChapter.chapterNumber}. Bölüm
-        </Text>
+        <View style={styles.headerLeft}>
+          <Pressable
+            onPress={() => setCurrentChapter((c) => c - 1)}
+            disabled={isFirstChapter}
+            style={[styles.chapterNavBtn, isFirstChapter && styles.chapterNavBtnDisabled]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-back" size={24} color={CHAPTER_NAV_COLOR} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            Yuhanna · {currentChapter + 1}. Bölüm
+          </Text>
+          <Pressable
+            onPress={() => setCurrentChapter((c) => c + 1)}
+            disabled={isLastChapter}
+            style={[styles.chapterNavBtn, isLastChapter && styles.chapterNavBtnDisabled]}
+            hitSlop={8}
+          >
+            <Ionicons name="chevron-forward" size={24} color={CHAPTER_NAV_COLOR} />
+          </Pressable>
+        </View>
         <View style={styles.fontControls}>
           <Pressable onPress={decreaseFont} style={styles.fontBtn} hitSlop={8}>
             <Text style={[styles.fontBtnText, { color: theme.text }]}>A−</Text>
@@ -199,7 +229,8 @@ export default function ReadScreen() {
       </View>
 
       <FlatList
-        data={sampleChapter.verses}
+        ref={flatListRef}
+        data={chapter.verses}
         keyExtractor={(item) => String(item.number)}
         renderItem={renderVerse}
         contentContainerStyle={styles.listContent}
@@ -313,9 +344,22 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 0.5,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  chapterNavBtn: {
+    padding: 4,
+  },
+  chapterNavBtnDisabled: {
+    opacity: 0.3,
+  },
   headerTitle: {
     fontFamily: fonts.medium,
     fontSize: 18,
+    flex: 1,
   },
   fontControls: {
     flexDirection: 'row',
