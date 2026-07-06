@@ -64,7 +64,8 @@ async function checkSupabasePremium(): Promise<boolean | null> {
       .maybeSingle();
 
     if (error || !data) return null;
-    return isProfilePremium(data.is_premium, data.premium_expires_at);
+    const profile = data as { is_premium: boolean | null; premium_expires_at: string | null };
+    return isProfilePremium(profile.is_premium, profile.premium_expires_at);
   } catch {
     return null;
   }
@@ -73,7 +74,8 @@ async function checkSupabasePremium(): Promise<boolean | null> {
 function mergePremium(rc: boolean | null, db: boolean | null, cache: boolean | null): boolean {
   if (rc === true || db === true) return true;
   if (rc === false && db === false) return false;
-  if (rc === false || db === false) return false;
+  if (rc === false && db === null) return false;
+  if (db === false && rc === null) return false;
   return cache === true;
 }
 

@@ -1,5 +1,5 @@
 import { useHaptics } from '@/hooks/useHaptics';
-import { usePremium, syncRevenueCatWithSupabase } from '@/hooks/usePremium';
+import { usePremium } from '@/hooks/usePremium';
 import { initPurchases, purchasePremium, restorePurchases } from '@/constants/purchases';
 import { fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
