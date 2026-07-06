@@ -1,5 +1,5 @@
 import { parseVerseRefForRead } from '@/constants/ask-verse-parse';
-import { askQuestion } from '@/constants/groq';
+import { askQuestion, isSupabaseConfigured } from '@/constants/groq';
 import { FREE_AI_QUESTIONS_PER_DAY } from '@/constants/premium';
 import { borderRadius, fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
@@ -32,7 +32,6 @@ import {
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const AI_USAGE_KEY = '@soz/aiUsage';
 const CONVERSATIONS_KEY = '@soz/conversations';
 const SAVED_ANSWERS_KEY = '@soz/savedAnswers';
 const LAST_ASK_RESULT_KEY = '@soz/lastAskResult';
@@ -59,8 +58,6 @@ type Conversation = {
 
 type UsageState = {
   count: number;
-  date: string;
-  isPremium: boolean;
 };
 
 const QUICK_QUESTIONS = [
@@ -75,32 +72,6 @@ const QUICK_FOLLOWUPS = [
   { label: 'Ayet referansı ver', send: 'Önceki konu için mümkün olduğunca çok ayet referansı parantez içinde ver.' },
   { label: 'Basitçe açıkla', send: 'Aynı konuyu daha basit kelimelerle ve kısaca açıkla.' },
 ];
-
-function getTodayDateStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-async function loadUsage(): Promise<UsageState> {
-  try {
-    const raw = await AsyncStorage.getItem(AI_USAGE_KEY);
-    if (!raw) return { count: 0, date: getTodayDateStr(), isPremium: false };
-    const parsed = JSON.parse(raw) as UsageState;
-    const today = getTodayDateStr();
-    if (parsed.date !== today) {
-      return { count: 0, date: today, isPremium: parsed.isPremium };
-    }
-    return parsed;
-  } catch {
-    return { count: 0, date: getTodayDateStr(), isPremium: false };
-  }
-}
-
-async function saveUsage(usage: UsageState): Promise<void> {
-  try {
-    await AsyncStorage.setItem(AI_USAGE_KEY, JSON.stringify(usage));
-  } catch (_) {}
-}
 
 function parseVerseRefs(text: string): Array<{ type: 'text'; value: string } | { type: 'ref'; value: string }> {
   const parts: Array<{ type: 'text'; value: string } | { type: 'ref'; value: string }> = [];
@@ -266,11 +237,7 @@ export default function AskScreen() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
-  const [usage, setUsage] = useState<UsageState>({
-    count: 0,
-    date: getTodayDateStr(),
-    isPremium: false,
-  });
+  const [usage, setUsage] = useState<UsageState>({ count: 0 });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
   const [selectedMsg, setSelectedMsg] = useState<string | null>(null);
@@ -290,8 +257,9 @@ export default function AskScreen() {
   const text = colors.text;
   const muted = colors.textMuted;
 
+  const supabaseReady = isSupabaseConfigured();
   const remaining = Math.max(0, FREE_DAILY_LIMIT - usage.count);
-  const canAsk = isPremium || remaining > 0;
+  const canAsk = supabaseReady && (isPremium || remaining > 0);
 
   useEffect(() => {
     let cancel = false;
@@ -321,11 +289,6 @@ export default function AskScreen() {
     }, [])
   );
 
-  const loadUsageState = useCallback(async () => {
-    const u = await loadUsage();
-    setUsage({ ...u, isPremium });
-  }, [isPremium]);
-
   useEffect(() => {
     if (prefill && typeof prefill === 'string') {
       setInput(prefill);
@@ -339,7 +302,6 @@ export default function AskScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadUsageState();
       (async () => {
         try {
           const v = await AsyncStorage.getItem('@soz/userProfile');
@@ -349,7 +311,7 @@ export default function AskScreen() {
           setStoredUserProfile('');
         }
       })();
-    }, [loadUsageState])
+    }, [])
   );
 
   useEffect(() => {
@@ -382,6 +344,14 @@ export default function AskScreen() {
     async (question: string) => {
       const trimmed = question.trim();
       if (!trimmed || loading) return;
+      if (!supabaseReady) {
+        showAlert(
+          'Söz\'e Sor kullanılamıyor',
+          'Bu özellik güvenli sunucu doğrulaması gerektirir. Lütfen Supabase yapılandırmasını tamamlayın veya internet bağlantınızı kontrol edin.'
+        );
+        return;
+      }
+
       if (isOffline) {
         setErrorMessage('Bağlantı kurulamadı. İnternet bağlantını kontrol et.');
         setLastFailedQuestion(trimmed);
@@ -425,7 +395,7 @@ export default function AskScreen() {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
       try {
-        const answer = await askQuestion(
+        const result = await askQuestion(
           trimmed,
           history,
           storedUserProfile || undefined,
@@ -433,7 +403,7 @@ export default function AskScreen() {
         const assistantMsg: Message = {
           id: `a-${Date.now()}`,
           role: 'assistant',
-          content: answer || 'Yanıt oluşturulamadı.',
+          content: result.answer || 'Yanıt oluşturulamadı.',
           timestamp: new Date(),
         };
         void AsyncStorage.setItem(LAST_ASK_RESULT_KEY, assistantMsg.content).catch(() => {});
@@ -457,25 +427,32 @@ export default function AskScreen() {
           if (!currentConversationId) setCurrentConversationId(conv.id);
           return next;
         });
-        if (!isPremium) {
-          const nextUsage: UsageState = {
-            count: usage.count + 1,
-            date: getTodayDateStr(),
-            isPremium,
-          };
-          setUsage(nextUsage);
-          await saveUsage(nextUsage);
+        if (!isPremium && result.questionsUsed > 0) {
+          setUsage({ count: result.questionsUsed });
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : '';
         console.warn('AI hatası (ask):', msg || e);
-        if (msg === 'API_NOT_CONFIGURED' || msg === 'GROQ_API_KEY_MISSING') {
+        if (msg === 'SUPABASE_NOT_CONFIGURED' || msg === 'AUTH_REQUIRED') {
           setMessages((prev) => prev.slice(0, -1));
           setInput(trimmed);
           showAlert(
-            'Yapılandırma Hatası',
-            'API anahtarı bulunamadı. Proje kökünde .env dosyasında şunu ekleyin:\n\nEXPO_PUBLIC_GROQ_API_KEY=gsk_...\n\nArdından: npx expo start --clear'
+            'Söz\'e Sor kullanılamıyor',
+            'Sunucu yapılandırması eksik veya oturum açılamadı. Supabase ayarlarını kontrol edin.'
           );
+        } else if (msg === 'DAILY_LIMIT_REACHED') {
+          const used =
+            e && typeof e === 'object' && 'questionsUsed' in e
+              ? Number((e as { questionsUsed?: number }).questionsUsed)
+              : FREE_DAILY_LIMIT;
+          setUsage({ count: used || FREE_DAILY_LIMIT });
+          setMessages((prev) => prev.slice(0, -1));
+          setInput(trimmed);
+          try {
+            router.push('/paywall');
+          } catch {
+            /* ignore */
+          }
         } else {
           const msgLower = msg.toLowerCase();
           const isNetwork =
@@ -526,6 +503,7 @@ export default function AskScreen() {
       lastOfflineAnswer,
       currentConversationId,
       storedUserProfile,
+      supabaseReady,
     ]
   );
 
@@ -654,6 +632,13 @@ export default function AskScreen() {
       {isOffline ? (
         <View style={[styles.offlineBox, { backgroundColor: `${ACCENT}1F` }]}>
           <Text style={[styles.offlineText, { color: muted }]}>İnternet bağlantısı yok. Bağlandığında tekrar dene.</Text>
+        </View>
+      ) : null}
+      {!supabaseReady ? (
+        <View style={[styles.offlineBox, { backgroundColor: `${ACCENT}1F` }]}>
+          <Text style={[styles.offlineText, { color: muted }]}>
+            Söz'e Sor, güvenli sunucu doğrulaması için Supabase yapılandırması gerektirir.
+          </Text>
         </View>
       ) : null}
       {isOffline && lastOfflineAnswer ? (

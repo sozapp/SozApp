@@ -214,3 +214,44 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.find_user_by_email(text) TO authenticated;
+
+-- Premium / RevenueCat (webhook tarafından güncellenir)
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS premium_expires_at TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS revenuecat_app_user_id TEXT;
+
+-- AI günlük kullanım (edge function service role ile yazar)
+CREATE TABLE IF NOT EXISTS ai_usage (
+  user_id UUID REFERENCES auth.users NOT NULL,
+  usage_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  question_count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, usage_date)
+);
+
+ALTER TABLE ai_usage ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users read own ai_usage" ON ai_usage;
+CREATE POLICY "Users read own ai_usage" ON ai_usage
+  FOR SELECT USING (auth.uid() = user_id);
+
+-- Atomik günlük AI sayacı (ask-ai edge function)
+CREATE OR REPLACE FUNCTION public.increment_daily_ai_usage(p_user_id uuid)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  INSERT INTO ai_usage (user_id, usage_date, question_count)
+  VALUES (p_user_id, CURRENT_DATE, 1)
+  ON CONFLICT (user_id, usage_date)
+  DO UPDATE SET question_count = ai_usage.question_count + 1
+  RETURNING question_count INTO v_count;
+  RETURN v_count;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.increment_daily_ai_usage(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.increment_daily_ai_usage(uuid) TO service_role;

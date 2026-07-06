@@ -8,9 +8,7 @@ export default {
     version: '1.0.0',
     orientation: 'portrait',
     userInterfaceStyle: 'dark',
-    extra: {
-      groqKey: process.env.EXPO_PUBLIC_GROQ_API_KEY,
-    },
+    extra: {},
     ios: {
       bundleIdentifier: 'com.soz.incil',
       supportsTablet: false,

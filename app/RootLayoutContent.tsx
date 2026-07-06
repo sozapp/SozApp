@@ -12,7 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef } from 'react';
 import { Modal, Text, TouchableOpacity, View } from 'react-native';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
+import { initPurchases } from '@/constants/purchases';
 import { supabase } from '@/constants/supabase';
+import { syncRevenueCatWithSupabase } from '@/hooks/usePremium';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { BlurView } from 'expo-blur';
 import { Animated, StyleSheet } from 'react-native';
@@ -86,6 +88,8 @@ export function RootLayoutContent() {
             const { error: signErr } = await supabase.auth.signInAnonymously();
             if (signErr) console.warn('Supabase anon sign-in:', signErr.message);
           }
+          initPurchases();
+          await syncRevenueCatWithSupabase();
         } catch (e) {
           console.warn('Supabase bağlantı:', e);
           return;
@@ -115,6 +119,7 @@ export function RootLayoutContent() {
     } = supabase.auth.onAuthStateChange((event) => {
       try {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          void syncRevenueCatWithSupabase();
           void isOnboardingCompleteInStorage().then((done) => {
             if (!done) return;
             NetInfo.fetch()

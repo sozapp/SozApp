@@ -1,150 +1,156 @@
-import Constants from 'expo-constants'
+import { supabase } from './supabase';
 
-const GROQ_URL =
-  'https://api.groq.com/openai/v1/chat/completions'
+export const FREE_AI_QUESTIONS_PER_DAY = 10;
 
-const getKey = (): string => {
-  const k1 = process.env.EXPO_PUBLIC_GROQ_API_KEY
-  const k2 = (Constants.expoConfig?.extra?.groqKey as string | undefined) ?? ''
-  return k1 ?? k2 ?? ''
+export function isSupabaseConfigured(): boolean {
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  return url.length > 0 && key.length > 0;
+}
+
+function getAskAiUrl(): string {
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  return `${base.replace(/\/$/, '')}/functions/v1/ask-ai`;
+}
+
+type AskAiSuccess = {
+  answer: string;
+  isPremium: boolean;
+  questionsUsed: number;
+  questionsRemaining: number | null;
+  dailyLimit: number;
+};
+
+type GroqProxyOptions = {
+  enforceLimit?: boolean;
+  maxTokens?: number;
+};
+
+async function callAskAiEdge(
+  body: Record<string, unknown>,
+  options?: GroqProxyOptions
+): Promise<AskAiSuccess> {
+  if (!isSupabaseConfigured() || !supabase) {
+    throw new Error('SUPABASE_NOT_CONFIGURED');
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (sessionError || !token) {
+    throw new Error('AUTH_REQUIRED');
+  }
+
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.timeout = 45000;
+
+    xhr.onload = () => {
+      let parsed: Record<string, unknown> = {};
+      try {
+        parsed = JSON.parse(xhr.responseText) as Record<string, unknown>;
+      } catch {
+        reject(new Error('Parse hatası'));
+        return;
+      }
+
+      if (xhr.status === 429) {
+        const err = new Error('DAILY_LIMIT_REACHED') as Error & {
+          questionsUsed?: number;
+          questionsRemaining?: number;
+        };
+        err.questionsUsed = typeof parsed.questionsUsed === 'number' ? parsed.questionsUsed : undefined;
+        err.questionsRemaining =
+          typeof parsed.questionsRemaining === 'number' ? parsed.questionsRemaining : 0;
+        reject(err);
+        return;
+      }
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const detail =
+          typeof parsed.error === 'string' ? parsed.error : `API ${xhr.status}`;
+        reject(new Error(detail));
+        return;
+      }
+
+      const answer = typeof parsed.answer === 'string' ? parsed.answer : '';
+      if (!answer) {
+        reject(new Error('Boş cevap'));
+        return;
+      }
+
+      resolve({
+        answer,
+        isPremium: Boolean(parsed.isPremium),
+        questionsUsed: typeof parsed.questionsUsed === 'number' ? parsed.questionsUsed : 0,
+        questionsRemaining:
+          parsed.questionsRemaining === null
+            ? null
+            : typeof parsed.questionsRemaining === 'number'
+              ? parsed.questionsRemaining
+              : 0,
+        dailyLimit:
+          typeof parsed.dailyLimit === 'number' ? parsed.dailyLimit : FREE_AI_QUESTIONS_PER_DAY,
+      });
+    };
+
+    xhr.onerror = () => reject(new Error('Network request failed'));
+    xhr.ontimeout = () => reject(new Error('Zaman aşımı'));
+
+    try {
+      xhr.open('POST', getAskAiUrl(), true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('apikey', anonKey);
+      xhr.send(
+        JSON.stringify({
+          ...body,
+          enforceLimit: options?.enforceLimit ?? true,
+          maxTokens: options?.maxTokens,
+        })
+      );
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
 }
 
 export const groqChat = async (
   prompt: string,
   system?: string,
-  maxTokens = 1000,
+  maxTokens = 1000
 ): Promise<string> => {
-  const key = getKey()
-
-  if (!key || key.length < 10) {
-    console.warn('[GROQ] Key bulunamadı')
-    throw new Error('API key eksik')
-  }
-
-  /** RN / iOS Simulator: fetch() sık “Network request failed” veriyor; native XHR kullan. */
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.timeout = 30000
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText) as {
-            choices?: Array<{ message?: { content?: string } }>
-          }
-          const content = data?.choices?.[0]?.message?.content
-          if (content) {
-            resolve(content)
-          } else {
-            reject(new Error('Boş cevap'))
-          }
-        } catch {
-          reject(new Error('Parse hatası'))
-        }
-        return
-      }
-      let detail = `API ${xhr.status}`
-      try {
-        const errBody = JSON.parse(xhr.responseText) as {
-          error?: { message?: string }
-        }
-        if (errBody?.error?.message) detail = errBody.error.message
-      } catch {
-        /* ignore */
-      }
-      reject(new Error(detail))
-    }
-
-    xhr.onerror = () => {
-      console.warn('[GROQ] Network erişimi yok (XHR onerror)')
-      reject(new Error('Network request failed'))
-    }
-
-    xhr.ontimeout = () => {
-      console.warn('[GROQ] Timeout')
-      reject(new Error('Zaman aşımı'))
-    }
-
-    try {
-      xhr.open('POST', GROQ_URL, true)
-      xhr.setRequestHeader('Content-Type', 'application/json')
-      xhr.setRequestHeader('Authorization', `Bearer ${key}`)
-      xhr.send(
-        JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: maxTokens,
-          temperature: 0.7,
-          messages: [
-            ...(system
-              ? [
-                  {
-                    role: 'system' as const,
-                    content: system,
-                  },
-                ]
-              : []),
-            { role: 'user' as const, content: prompt },
-          ],
-        }),
-      )
-    } catch (e) {
-      console.warn('[GROQ] XHR hatası:', e)
-      reject(e instanceof Error ? e : new Error(String(e)))
-    }
-  })
-}
-
-export function getGroqApiKey(): string {
-  return getKey()
-}
-
-const SYSTEM_PROMPT = `Sen Söz adlı Türkçe İncil uygulamasının AI asistanısın. Adın "Söz Asistanı".
-
-Yanıt formatı:
-- Her zaman Türkçe yaz
-- Sıcak ve samimi ol
-- Cevapları 2-3 paragrafla sınırla
-- Mümkünse ilgili ayet referansı ver
-- Emin olmadığında dürüst ol`
+  const result = await callAskAiEdge(
+    {
+      prompt,
+      system,
+    },
+    { enforceLimit: false, maxTokens }
+  );
+  return result.answer;
+};
 
 export async function askQuestion(
   question: string,
   conversationHistory: { role: string; content: string }[],
-  userProfileHint?: string,
-): Promise<string> {
-  try {
-    const history = conversationHistory
-      .filter((m) => m.role === 'user' || m.role === 'assistant')
-      .map((m) => ({
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-      }))
+  userProfileHint?: string
+): Promise<{ answer: string; questionsUsed: number; questionsRemaining: number | null }> {
+  const history = conversationHistory
+    .filter((m) => m.role === 'user' || m.role === 'assistant')
+    .map((m) => ({ role: m.role, content: m.content }));
 
-    const profileLine =
-      userProfileHint != null && userProfileHint.trim().length > 0
-        ? `\n\nBu kişinin profili: ${userProfileHint.trim()}`
-        : ''
-    const system = `${SYSTEM_PROMPT}${profileLine}`
+  const result = await callAskAiEdge({
+    question,
+    history,
+    userProfileHint,
+  });
 
-    const content = await groqChat(
-      JSON.stringify(
-        {
-          conversation: history,
-          question,
-        },
-        null,
-        2,
-      ),
-      system,
-      1000,
-    )
-
-    return content || ''
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.warn('Network error:', msg)
-    return ''
-  }
+  return {
+    answer: result.answer,
+    questionsUsed: result.questionsUsed,
+    questionsRemaining: result.questionsRemaining,
+  };
 }
 
-export const groq = groqChat
+export const groq = groqChat;

@@ -1,5 +1,5 @@
 import { useHaptics } from '@/hooks/useHaptics';
-import { usePremium } from '@/hooks/usePremium';
+import { usePremium, syncRevenueCatWithSupabase } from '@/hooks/usePremium';
 import { initPurchases, purchasePremium, restorePurchases } from '@/constants/purchases';
 import { fonts } from '@/constants/theme';
 import { useTheme } from '@/hooks/useTheme';
@@ -58,7 +58,7 @@ const TrialIcon = () => (
 export default function PaywallScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { activatePremium } = usePremium();
+  const { refreshPremium } = usePremium();
   const haptics = useHaptics();
   const [period, setPeriod] = useState<BillingPeriod>('yearly');
   const [currency, setCurrency] = useState<Currency>('TRY');
@@ -99,14 +99,14 @@ export default function PaywallScreen() {
       setIsPurchasing(true);
       const success = await purchasePremium(period);
       if (!success) return;
-      await activatePremium();
+      await refreshPremium();
       router.back();
     } catch {
       /* ignore */
     } finally {
       setIsPurchasing(false);
     }
-  }, [activatePremium, router, haptics, period, isPurchasing]);
+  }, [refreshPremium, router, haptics, period, isPurchasing]);
 
   const handleRestore = useCallback(async () => {
     if (isRestoring) return;
@@ -114,14 +114,14 @@ export default function PaywallScreen() {
       setIsRestoring(true);
       const restored = await restorePurchases();
       if (!restored) return;
-      await activatePremium();
+      await refreshPremium();
       router.back();
     } catch {
       /* ignore */
     } finally {
       setIsRestoring(false);
     }
-  }, [activatePremium, isRestoring, router]);
+  }, [refreshPremium, isRestoring, router]);
 
   const openDonation = useCallback(() => {
     try {

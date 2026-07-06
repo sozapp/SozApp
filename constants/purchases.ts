@@ -13,6 +13,18 @@ export const initPurchases = (): void => {
   purchasesInitialized = true;
 };
 
+export const isPurchasesConfigured = (): boolean => purchasesInitialized;
+
+export const loginRevenueCat = async (supabaseUserId: string): Promise<void> => {
+  initPurchases();
+  if (!purchasesInitialized) return;
+  try {
+    await Purchases.logIn(supabaseUserId);
+  } catch (e) {
+    console.warn('RevenueCat logIn error:', e);
+  }
+};
+
 const findPackageByType = (
   offerings: Awaited<ReturnType<typeof Purchases.getOfferings>>,
   packageType: 'monthly' | 'yearly'
@@ -45,6 +57,17 @@ export const restorePurchases = async (): Promise<boolean> => {
     return info.entitlements.active.premium !== undefined;
   } catch (e) {
     console.error('Restore purchase error:', e);
+    return false;
+  }
+};
+
+export const getRevenueCatPremiumStatus = async (): Promise<boolean> => {
+  try {
+    initPurchases();
+    if (!purchasesInitialized) return false;
+    const info = await Purchases.getCustomerInfo();
+    return info.entitlements.active.premium !== undefined;
+  } catch {
     return false;
   }
 };

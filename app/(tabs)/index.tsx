@@ -41,6 +41,7 @@ import ShareVerseModal from '@/components/ShareVerseModal';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
+import { usePremium } from '@/hooks/usePremium';
 
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
@@ -1594,7 +1595,7 @@ export default function HomeScreen() {
   const { colors, fonts } = useTheme();
   const { t, language } = useTranslation();
   const [userName, setUserName] = useState('');
-  const [isPremium, setIsPremium] = useState(false);
+  const { isPremium } = usePremium();
   const [streak, setStreak] = useState(0);
   const { isOnline } = useNetwork();
   const [planDay, setPlanDay] = useState(1);
@@ -2052,7 +2053,6 @@ export default function HomeScreen() {
         setIsHomeLoading(true);
         try {
           const vals = await AsyncStorage.multiGet([
-            '@soz/isPremium',
             '@soz/streak',
             '@soz/planProgress',
             '@soz/favoritedDailyVerse',
@@ -2060,9 +2060,8 @@ export default function HomeScreen() {
             '@soz/lastMoodAt',
             `@soz/reflectionDone/${todayDevotional.day}`,
           ]);
-          setIsPremium(vals[0][1] === 'true');
-          setStreak(parseInt(vals[1][1] ?? '0', 10));
-          const planVal = vals[2][1];
+          setStreak(parseInt(vals[0][1] ?? '0', 10));
+          const planVal = vals[1][1];
           if (planVal != null) {
             try {
               const parsed = JSON.parse(planVal);
@@ -2072,16 +2071,15 @@ export default function HomeScreen() {
               setPlanDay(parseInt(planVal, 10) || 1);
             }
           }
-          setFavoritedVerse(vals[3][1] === 'true');
-          if (vals[4][1]) setLastMood(vals[4][1]);
+          setFavoritedVerse(vals[2][1] === 'true');
+          if (vals[3][1]) setLastMood(vals[3][1]);
           else setLastMood(null);
-          if (vals[5][1]) setLastMoodAt(vals[5][1]);
+          if (vals[4][1]) setLastMoodAt(vals[4][1]);
           else setLastMoodAt(null);
-          setReflectionDoneToday(vals[6][1] === 'true');
+          setReflectionDoneToday(vals[5][1] === 'true');
           setLastRead(await loadLastRead());
         } catch (e) {
           console.log('Offline mode:', e);
-          setIsPremium(false);
           setStreak(0);
           setPlanDay(1);
           setFavoritedVerse(false);
