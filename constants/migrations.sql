@@ -50,6 +50,31 @@ CREATE TABLE IF NOT EXISTS plan_progress (
   UNIQUE(user_id, plan_id)
 );
 
+-- Arkadaşlık (profiles_select politikası bunlara referans verdiği için tablolar RLS bölümünden önce olmalı)
+CREATE TABLE IF NOT EXISTS friendships (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  friend_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, friend_id)
+);
+
+CREATE TABLE IF NOT EXISTS friend_activity (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  type TEXT NOT NULL,
+  verse_id TEXT,
+  book TEXT,
+  chapter INTEGER,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id);
+CREATE INDEX IF NOT EXISTS idx_friend_activity_user_created ON friend_activity(user_id, created_at DESC);
+
 -- Row Level Security
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
@@ -127,31 +152,7 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- Arkadaşlık
-CREATE TABLE IF NOT EXISTS friendships (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  friend_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'rejected')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, friend_id)
-);
-
-CREATE TABLE IF NOT EXISTS friend_activity (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  type TEXT NOT NULL,
-  verse_id TEXT,
-  book TEXT,
-  chapter INTEGER,
-  note TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
-CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships(friend_id);
-CREATE INDEX IF NOT EXISTS idx_friend_activity_user_created ON friend_activity(user_id, created_at DESC);
-
+-- Arkadaşlık RLS (tablolar yukarıda oluşturuldu)
 ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE friend_activity ENABLE ROW LEVEL SECURITY;
 
