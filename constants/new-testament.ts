@@ -1,10 +1,35 @@
 /**
- * Yeni Ahit — Türkçe Kutsal Kitap 2001
- * Yuhanna mevcut bible.ts'den; diğer kitaplar bölüm/ayet sayılarıyla placeholder.
- * Gerçek metin için lisanslı çeviri eklenebilir.
+ * Yeni Ahit — Türkçe Kutsal Kitap 2001 / Yeni Çeviri
+ * Matta, Markos: tam metin (matthew-data, mark-data); Yuhanna: bible.ts; diğer kitaplar placeholder.
  */
 
 import { johnChapters } from './bible';
+import { ACTS_CHAPTER_VERSES } from './acts-data';
+import { ROMANS_CHAPTER_VERSES } from './romans-data';
+import { CORINTHIANS1_CHAPTER_VERSES } from './corinthians1-data';
+import { CORINTHIANS2_CHAPTER_VERSES } from './corinthians2-data';
+import { GALATIANS_CHAPTER_VERSES } from './galatians-data';
+import { EPHESIANS_CHAPTER_VERSES } from './ephesians-data';
+import { PHILIPPIANS_CHAPTER_VERSES } from './philippians-data';
+import { COLOSSIANS_CHAPTER_VERSES } from './colossians-data';
+import { PHILEMON_CHAPTER_VERSES } from './philemon-data';
+import { TITUS_CHAPTER_VERSES } from './titus-data';
+import { THESSALONIANS1_CHAPTER_VERSES } from './thessalonians1-data';
+import { THESSALONIANS2_CHAPTER_VERSES } from './thessalonians2-data';
+import { TIMOTHY1_CHAPTER_VERSES } from './timothy1-data';
+import { TIMOTHY2_CHAPTER_VERSES } from './timothy2-data';
+import { HEBREWS_CHAPTER_VERSES } from './hebrews-data';
+import { JAMES_CHAPTER_VERSES } from './james-data';
+import { PETER1_CHAPTER_VERSES } from './peter1-data';
+import { PETER2_CHAPTER_VERSES } from './peter2-data';
+import { JOHN1_CHAPTER_VERSES } from './john1-data';
+import { JOHN2_CHAPTER_VERSES } from './john2-data';
+import { JOHN3_CHAPTER_VERSES } from './john3-data';
+import { JUDE_CHAPTER_VERSES } from './jude-data';
+import { REVELATION_CHAPTER_VERSES } from './revelation-data';
+import { LUKE_CHAPTER_VERSES } from './luka-data';
+import { MATTHEW_CHAPTER_VERSES } from './matthew-data';
+import { MARK_CHAPTER_VERSES } from './mark-data';
 
 export type VerseNT = {
   id: string;
@@ -75,8 +100,8 @@ const johnBook: Book = {
   chapters: johnChapters.map((ch) => ({
     book: 'Yuhanna',
     chapter: ch.chapterNumber,
-    verses: ch.verses.map((v) =>
-      createVerse('joh', 'Yuhanna', 'Yuh', ch.chapterNumber, v.number, v.text)
+    verses: (ch.verses ?? []).map((v) =>
+      createVerse('joh', 'Yuhanna', 'Yuh', ch.chapterNumber, v.number, v.text ?? '—')
     ),
   })),
 };
@@ -109,33 +134,120 @@ const JOHN3_VERSES = [15];
 const JUDE_VERSES = [25];
 const REVELATION_VERSES = [20,29,22,11,14,17,17,13,21,11,19,18,18,20,8,21,18,24,21,15,27,21];
 
-export const matthew = createPlaceholderBook('mat', 'Matta', 'Mat', MATTHEW_VERSES);
-export const mark = createPlaceholderBook('mar', 'Markos', 'Mar', MARK_VERSES);
-export const luke = createPlaceholderBook('luk', 'Luka', 'Luk', LUKE_VERSES);
+export const matthew: Book = {
+  id: 'mat',
+  name: 'Matta',
+  shortName: 'Mat',
+  testament: 'new',
+  chapters: MATTHEW_CHAPTER_VERSES.map((verseTexts, i) => {
+    const ch = i + 1;
+    return {
+      book: 'Matta',
+      chapter: ch,
+      verses: verseTexts.map((text, j) =>
+        createVerse('mat', 'Matta', 'Mat', ch, j + 1, text)
+      ),
+    };
+  }),
+};
+export const mark: Book = {
+  id: 'mar',
+  name: 'Markos',
+  shortName: 'Mar',
+  testament: 'new',
+  chapters: MARK_CHAPTER_VERSES.map((verseTexts, i) => {
+    const ch = i + 1;
+    return {
+      book: 'Markos',
+      chapter: ch,
+      verses: verseTexts.map((text, j) =>
+        createVerse('mar', 'Markos', 'Mar', ch, j + 1, text)
+      ),
+    };
+  }),
+};
+export const luke: Book = {
+  id: 'luk',
+  name: 'Luka',
+  shortName: 'Luk',
+  testament: 'new',
+  chapters: LUKE_CHAPTER_VERSES.map((verseTexts, i) => {
+    const ch = i + 1;
+    const texts = Array.isArray(verseTexts) ? verseTexts : [];
+    return {
+      book: 'Luka',
+      chapter: ch,
+      verses: texts.map((text, j) =>
+        createVerse('luk', 'Luka', 'Luk', ch, j + 1, text ?? '—')
+      ),
+    };
+  }),
+};
 export const john = johnBook;
-export const acts = createPlaceholderBook('act', 'Elçilerin İşleri', 'Elç', ACTS_VERSES);
-export const romans = createPlaceholderBook('rom', 'Romalılar', 'Rom', ROMANS_VERSES);
-export const corinthians1 = createPlaceholderBook('1co', '1. Korintliler', '1Ko', CORINTHIANS1_VERSES);
-export const corinthians2 = createPlaceholderBook('2co', '2. Korintliler', '2Ko', CORINTHIANS2_VERSES);
-export const galatians = createPlaceholderBook('gal', 'Galatyalılar', 'Gal', GALATIANS_VERSES);
-export const ephesians = createPlaceholderBook('eph', 'Efesliler', 'Ef', EPHESIANS_VERSES);
-export const philippians = createPlaceholderBook('php', 'Filipililere', 'Flp', PHILIPPIANS_VERSES);
-export const colossians = createPlaceholderBook('col', 'Koloseliler', 'Kol', COLOSSIANS_VERSES);
-export const thessalonians1 = createPlaceholderBook('1th', '1. Selanikliler', '1Se', THESSALONIANS1_VERSES);
-export const thessalonians2 = createPlaceholderBook('2th', '2. Selanikliler', '2Se', THESSALONIANS2_VERSES);
-export const timothy1 = createPlaceholderBook('1ti', '1. Timoteos', '1Ti', TIMOTHY1_VERSES);
-export const timothy2 = createPlaceholderBook('2ti', '2. Timoteos', '2Ti', TIMOTHY2_VERSES);
-export const titus = createPlaceholderBook('tit', 'Titus', 'Tit', TITUS_VERSES);
-export const philemon = createPlaceholderBook('phm', 'Filimon', 'Flm', PHILEMON_VERSES);
-export const hebrews = createPlaceholderBook('heb', 'İbraniler', 'İbr', HEBREWS_VERSES);
-export const james = createPlaceholderBook('jam', 'Yakup', 'Yak', JAMES_VERSES);
-export const peter1 = createPlaceholderBook('1pe', '1. Petrus', '1Pe', PETER1_VERSES);
-export const peter2 = createPlaceholderBook('2pe', '2. Petrus', '2Pe', PETER2_VERSES);
-export const john1 = createPlaceholderBook('1jn', '1. Yuhanna', '1Yu', JOHN1_VERSES);
-export const john2 = createPlaceholderBook('2jn', '2. Yuhanna', '2Yu', JOHN2_VERSES);
-export const john3 = createPlaceholderBook('3jn', '3. Yuhanna', '3Yu', JOHN3_VERSES);
-export const jude = createPlaceholderBook('jud', 'Yahuda', 'Yah', JUDE_VERSES);
-export const revelation = createPlaceholderBook('rev', 'Vahiy', 'Vah', REVELATION_VERSES);
+export const acts: Book = {
+  id: 'act',
+  name: 'Elçilerin İşleri',
+  shortName: 'Elç',
+  testament: 'new',
+  chapters: ACTS_CHAPTER_VERSES.map((verseTexts, i) => {
+    const ch = i + 1;
+    const texts = Array.isArray(verseTexts) ? verseTexts : [];
+    return {
+      book: 'Elçilerin İşleri',
+      chapter: ch,
+      verses: texts.map((text, j) =>
+        createVerse('act', 'Elçilerin İşleri', 'Elç', ch, j + 1, text ?? '—')
+      ),
+    };
+  }),
+};
+function bookFromChapterVerses(
+  id: string,
+  name: string,
+  shortName: string,
+  chapterVerses: string[][]
+): Book {
+  return {
+    id,
+    name,
+    shortName,
+    testament: 'new',
+    chapters: chapterVerses.map((verseTexts, i) => {
+      const ch = i + 1;
+      const texts = Array.isArray(verseTexts) ? verseTexts : [];
+      return {
+        book: name,
+        chapter: ch,
+        verses: texts.map((text, j) =>
+          createVerse(id, name, shortName, ch, j + 1, text ?? '—')
+        ),
+      };
+    }),
+  };
+}
+
+export const romans = bookFromChapterVerses('rom', 'Romalılar', 'Rom', ROMANS_CHAPTER_VERSES);
+export const corinthians1 = bookFromChapterVerses('1co', '1. Korintliler', '1Ko', CORINTHIANS1_CHAPTER_VERSES);
+export const corinthians2 = bookFromChapterVerses('2co', '2. Korintliler', '2Ko', CORINTHIANS2_CHAPTER_VERSES);
+export const galatians = bookFromChapterVerses('gal', 'Galatyalılar', 'Gal', GALATIANS_CHAPTER_VERSES);
+export const ephesians = bookFromChapterVerses('eph', 'Efesliler', 'Ef', EPHESIANS_CHAPTER_VERSES);
+export const philippians = bookFromChapterVerses('php', 'Filipililere', 'Flp', PHILIPPIANS_CHAPTER_VERSES);
+export const colossians = bookFromChapterVerses('col', 'Koloseliler', 'Kol', COLOSSIANS_CHAPTER_VERSES);
+export const thessalonians1 = bookFromChapterVerses('1th', '1. Selanikliler', '1Se', THESSALONIANS1_CHAPTER_VERSES);
+export const thessalonians2 = bookFromChapterVerses('2th', '2. Selanikliler', '2Se', THESSALONIANS2_CHAPTER_VERSES);
+export const timothy1 = bookFromChapterVerses('1ti', '1. Timoteos', '1Ti', TIMOTHY1_CHAPTER_VERSES);
+export const timothy2 = bookFromChapterVerses('2ti', '2. Timoteos', '2Ti', TIMOTHY2_CHAPTER_VERSES);
+export const titus = bookFromChapterVerses('tit', 'Titus', 'Tit', TITUS_CHAPTER_VERSES);
+export const philemon = bookFromChapterVerses('phm', 'Filimon', 'Flm', PHILEMON_CHAPTER_VERSES);
+export const hebrews = bookFromChapterVerses('heb', 'İbraniler', 'İbr', HEBREWS_CHAPTER_VERSES);
+export const james = bookFromChapterVerses('jam', 'Yakup', 'Yak', JAMES_CHAPTER_VERSES);
+export const peter1 = bookFromChapterVerses('1pe', '1. Petrus', '1Pe', PETER1_CHAPTER_VERSES);
+export const peter2 = bookFromChapterVerses('2pe', '2. Petrus', '2Pe', PETER2_CHAPTER_VERSES);
+export const john1 = bookFromChapterVerses('1jn', '1. Yuhanna', '1Yu', JOHN1_CHAPTER_VERSES);
+export const john2 = bookFromChapterVerses('2jn', '2. Yuhanna', '2Yu', JOHN2_CHAPTER_VERSES);
+export const john3 = bookFromChapterVerses('3jn', '3. Yuhanna', '3Yu', JOHN3_CHAPTER_VERSES);
+export const jude = bookFromChapterVerses('jud', 'Yahuda', 'Yah', JUDE_CHAPTER_VERSES);
+export const revelation = bookFromChapterVerses('rev', 'Vahiy', 'Vah', REVELATION_CHAPTER_VERSES);
 
 export const newTestament: Book[] = [
   matthew,

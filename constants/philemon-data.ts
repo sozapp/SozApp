@@ -1,0 +1,31 @@
+/** Filimon — Türkçe Kutsal Kitap (Yeni Çeviri) ayet metinleri */
+export const PHILEMON_CHAPTER_VERSES: string[][] = [
+  // Filimon 1 (25 ayet)
+  [
+    "Mesih İsa uğruna tutuklu olan ben Pavlus ve kardeşimiz Timoteos'tan sevgili emektaşımız Filimon'a,",
+    "kızkardeşimiz Afiya'ya, birlikte mücadele verdiğimiz Arhippus'a ve senin evindeki inanlılar topluluğuna selam!",
+    "Babamız Tanrı'dan ve Rab İsa Mesih'ten sizlere lütuf ve esenlik olsun.",
+    "Rab İsa'ya olan imanını ve bütün kutsallara beslediğin sevgiyi duydukça dualarımda seni anıyor, Tanrım'a sürekli şükrediyorum.",
+    "Çünkü Rab İsa'ya olan imanını ve bütün kutsallara beslediğin sevgiyi duyuyorum.",
+    "Mesih'te sahip olduğumuz her iyiliğin bilincine vararak imanını başkalarıyla paylaşmakta etkin olman için dua ediyorum.",
+    "Sevgin benim için büyük sevinç ve teselli kaynağı oldu. Çünkü kutsalların yürekleri senin sayende ferahladı, kardeşim.",
+    "Bu nedenle, gerekeni sana buyurmaya Mesih'te büyük cesaretim olduğu halde, sevgiyle rica etmeyi yeğliyorum.",
+    "Mesih İsa uğruna tutuklu bulunan ben yaşlı Pavlus şimdi sana rica ediyorum.",
+    "Tutukluluğum sırasında kendisine ruhsal baba olduğum oğlum Onisimos'la ilgili bir ricam var.",
+    "Bir zamanlar sana yararsızdı; ama şimdi hem sana hem de bana yararlıdır.",
+    "Kendisini, yani can ciğerimi sana geri gönderiyorum.",
+    "Müjde'nin uğruna tutuklu kaldığım sürece senin yerine bana hizmet etmesi için onu yanımda alıkoymak isterdim.",
+    "Ama senin onayın olmadan bir şey yapmak istemedim. Öyle ki, yapacağın iyilik zorunluluktanmış gibi görünmesin, gönülden olsun.",
+    "Onisimos'un bir süre senden ayrılması belki de onu temelli geri alman içindi.",
+    "Onu artık köle değil, köleden üstün, sevgili bir kardeş olarak geri alacaksın. O, özellikle benim için çok değerlidir. Ama hem bir insan, hem de Rab'be ait biri olarak senin için daha da sevilecek bir kardeştir.",
+    "Bu nedenle, eğer beni yoldaşın sayıyorsan, kendisini beni kabul eder gibi kabul et.",
+    "Sana herhangi bir haksızlık etmişse ya da bir borcu varsa, bunu benim hesabıma say.",
+    "Ben Pavlus bunu kendi elimle yazıyorum, bedelini ben öderim. Senin kendi yaşamını bile bana borçlu olduğunu söylememe gerek yok.",
+    "Evet, kardeş, Rab yolunda bana bir yardımın olsun. Mesih'te yüreğimi ferahlat.",
+    "Sözümü dinleyeceğinden emin olarak ve istediğimden fazlasını da yapacağını bilerek sana yazıyorum.",
+    "Bu arada bana kalabileceğim bir yer hazırla. Çünkü dualarınız aracılığıyla sizlere bağışlanacağımı umuyorum.",
+    "Mesih İsa uğruna kendisiyle birlikte tutuklu bulunduğum Epafras sana selam eder.",
+    "Emektaşlarım Markos, Aristarhus, Dimas ve Luka da sana selam ederler.",
+    "Rab İsa Mesih'in lütfu ruhunuzla birlikte olsun.",
+  ],
+];

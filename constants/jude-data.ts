@@ -1,0 +1,31 @@
+/** Yahuda — Türkçe Kutsal Kitap (Yeni Çeviri) ayet metinleri */
+export const JUDE_CHAPTER_VERSES: string[][] = [
+  // Yahuda 1 (25 ayet)
+  [
+    "Mesih İsa'nın kulu, Yakup'un kardeşi Yahuda'dan, Baba Tanrı tarafından seçilmiş, İsa Mesih tarafından korunan ve çağrılmış olanlara selam!",
+    "Merhamet, esenlik ve sevgi sizinle birlikte artsın.",
+    "Sevgili kardeşlerim, hepinize yazmak istediğim ortak kurtuluşumuz konusunda size yazmam gerekti. Bu nedenle imanı korumak için savaşmanızı öğütlüyorum.",
+    "Çünkü bazı kişiler bir sızıntı gibi aramıza girdi. Onlar uzun zamandır bu yargılamaya yazılmış tanrısız kişilerdir. Tanrı'nın lütfunu sefahate çeviriyor, tek Efendimiz ve Rab'imiz Mesih İsa'yı reddediyorlar.",
+    "Hepinize bir kez her şeyi anımsatmak istiyorum: Rab halkı Mısır'dan kurtardıktan sonra iman etmeyenleri yok etti.",
+    "Kendi görevlerini korumayan melekleri sonsuz bağlarla büyük gün için karanlıkta tutuyor.",
+    "Sodom ve Gomora ile çevredeki kentler de aynı şekilde fuhuşta bulunup başka bedene yönelince sonsuz ateş cezasına örnek oldular.",
+    "Buna karşılık bu düşsel görüler de aynı şekilde bedeni kirletiyor, yönetimi reddediyor, yüce varlıklara sövüyor.",
+    "Oysa Başmelek Mikâil bile Musa'nın cesedi konusunda İblis'le çekişirken, onun aleyhine küfür eden bir yargı vermek cesaretini göstermedi. «Rab seni azarlasın» dedi.",
+    "Ama bunlar bilmedikleri her şeye söverler. Anlayışlı hayvanlar gibi, doğaları gereği yok olmak için yaratılmış yaratıklar gibi, bildikleriyle bozulup mahvolurlar.",
+    "Vay onların haline! Kayin'in yoluna gittiler. Balam'ın aldığı ücret uğruna saptılar. Korah'ın isyanında mahvoldular.",
+    "Bunlar sizin sevgi ziyafetlerinizde leke gibidir. Kendilerinden korkmadan birlikte yemek yerler. Yağmursuz bulutlar, rüzgarla sürüklenen ağaçlar gibi kısır, iki kez ölü, kökünden sökülmüşlerdir.",
+    "Vahşi denizin köpüğü gibi kendi utanclarını savuruyorlar. Sapık yıldızlar gibi kendileri için koyu karanlığın cezası saklı tutulmuştur.",
+    "Âdem'den bu yana yedinci kuşaktan Hanok da bunlar için peygamberlik etti: «İşte Rab binlerce kutsalıyla geldi.»",
+    "«Herkesi yargılamak, tanrısızların Tanrı'ya karşı işledikleri bütün tanrısızlıkları, tanrısız günahkârların O'na karşı söyledikleri bütün sert sözleri cezalandırmak için.»",
+    "Bunlar söylenenden söylenen, her şeyi kusur sayan, tutkularına göre yaşayan, ağızlarıyla övünen, çıkar için yaltaklanan kişilerdir.",
+    "Ama siz sevgili kardeşlerim, Rabbimiz İsa Mesih'in elçileri ağzıyla söylenen sözleri anımsayın.",
+    "Size demişlerdi: «Son zamanda alaycılar gelecek, kendi tanrısız tutkularına göre yaşayacak.»",
+    "Bunlar bölücü, benliğe ait, Ruh'tan yoksun kişilerdir.",
+    "Ama siz sevgili kardeşlerim, kendinizi en kutsal imanınızda geliştirin. Kutsal Ruh'ta dua edin.",
+    "Kendinizi Tanrı'nın sevgisinde tutun. Rabbimiz İsa Mesih'in merhametiyle sonsuz yaşama kavuşmayı bekleyin.",
+    "Bazılarını merhametle karşılayın; kuşku içinde olanları kurtarın.",
+    "Bazılarını ateşten çekip kurtarın. Bazılarına korkuyla merhamet edin. Giysiye bile dokunan bedenden nefret edin.",
+    "Kendinizi suçlamadan, sizi yüceliğe kavuşturabilecek Olan'a teslim edin - büyük sevinçle -",
+    "tek Tanrı, Kurtarıcımız aracılığıyla Rabbimiz İsa Mesih'te. Yücelik, büyüklük, kudret ve yetki bütün zamanlardan önce, şimdi ve sonsuza dek O'nun olsun! Amin.",
+  ],
+];

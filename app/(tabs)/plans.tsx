@@ -1,22 +1,29 @@
+import { FREE_PLAN_ID } from '@/constants/premium';
 import { plans } from '@/constants/plans';
 import {
   getPlanProgress,
   markDayComplete,
   savePlanProgress,
 } from '@/constants/storage';
+import { logFriendActivity } from '@/constants/friend-activity';
+import { supabase } from '@/constants/supabase';
 import { colors, fonts, borderRadius } from '@/constants/theme';
+import { useNetwork } from '@/context/NetworkContext';
+import { useChurch } from '@/hooks/useChurch';
+import { useHaptics } from '@/hooks/useHaptics';
 import { usePremium } from '@/hooks/usePremium';
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { requestReviewIfAppropriate } from '@/hooks/useStoreReview';
+import { useTheme } from '@/hooks/useTheme';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PlanProgress } from '@/constants/storage';
 import type { ReadingPlan } from '@/constants/plans';
@@ -33,12 +40,23 @@ function todayString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+const ACCENT = '#C4956A';
+
+const MOCK_GROUP_PLAN = {
+  title: 'Matta 5-7',
+  reference: 'Matta 5-7',
+  totalDays: 7,
+  completedDays: 4,
+  membersProgress: 72,
+};
+
 export default function PlansScreen() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const theme = isDark ? colors.dark : colors.light;
+  const { theme } = useTheme();
   const router = useRouter();
+  const { isOnline } = useNetwork();
   const { isPremium } = usePremium();
+  const haptics = useHaptics();
+  const { church } = useChurch();
   const [progressByPlanId, setProgressByPlanId] = useState<Record<string, PlanProgress | null>>({});
 
   const loadProgress = useCallback(async () => {
@@ -62,6 +80,10 @@ export default function PlansScreen() {
   const handleStartOrContinue = useCallback(
     async (plan: ReadingPlan) => {
       let progress = progressByPlanId[plan.id] ?? null;
+      const wasNewPlan = progress == null;
+      const currentDay = getCurrentDay(progress, plan.totalDays);
+      const hadDay = progress?.completedDays?.includes(currentDay) ?? false;
+
       if (progress == null) {
         progress = {
           planId: plan.id,
@@ -78,17 +100,51 @@ export default function PlansScreen() {
         }
       }
 
-      const currentDay = getCurrentDay(progress, plan.totalDays);
-      const dayInfo = plan.days.find((d) => d.day === currentDay);
       try {
+        if (wasNewPlan && isOnline) {
+          if (!supabase) {
+            console.log('Supabase not available, using local storage');
+          } else {
+            try {
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+              await logFriendActivity(supabase, user, isOnline, {
+                type: 'plan_started',
+                note: plan.title,
+              });
+            } catch {
+              /* ignore */
+            }
+          }
+        }
         await markDayComplete(plan.id, currentDay);
+        if (!hadDay && isOnline) {
+          if (!supabase) {
+            console.log('Supabase not available, using local storage');
+          } else {
+            try {
+              const {
+                data: { user },
+              } = await supabase.auth.getUser();
+              await logFriendActivity(supabase, user, isOnline, {
+                type: 'plan_day_complete',
+                note: plan.title,
+              });
+            } catch {
+              /* ignore */
+            }
+          }
+        }
         await loadProgress();
+        haptics.success();
+        requestReviewIfAppropriate();
       } catch (_) {
         // ignore
       }
       router.push('/(tabs)/read');
     },
-    [progressByPlanId, router, loadProgress]
+    [progressByPlanId, router, loadProgress, haptics, isOnline]
   );
 
   return (
@@ -102,6 +158,39 @@ export default function PlansScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {church != null && (
+          <View style={styles.groupSection}>
+            <Text style={[styles.groupSectionTitle, { color: theme.text }]}>
+              Kilisenizin aktif planı
+            </Text>
+            <Pressable
+              style={[styles.card, styles.groupPlanCard, { backgroundColor: theme.surface }]}
+              onPress={() => router.push('/church')}
+            >
+              <Text style={[styles.planTitle, { color: theme.text }]}>
+                {church.groupName} — {MOCK_GROUP_PLAN.title}
+              </Text>
+              <Text style={[styles.planDesc, { color: theme.textMuted }]}>
+                Grup ortalaması: %{MOCK_GROUP_PLAN.membersProgress} tamamlandı
+              </Text>
+              <View style={[styles.progressBg, { backgroundColor: theme.textMuted }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${(MOCK_GROUP_PLAN.completedDays / MOCK_GROUP_PLAN.totalDays) * 100}%` },
+                  ]}
+                />
+              </View>
+              <Text style={[styles.daysLabel, { color: theme.textMuted }]}>
+                {MOCK_GROUP_PLAN.completedDays} / {MOCK_GROUP_PLAN.totalDays} gün
+              </Text>
+              <Text style={[styles.groupPlanLink, { color: ACCENT }]}>
+                Gruba git →
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
         {plans.map((plan) => {
           const progress = progressByPlanId[plan.id] ?? null;
           const completedCount = progress?.completedDays?.length ?? 0;
@@ -109,15 +198,16 @@ export default function PlansScreen() {
           const currentDay = getCurrentDay(progress, plan.totalDays);
           const dayInfo = plan.days.find((d) => d.day === currentDay);
           const streak = progress?.streak ?? 0;
+          const planUnlocked = isPremium || plan.id === FREE_PLAN_ID;
 
           return (
             <View
               key={plan.id}
               style={[styles.card, { backgroundColor: theme.surface }]}
             >
-              {!isPremium && (
+              {!planUnlocked && (
                 <View style={styles.cardLockWrap}>
-                  <Text style={styles.cardLock}>🔒</Text>
+                  <Ionicons name="lock-closed" size={22} color={ACCENT} />
                 </View>
               )}
               <Text style={[styles.planTitle, { color: theme.text }]}>{plan.title}</Text>
@@ -137,7 +227,10 @@ export default function PlansScreen() {
               </Text>
               {streak > 0 && (
                 <View style={[styles.streakBadge, { backgroundColor: colors.accentBadgeBg, borderColor: colors.accentBadgeBorder }]}>
-                  <Text style={[styles.streakText, { color: colors.accent }]}>🔥 {streak} günlük seri</Text>
+                  <View style={styles.streakRow}>
+                    <Ionicons name="flash" size={14} color="#C4956A" />
+                    <Text style={[styles.streakText, { color: ACCENT }]}> {streak} günlük seri</Text>
+                  </View>
                 </View>
               )}
               <Pressable
@@ -146,8 +239,13 @@ export default function PlansScreen() {
                   { opacity: pressed ? 0.9 : 1 },
                 ]}
                 onPress={() => {
-                  if (!isPremium) {
-                    router.push('/paywall');
+                  haptics.light();
+                  if (!planUnlocked) {
+                    try {
+                      router.push('/paywall');
+                    } catch {
+                      /* ignore */
+                    }
                     return;
                   }
                   handleStartOrContinue(plan);
@@ -186,6 +284,22 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
+  groupSection: {
+    marginBottom: 24,
+  },
+  groupSectionTitle: {
+    fontFamily: fonts.medium,
+    fontSize: 18,
+    marginBottom: 12,
+  },
+  groupPlanCard: {
+    paddingVertical: 16,
+  },
+  groupPlanLink: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    marginTop: 8,
+  },
   card: {
     borderRadius: 14,
     padding: 20,
@@ -197,9 +311,6 @@ const styles = StyleSheet.create({
     top: 16,
     right: 16,
     zIndex: 1,
-  },
-  cardLock: {
-    fontSize: 18,
   },
   planTitle: {
     fontFamily: fonts.medium,
@@ -219,7 +330,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.accent,
+    backgroundColor: ACCENT,
   },
   daysLabel: {
     fontFamily: fonts.regular,
@@ -234,12 +345,16 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     marginBottom: 12,
   },
+  streakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   streakText: {
     fontFamily: fonts.medium,
     fontSize: 13,
   },
   continueBtn: {
-    backgroundColor: colors.accent,
+    backgroundColor: ACCENT,
     borderRadius: borderRadius.button,
     paddingVertical: 16,
     alignItems: 'center',

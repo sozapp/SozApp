@@ -4,6 +4,20 @@ import { Platform } from 'react-native';
 
 const DAILY_REMINDER_ID = 'soz-daily-reminder';
 
+const MORNING_MESSAGES = [
+  { title: 'Günaydın!', body: 'Bugünkü ayetiniz hazır: Yuhanna 3:16' },
+  { title: 'Yeni bir gün', body: 'Söz ile güne başla: Filipililere 4:13' },
+  { title: 'Bugün için bir söz', body: 'Mezmur 23:1 seni bekliyor' },
+  { title: 'Günlük okuman hazır', body: "3 dakikan varsa İncil'i aç" },
+  { title: 'Sabah bereketi', body: 'Bugün kaldığın yerden devam et' },
+];
+
+function getDayOfYear(): number {
+  const d = new Date();
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d.getTime() - start.getTime()) / 86400000);
+}
+
 export async function registerForPushNotifications(): Promise<boolean> {
   if (!Device.isDevice) return false;
 
@@ -26,11 +40,14 @@ export async function registerForPushNotifications(): Promise<boolean> {
 export async function scheduleDailyReminder(hour: number, minute: number): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
 
+  const dayOfYear = getDayOfYear();
+  const msg = MORNING_MESSAGES[dayOfYear % MORNING_MESSAGES.length];
+
   await Notifications.scheduleNotificationAsync({
     identifier: DAILY_REMINDER_ID,
     content: {
-      title: 'Günlük okuman seni bekliyor 📖',
-      body: 'Söz ile bugünkü ayetini oku',
+      title: msg.title,
+      body: msg.body,
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,

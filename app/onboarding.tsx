@@ -1,67 +1,98 @@
-import { colors, fonts } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
 import {
-  Dimensions,
-  FlatList,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-  Pressable,
+  Step1Welcome,
+  Step2WhoFor,
+  Step3Features,
+  Step4Personalize,
+  Step5Ready,
+} from '@/components/onboarding';
+import { OB } from '@/components/onboarding/onboardingPalette';
+import { useHaptics } from '@/hooks/useHaptics';
+import { SozAlert } from '@/components/SozAlert';
+import { useSozAlert } from '@/hooks/useSozAlert';
+import { useTheme } from '@/hooks/useTheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Animated,
+  ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const ONBOARDED_KEY = '@soz/onboarded';
-const USER_TYPE_KEY = '@soz/userType';
-
-export type UserType = 'faith' | 'curious' | 'research';
-
-const BG = '#0A0A08';
-const TEXT = '#E8E0D0';
 const ACCENT = '#C4956A';
-const MUTED = 'rgba(232,224,208,0.5)';
-const DOT_ACTIVE = ACCENT;
-const DOT_INACTIVE = 'rgba(255,255,255,0.3)';
+const ACCENT_LIGHT = '#FFF8EE';
+const ONBOARDING_GRADIENT_TOP = '#EDD9B8';
+const ONBOARDING_BG = ACCENT_LIGHT;
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const CARDS: { id: UserType; title: string; subtitle: string }[] = [
-  {
-    id: 'faith',
-    title: 'İmanımı derinleştirmek istiyorum',
-    subtitle: 'Okuma planları ve günlük ayetler',
+const shellStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: ONBOARDING_BG,
   },
-  {
-    id: 'curious',
-    title: 'İncil hakkında merak ediyorum',
-    subtitle: 'Bağlam notları ve açıklamalar',
+  safeTransparent: {
+    flex: 1,
+    backgroundColor: 'transparent',
   },
-  {
-    id: 'research',
-    title: 'Araştırma ve çalışma için',
-    subtitle: 'Çeviri karşılaştırma ve notlar',
+});
+
+const DOT_ACTIVE_W = 20;
+const DOT_PASSIVE_W = 6;
+const DOT_H = 6;
+const DOT_ACTIVE_BG = ACCENT;
+const DOT_PASSIVE_BG = '#D4C5B0';
+
+const indicatorStyles = StyleSheet.create({
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-];
+  dot: {
+    height: DOT_H,
+    borderRadius: 3,
+  },
+});
 
-const FINAL_MESSAGES: Record<UserType, string> = {
-  faith: 'Okuma planın seni bekliyor.',
-  curious: 'Merak etmek güzel bir başlangıç.',
-  research: 'Derin çalışma için her şey hazır.',
-};
+function StepIndicator({
+  step,
+  total = 5,
+}: {
+  step: number;
+  total?: number;
+}) {
+  const dotWidths = useRef(
+    Array.from({ length: total }, () => new Animated.Value(DOT_PASSIVE_W))
+  ).current;
 
-function StepIndicator({ step }: { step: number }) {
+  useEffect(() => {
+    dotWidths.forEach((w, i) => {
+      Animated.spring(w, {
+        toValue: i === step ? DOT_ACTIVE_W : DOT_PASSIVE_W,
+        tension: 80,
+        friction: 10,
+        useNativeDriver: false,
+      }).start();
+    });
+  }, [step, dotWidths]);
+
   return (
-    <View style={styles.dots}>
-      {[0, 1, 2].map((i) => (
-        <View
+    <View style={indicatorStyles.dotsRow}>
+      {dotWidths.map((w, i) => (
+        <Animated.View
           key={i}
           style={[
-            styles.dot,
-            { backgroundColor: i === step ? DOT_ACTIVE : DOT_INACTIVE },
+            indicatorStyles.dot,
+            {
+              width: w,
+              backgroundColor: i === step ? DOT_ACTIVE_BG : DOT_PASSIVE_BG,
+            },
           ]}
         />
       ))}
@@ -70,255 +101,359 @@ function StepIndicator({ step }: { step: number }) {
 }
 
 export default function OnboardingScreen() {
+  const { fonts } = useTheme();
   const router = useRouter();
-  const flatListRef = useRef<FlatList>(null);
-  const [step, setStep] = useState(0);
-  const [userType, setUserType] = useState<UserType | null>(null);
+  const haptics = useHaptics();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [selectedProfile, setSelectedProfile] = useState<string | null>(null);
+  const [selectedChurch, setSelectedChurch] = useState<string | null>(null);
+  const [userName, setUserName] = useState('');
+  const [confettiStarted, setConfettiStarted] = useState(false);
+  const [showFooter, setShowFooter] = useState(true);
+  const { alertConfig, showAlert, hideAlert } = useSozAlert();
+  const mainScrollRef = useRef<ScrollView>(null);
+  const kimIcinScrollHintDone = useRef(false);
 
-  const onMomentumScrollEnd = useCallback(
-    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-      setStep(index);
-    },
-    []
-  );
+  const styles = useMemo(() => makeStyles(fonts), [fonts]);
 
-  const goNext = useCallback(() => {
-    if (step < 2) {
-      flatListRef.current?.scrollToOffset({
-        offset: (step + 1) * SCREEN_WIDTH,
-        animated: true,
-      });
-      setStep(step + 1);
+  useEffect(() => {
+    if (currentStep !== 1 || kimIcinScrollHintDone.current) return;
+    kimIcinScrollHintDone.current = true;
+    const t1 = setTimeout(() => {
+      mainScrollRef.current?.scrollTo({ y: 30, animated: true });
+    }, 400);
+    const t2 = setTimeout(() => {
+      mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    }, 400 + 600);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [currentStep]);
+
+  const hideFooter = useCallback(() => {
+    setShowFooter(false);
+  }, []);
+
+  useEffect(() => {
+    if (currentStep === 4) setConfettiStarted(true);
+  }, [currentStep]);
+
+  const canProceed = useMemo(() => {
+    switch (currentStep) {
+      case 0:
+        return true;
+      case 1:
+        return selectedProfile !== null;
+      case 2:
+        return true;
+      case 3:
+        return userName.trim().length >= 2;
+      case 4:
+        return true;
+      default:
+        return true;
     }
-  }, [step]);
+  }, [currentStep, selectedProfile, userName]);
+
+  const goToStep = useCallback((index: number) => {
+    const i = Math.max(0, Math.min(4, index));
+    setCurrentStep(i);
+    setShowFooter(i !== 4);
+    if (i === 4) setConfettiStarted(true);
+    haptics.light();
+  }, [haptics]);
+
+  const handleNext = useCallback(() => {
+    if (!canProceed) return;
+    if (currentStep < 4) goToStep(currentStep + 1);
+  }, [canProceed, currentStep, goToStep]);
+
+  const handleBack = useCallback(() => {
+    if (currentStep > 0) goToStep(currentStep - 1);
+  }, [currentStep, goToStep]);
+
+  const skipToEnd = useCallback(() => {
+    goToStep(4);
+  }, [goToStep]);
+
+  const requestNotificationPermission = useCallback(async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      await Notifications.requestPermissionsAsync();
+    }
+  }, []);
 
   const finishOnboarding = useCallback(async () => {
     try {
-      await AsyncStorage.setItem(ONBOARDED_KEY, 'true');
-      if (userType) await AsyncStorage.setItem(USER_TYPE_KEY, userType);
-    } catch (_) {}
+      await AsyncStorage.multiSet([
+        ['@soz/onboardingSeen', 'true'],
+        ['@soz/userName', userName.trim()],
+        ['@soz/userProfile', selectedProfile ?? ''],
+        ['@soz/userChurch', selectedChurch ?? ''],
+      ]);
+    } catch (e) {
+      console.error('Onboarding kayıt hatası:', e);
+    }
     router.replace('/(tabs)');
-  }, [userType, router]);
+  }, [userName, selectedChurch, selectedProfile, router]);
 
-  const renderStep0 = () => (
-    <View style={[styles.step, { width: SCREEN_WIDTH }]}>
-      <View style={styles.step0Content}>
-        <Text style={styles.logoSymbol}>S</Text>
-        <Text style={styles.logoTitle}>Söz</Text>
-        <Text style={styles.logoSubtitle}>Türkçe İncil</Text>
-      </View>
-      <Pressable
-        style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-        onPress={goNext}
-      >
-        <Text style={styles.primaryBtnText}>Başlayalım →</Text>
-      </Pressable>
-    </View>
-  );
+  const finishWithPermissionPrompt = useCallback(() => {
+    showAlert(
+      'Bildirimler',
+      'Günlük ayet hatırlatıcısı ve seri bildirimleri için izin ver.',
+      [
+        {
+          text: 'Şimdi Değil',
+          style: 'cancel',
+          onPress: () => {
+            void finishOnboarding();
+          },
+        },
+        {
+          text: 'İzin Ver',
+          onPress: async () => {
+            await requestNotificationPermission();
+            await finishOnboarding();
+          },
+        },
+      ]
+    );
+  }, [finishOnboarding, requestNotificationPermission, showAlert]);
 
-  const renderStep1 = () => (
-    <View style={[styles.step, { width: SCREEN_WIDTH }]}>
-      <View style={styles.step1Header}>
-        <Text style={styles.step1Title}>Seni tanıyalım</Text>
-        <Text style={styles.step1Subtitle}>Bu uygulamayı nasıl kullanacaksın?</Text>
-      </View>
-      <View style={styles.cards}>
-        {CARDS.map((card) => {
-          const selected = userType === card.id;
-          return (
-            <Pressable
-              key={card.id}
-              style={[
-                styles.card,
-                selected && styles.cardSelected,
-              ]}
-              onPress={() => setUserType(card.id)}
-            >
-              <Text style={styles.cardTitle}>{card.title}</Text>
-              <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <Pressable
-        style={[
-          styles.primaryBtn,
-          !userType && styles.primaryBtnDisabled,
-        ]}
-        onPress={goNext}
-        disabled={!userType}
-      >
-        <Text style={styles.primaryBtnText}>Devam →</Text>
-      </Pressable>
-    </View>
-  );
+  const skipDenom = useCallback(() => {
+    if (currentStep === 3) goToStep(4);
+  }, [currentStep, goToStep]);
 
-  const renderStep2 = () => (
-    <View style={[styles.step, { width: SCREEN_WIDTH }]}>
-      <View style={styles.step2Content}>
-        <Ionicons name="checkmark-circle" size={72} color={ACCENT} style={styles.checkIcon} />
-        <Text style={styles.step2Title}>Hazırsın!</Text>
-        <Text style={styles.step2Message}>
-          {userType ? FINAL_MESSAGES[userType] : FINAL_MESSAGES.faith}
-        </Text>
-      </View>
-      <Pressable
-        style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-        onPress={finishOnboarding}
-      >
-        <Text style={styles.primaryBtnText}>Uygulamayı Aç →</Text>
-      </Pressable>
-    </View>
-  );
-
-  const renderItem = ({ item }: { item: number }) => {
-    if (item === 0) return renderStep0();
-    if (item === 1) return renderStep1();
-    return renderStep2();
+  const renderScrollableSteps = () => {
+    switch (currentStep) {
+      case 0:
+        return <Step1Welcome hideFooter onNext={() => {}} />;
+      case 1:
+        return (
+          <Step2WhoFor
+            hideFooter
+            selectedProfile={selectedProfile}
+            onSelectProfile={setSelectedProfile}
+            onNext={() => {}}
+          />
+        );
+      case 2:
+        return <Step3Features />;
+      case 4:
+        return (
+          <Step5Ready
+            hideFooter={hideFooter}
+            userName={userName}
+            onFinish={finishWithPermissionPrompt}
+            confettiStarted={confettiStarted}
+          />
+        );
+      default:
+        return null;
+    }
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <StepIndicator step={step} />
-      <FlatList
-        ref={flatListRef}
-        data={[0, 1, 2]}
-        renderItem={renderItem}
-        keyExtractor={(i) => String(i)}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onMomentumScrollEnd}
-        scrollEventThrottle={16}
-        bounces={false}
+    <View style={shellStyles.root}>
+      <LinearGradient
+        colors={[ONBOARDING_GRADIENT_TOP, ACCENT_LIGHT]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 0.45 }}
+        style={StyleSheet.absoluteFillObject}
       />
-    </SafeAreaView>
+      <SafeAreaView style={shellStyles.safeTransparent} edges={['top', 'bottom']}>
+      <View style={styles.outerContainer}>
+        <View style={styles.innerContainer}>
+          <View style={styles.header}>
+            <StepIndicator step={currentStep} />
+            {currentStep !== 4 ? (
+              <TouchableOpacity
+                style={styles.skipBtn}
+                onPress={skipToEnd}
+                hitSlop={12}
+                activeOpacity={0.75}
+              >
+                <Text style={styles.skipText}>Atla →</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.skipBtn} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />
+            )}
+          </View>
+
+          <View style={styles.body}>
+            {currentStep === 3 ? (
+              <View style={styles.step4Wrap}>
+                <Step4Personalize
+                  hideFooter
+                  scrollBottomInset={120}
+                  userName={userName}
+                  setUserName={setUserName}
+                  selectedChurch={selectedChurch}
+                  onSelectChurch={setSelectedChurch}
+                  onSkip={skipDenom}
+                  onNext={() => {}}
+                />
+              </View>
+            ) : (
+              <ScrollView
+                ref={mainScrollRef}
+                style={styles.scroll}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+              >
+                {renderScrollableSteps()}
+              </ScrollView>
+            )}
+          </View>
+
+          {showFooter ? (
+            <View style={styles.bottomBar}>
+              {currentStep > 0 ? (
+                <TouchableOpacity
+                  style={[styles.backBtn, { borderColor: OB.border }]}
+                  onPress={handleBack}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="arrow-back" size={20} color={OB.muted} />
+                  <Text style={[styles.backBtnText, { color: OB.muted }]}>
+                    Geri
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+
+              <TouchableOpacity
+                style={[
+                  styles.nextBtn,
+                  !canProceed && styles.nextBtnDisabled,
+                  currentStep === 0 && styles.nextBtnFull,
+                ]}
+                onPress={handleNext}
+                disabled={!canProceed}
+                activeOpacity={canProceed ? 0.85 : 1}
+              >
+                <Text style={styles.nextBtnText}>İleri</Text>
+                <Ionicons name="arrow-forward" size={16} color={OB.title} />
+              </TouchableOpacity>
+            </View>
+          ) : null}
+        </View>
+      </View>
+      </SafeAreaView>
+      <SozAlert {...alertConfig} onDismiss={hideAlert} />
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 16,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  step: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    justifyContent: 'space-between',
-  },
-  step0Content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logoSymbol: {
-    fontFamily: fonts.thin,
-    fontSize: 80,
-    color: ACCENT,
-    marginBottom: 8,
-  },
-  logoTitle: {
-    fontFamily: fonts.thin,
-    fontSize: 52,
-    color: TEXT,
-    marginBottom: 8,
-  },
-  logoSubtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
-    letterSpacing: 0.25 * 12,
-    color: ACCENT,
-  },
-  step1Header: {
-    paddingTop: 24,
-    marginBottom: 32,
-  },
-  step1Title: {
-    fontFamily: fonts.thin,
-    fontSize: 32,
-    color: TEXT,
-    marginBottom: 8,
-  },
-  step1Subtitle: {
-    fontFamily: fonts.italic,
-    fontSize: 14,
-    color: MUTED,
-  },
-  cards: {
-    flex: 1,
-    gap: 12,
-  },
-  card: {
-    backgroundColor: colors.dark.surface,
-    borderRadius: 14,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  cardSelected: {
-    borderColor: ACCENT,
-  },
-  cardTitle: {
-    fontFamily: fonts.medium,
-    fontSize: 17,
-    color: TEXT,
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    color: MUTED,
-  },
-  step2Content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkIcon: {
-    marginBottom: 24,
-  },
-  step2Title: {
-    fontFamily: fonts.thin,
-    fontSize: 38,
-    color: TEXT,
-    marginBottom: 16,
-  },
-  step2Message: {
-    fontFamily: fonts.regular,
-    fontSize: 18,
-    color: TEXT,
-    textAlign: 'center',
-  },
-  primaryBtn: {
-    backgroundColor: ACCENT,
-    borderRadius: 12,
-    paddingVertical: 18,
-    alignItems: 'center',
-    width: '100%',
-  },
-  primaryBtnPressed: {
-    opacity: 0.9,
-  },
-  primaryBtnDisabled: {
-    opacity: 0.4,
-  },
-  primaryBtnText: {
-    fontFamily: fonts.medium,
-    fontSize: 17,
-    color: colors.white,
-  },
-});
+function makeStyles(fonts: { regular: string; medium: string }) {
+  return StyleSheet.create({
+    outerContainer: {
+      flex: 1,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 8,
+    },
+    innerContainer: {
+      flex: 1,
+      width: '100%',
+      minHeight: 0,
+      alignSelf: 'stretch',
+      backgroundColor: 'transparent',
+      position: 'relative',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 12,
+      backgroundColor: 'transparent',
+    },
+    skipBtn: {
+      paddingVertical: 8,
+      paddingLeft: 16,
+      minWidth: 76,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+    },
+    skipText: {
+      fontFamily: fonts.regular,
+      fontSize: 14,
+      color: OB.muted,
+    },
+    body: {
+      flex: 1,
+      minHeight: 0,
+      width: '100%',
+    },
+    scroll: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingBottom: 120,
+    },
+    step4Wrap: {
+      flex: 1,
+      minHeight: 0,
+    },
+    bottomBar: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 10,
+      gap: 12,
+      backgroundColor: 'transparent',
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: OB.border,
+    },
+    backBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      borderWidth: 0.5,
+    },
+    backBtnText: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+    },
+    nextBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: OB.accent,
+      borderRadius: 12,
+      paddingVertical: 15,
+      shadowColor: OB.accent,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 5,
+    },
+    nextBtnFull: {
+      flex: 1,
+    },
+    nextBtnDisabled: {
+      backgroundColor: ACCENT,
+      opacity: 0.45,
+    },
+    nextBtnText: {
+      fontSize: 16,
+      color: OB.title,
+      fontFamily: fonts.medium,
+    },
+  });
+}

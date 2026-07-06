@@ -1078,7 +1078,7 @@ export function getVerseTextByVerseId(verseId: string): string | null {
   if (book !== BOOK || Number.isNaN(verseNum) || Number.isNaN(chapterNum)) return null;
   const chapter = johnChapters.find((c) => c.chapterNumber === chapterNum);
   if (!chapter) return null;
-  const verse = chapter.verses.find((v) => v.number === verseNum);
+  const verse = (chapter.verses ?? []).find((v) => v.number === verseNum);
   return verse?.text ?? null;
 }
 
