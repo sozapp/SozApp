@@ -115,6 +115,11 @@ ALTER TABLE highlights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE plan_progress ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users own notes" ON notes;
+DROP POLICY IF EXISTS "Users own highlights" ON highlights;
+DROP POLICY IF EXISTS "Users own favorites" ON favorites;
+DROP POLICY IF EXISTS "Users own plan_progress" ON plan_progress;
+
 CREATE POLICY "Users own notes" ON notes
   FOR ALL USING (auth.uid() = user_id);
 
