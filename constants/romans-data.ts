@@ -181,8 +181,9 @@ export const ROMANS_CHAPTER_VERSES: string[][] = [
     "Ama şimdi günaha köle olmaktan kurtuldunuz ve Tanrı'ya köle oldunuz. Bundan kazancınız Tanrı'ya adanmışlık ve sonucu sonsuz yaşamdır.",
     "Çünkü günahın bedeli ölümdür, ama Tanrı'nın bağışı Rabbimiz Mesih İsa sayesinde sonsuz yaşamdır.",
   ],
-  // Romalılar 7-16 — metin eklenecek
-  ...ROMANS_VERSES.slice(6).map((count) =>
-    Array.from({ length: count }, () => "—")
-  ),
+  // Romalılar 7-16: gerçek "Yeni Çeviri" metni henüz eklenmedi.
+  // Telifli bir çeviri olduğu için doğrulanmamış bir kaynaktan kopyalanmadı.
+  ...ROMANS_VERSES.slice(6).map((_, i) => [
+    `Romalılar ${i + 7}. bölümün metni bu sürümde henüz eklenmedi.`,
+  ]),
 ];
