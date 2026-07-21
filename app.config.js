@@ -29,7 +29,6 @@ export default {
       usesCleartextTraffic: true,
     },
     plugins: [
-      'react-native-purchases',
       [
         'expo-notifications',
         {
