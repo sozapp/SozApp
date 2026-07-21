@@ -5,9 +5,8 @@ import {
   CormorantGaramond_400Regular_Italic,
   useFonts,
 } from '@expo-google-fonts/cormorant-garamond';
-import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
-import { usePathname, useRouter } from 'expo-router';
+import { usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { registerForPushNotifications } from '@/hooks/useNotifications';
@@ -25,11 +24,8 @@ SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 
 export default function RootLayout() {
-  const router = useRouter();
   const pathname = usePathname();
   const postOnboardingInitDone = useRef(false);
-  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
-  const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const [fontsLoaded, fontError] = useFonts({
     CormorantGaramond_300Light,
     CormorantGaramond_400Regular,
@@ -40,9 +36,17 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => {});
     }
   }, [fontsLoaded, fontError]);
+
+  // Fonts asla gelmezse native splash'te kalmamak için
+  useEffect(() => {
+    const t = setTimeout(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    }, 4000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,40 +80,21 @@ export default function RootLayout() {
     };
   }, [pathname]);
 
-  useEffect(() => {
-    notificationListener.current =
-      Notifications.addNotificationReceivedListener((notification) => {
-        console.log('Notification received:', notification);
-      });
-
-    responseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const type = response.notification.request.content.data?.type;
-        if (type === 'daily_verse') router.push('/(tabs)/read');
-        if (type === 'streak_reminder') router.push('/(tabs)/index');
-      });
-
-    return () => {
-      notificationListener.current?.remove();
-      responseListener.current?.remove();
-    };
-  }, [router]);
-
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
+  const fontsReady = fontsLoaded || !!fontError;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <AmbientMusicProvider>
-          <LanguageProvider>
-            <NetworkProvider>
-              <RootLayoutContent />
-            </NetworkProvider>
-          </LanguageProvider>
-        </AmbientMusicProvider>
-      </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0A0A08' }}>
+      {fontsReady ? (
+        <ThemeProvider>
+          <AmbientMusicProvider>
+            <LanguageProvider>
+              <NetworkProvider>
+                <RootLayoutContent />
+              </NetworkProvider>
+            </LanguageProvider>
+          </AmbientMusicProvider>
+        </ThemeProvider>
+      ) : null}
 
       {showSplash && (
         <SozSplashScreen onFinish={() => setShowSplash(false)} />

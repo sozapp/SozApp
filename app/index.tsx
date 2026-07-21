@@ -4,6 +4,8 @@ import { View } from 'react-native';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
 import { supabase } from '@/constants/supabase';
 
+const SESSION_TIMEOUT_MS = 2500;
+
 export default function Index() {
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
@@ -26,9 +28,12 @@ export default function Index() {
           if (!cancelled) setHasSession(false);
           return;
         }
-        const sessionRes = await supabase.auth
-          .getSession()
-          .catch(() => ({ data: { session: null } }));
+        const sessionRes = await Promise.race([
+          supabase.auth.getSession().catch(() => ({ data: { session: null } })),
+          new Promise<{ data: { session: null } }>((resolve) =>
+            setTimeout(() => resolve({ data: { session: null } }), SESSION_TIMEOUT_MS)
+          ),
+        ]);
         const session = sessionRes.data.session;
         const isRealUser = session?.user && !session.user.is_anonymous && session.user.email;
         if (!cancelled) setHasSession(!!isRealUser);
@@ -39,7 +44,9 @@ export default function Index() {
         }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (hasSession === null || onboarded === null) {

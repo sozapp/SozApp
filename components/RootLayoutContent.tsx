@@ -180,7 +180,13 @@ export function RootLayoutContent() {
         console.warn('Notification listener:', e);
       }
     });
-    return () => sub.remove();
+    return () => {
+      try {
+        sub.remove();
+      } catch {
+        // Expo Go / eski API — cleanup hatası uygulamayı durdurmasın
+      }
+    };
   }, []);
 
   useEffect(() => {

@@ -18,6 +18,13 @@ export default function SozSplashScreen({ onFinish }: { onFinish: () => void }) 
   const exitOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      onFinish();
+    };
+
     // Logo spring — 100ms
     setTimeout(() => {
       Animated.parallel([
@@ -92,8 +99,17 @@ export default function SozSplashScreen({ onFinish }: { onFinish: () => void }) 
         toValue: 0,
         duration: 400,
         useNativeDriver: false,
-      }).start(() => onFinish());
+      }).start(({ finished: animFinished }) => {
+        if (animFinished) finish();
+      });
     }, 1900);
+
+    // Animasyon callback kaçsa bile splash ekranı asla takılı kalmasın
+    const failsafe = setTimeout(finish, 2800);
+    return () => {
+      clearTimeout(failsafe);
+      finished = true;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
