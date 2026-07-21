@@ -189,7 +189,7 @@ export default function ExploreScreen() {
   const [showWatchModal, setShowWatchModal] = useState(false);
   const [watchFavoriteIds, setWatchFavoriteIds] = useState<string[]>([]);
   const [shareRandomVisible, setShareRandomVisible] = useState(false);
-  const { alertConfig, showAlert, hideAlert } = useSozAlert();
+  const { alertConfig, hideAlert } = useSozAlert();
   const [shareRandomText, setShareRandomText] = useState('');
   const [shareRandomRef, setShareRandomRef] = useState('');
   const [gameStreaks, setGameStreaks] = useState<Record<string, number>>({
@@ -825,9 +825,6 @@ export default function ExploreScreen() {
             <SectionHeader title="Araçlar" subtitle="Büyümek için" styles={styles} />
             <View style={styles.toolsGrid}>
               {toolsFiltered.map((tool, i) => (
-                (() => {
-                  const isChurchSoon = tool.route === '/church';
-                  return (
                 <TouchableOpacity
                   key={`${tool.title}-${i}`}
                   style={[
@@ -836,23 +833,13 @@ export default function ExploreScreen() {
                       borderTopWidth: 3,
                       borderTopColor: toolColors[tool.key],
                     },
-                    isChurchSoon && styles.toolCardSoon,
                   ]}
                   onPress={() => {
-                    if (isChurchSoon) {
-                      showAlert('Kilise Grubu', 'Yakında! Topluluğunla birlikte okuyabileceksin.');
-                      return;
-                    }
                     router.push(tool.route as never);
                     void Haptics.selectionAsync();
                   }}
                   activeOpacity={0.85}
                 >
-                  {isChurchSoon ? (
-                    <View style={styles.toolSoonBadge}>
-                      <Text style={styles.toolSoonBadgeText}>Yakında</Text>
-                    </View>
-                  ) : null}
                   <View style={[styles.toolIcon, { borderColor: `${toolColors[tool.key]}35` }]}>
                     <Ionicons
                       name={tool.icon as keyof typeof Ionicons.glyphMap}
@@ -863,8 +850,6 @@ export default function ExploreScreen() {
                   <Text style={styles.toolTitle}>{tool.title}</Text>
                   <Text style={styles.toolDesc}>{tool.desc}</Text>
                 </TouchableOpacity>
-                  );
-                })()
               ))}
             </View>
           </View>
@@ -1286,22 +1271,6 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       borderColor: colors.border,
       gap: 8,
       position: 'relative',
-    },
-    toolCardSoon: { opacity: 0.7 },
-    toolSoonBadge: {
-      position: 'absolute',
-      top: 8,
-      right: 8,
-      backgroundColor: `${ACCENT}30`,
-      borderRadius: 8,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      zIndex: 2,
-    },
-    toolSoonBadgeText: {
-      color: ACCENT,
-      fontSize: 9,
-      fontFamily: fonts.regular,
     },
     toolIcon: {
       width: 40,

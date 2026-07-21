@@ -1414,7 +1414,7 @@ export default function ProfileScreen() {
             </Pressable>
             <Pressable
               style={styles.row}
-              onPress={() => showAlert('Yakında', 'Bu özellik yakında geliyor!')}
+              onPress={() => router.push('/church')}
             >
               <View style={styles.rowIcon}>
                 <Ionicons name="people-outline" size={18} color={ACCENT} />
