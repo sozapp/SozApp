@@ -1464,15 +1464,15 @@ export default function ProfileScreen() {
               </>
             ) : (
               <Pressable
-                style={[styles.row, styles.rowLast, { opacity: 0.6 }]}
-                onPress={() => showAlert('Yakında', 'Hesap özelliği yakında!')}
+                style={[styles.row, styles.rowLast]}
+                onPress={() => router.push('/auth')}
               >
                 <View style={styles.rowIcon}>
                   <Ionicons name="person-add-outline" size={18} color={ACCENT} />
                 </View>
                 <View style={styles.rowBody}>
                   <Text style={styles.authCtaTitle}>{t('signIn')}</Text>
-                  <Text style={styles.rowSub}>Yakında — verilerini yedekle</Text>
+                  <Text style={styles.rowSub}>{t('signInDesc')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
