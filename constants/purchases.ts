@@ -1,6 +1,18 @@
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import Purchases from 'react-native-purchases';
 
 let purchasesInitialized = false;
+
+// RevenueCat, Expo Go içinde native mağaza doğrulaması yapamıyor ve gerçek
+// (appl_/goog_) key verilirse kendi içinde console.error + throw yapıyor —
+// bu da geliştirme sırasında kırmızı LogBox ekranına yol açıyor. Expo Go'da
+// sadece test_/rcb_ ile başlayan "Test Store" key'leri destekleniyor, bkz.
+// https://rev.cat/sdk-test-store. Uyumsuzsa configure()'ı hiç çağırmayız.
+const WEB_COMPATIBLE_KEY_PREFIXES = ['test_', 'rcb_'];
+
+function isRunningInExpoGo(): boolean {
+  return Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+}
 
 export const initPurchases = (): void => {
   if (purchasesInitialized) return;
@@ -9,8 +21,20 @@ export const initPurchases = (): void => {
     console.log('RevenueCat key missing; purchases disabled');
     return;
   }
-  Purchases.configure({ apiKey });
-  purchasesInitialized = true;
+  const isTestStoreKey = WEB_COMPATIBLE_KEY_PREFIXES.some((prefix) => apiKey.startsWith(prefix));
+  if (isRunningInExpoGo() && !isTestStoreKey) {
+    console.log(
+      'RevenueCat: Expo Go içinde gerçek mağaza key kullanılamaz, satın almalar bu ortamda devre dışı. ' +
+        'Test etmek için bir Test Store key (test_...) kullanın ya da development build oluşturun.'
+    );
+    return;
+  }
+  try {
+    Purchases.configure({ apiKey });
+    purchasesInitialized = true;
+  } catch (e) {
+    console.warn('RevenueCat configure error:', e);
+  }
 };
 
 export const isPurchasesConfigured = (): boolean => purchasesInitialized;
