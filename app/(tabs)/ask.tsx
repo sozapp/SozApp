@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
   Modal,
@@ -243,6 +244,7 @@ export default function AskScreen() {
   const [selectedMsg, setSelectedMsg] = useState<string | null>(null);
   const [showMsgActions, setShowMsgActions] = useState(false);
   const [recordingVis, setRecordingVis] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [storedUserProfile, setStoredUserProfile] = useState('');
   const [lastOfflineAnswer, setLastOfflineAnswer] = useState<string | null>(null);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
@@ -584,10 +586,14 @@ export default function AskScreen() {
   }, [slideAnim, overlayAnim]);
 
   const micPressIn = async () => {
+    if (isOffline) {
+      showAlert('İnternet gerekli', 'Sesli soru için bağlantı gerekir.');
+      return;
+    }
     try {
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
-        setRecordingVis(true);
+        showAlert('İzin gerekli', 'Sesli soru için mikrofon iznine ihtiyaç var.');
         return;
       }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
@@ -597,22 +603,37 @@ export default function AskScreen() {
       recordingRef.current = rec;
       setRecordingVis(true);
     } catch (_) {
-      setRecordingVis(true);
+      recordingRef.current = null;
+      showAlert('Hata', 'Kayıt başlatılamadı.');
     }
   };
 
   const micPressOut = async () => {
     setRecordingVis(false);
+    const r = recordingRef.current;
+    recordingRef.current = null;
+    if (!r) return;
     try {
-      const r = recordingRef.current;
-      recordingRef.current = null;
-      if (r) {
-        await r.stopAndUnloadAsync();
+      await r.stopAndUnloadAsync();
+      const uri = r.getURI();
+      if (!uri) throw new Error('Kayıt bulunamadı');
+      setIsTranscribing(true);
+      const text = await transcribeAudio(uri);
+      if (text) {
+        setInput((prev) => (prev ? `${prev} ${text}` : text));
+      } else {
+        showAlert('Anlaşılamadı', 'Ses metne çevrilemedi, tekrar dener misin?');
       }
-    } catch (_) {
-      /* ignore */
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '';
+      if (msg === 'SUPABASE_NOT_CONFIGURED' || msg === 'AUTH_REQUIRED') {
+        showAlert('Kullanılamıyor', 'Sesli soru için giriş yapmanız gerekiyor.');
+      } else {
+        showAlert('Hata', 'Ses metne çevrilemedi, tekrar dener misin?');
+      }
+    } finally {
+      setIsTranscribing(false);
     }
-    showAlert('Yakında', 'Sesle soru ve otomatik metin özelliği yakında eklenecek.');
   };
 
   const lastAssistantId =
@@ -849,6 +870,14 @@ export default function AskScreen() {
             <Text style={{ color: ACCENT, fontFamily: fonts.medium, fontSize: 13 }}>Kayıt…</Text>
           </View>
         ) : null}
+        {isTranscribing ? (
+          <View style={[styles.recBanner, { backgroundColor: `${ACCENT}26` }]}>
+            <ActivityIndicator size="small" color={ACCENT} />
+            <Text style={{ color: ACCENT, fontFamily: fonts.medium, fontSize: 13, marginLeft: 8 }}>
+              Metne çevriliyor…
+            </Text>
+          </View>
+        ) : null}
 
         <View style={[styles.inputWrap, { backgroundColor: bg, borderTopColor: `${ACCENT}1F` }]}>
           <View style={styles.inputRow}>
@@ -856,14 +885,18 @@ export default function AskScreen() {
               onPressIn={micPressIn}
               onPressOut={micPressOut}
               style={[styles.micBtn, { backgroundColor: surface }]}
-              disabled={loading || !canAsk || isOffline}
+              disabled={loading || !canAsk || isOffline || isTranscribing}
               activeOpacity={0.8}
             >
-              <Ionicons
-                name={recordingVis ? 'mic' : 'mic-outline'}
-                size={20}
-                color={recordingVis ? '#E74C3C' : muted}
-              />
+              {isTranscribing ? (
+                <ActivityIndicator size="small" color={muted} />
+              ) : (
+                <Ionicons
+                  name={recordingVis ? 'mic' : 'mic-outline'}
+                  size={20}
+                  color={recordingVis ? '#E74C3C' : muted}
+                />
+              )}
             </TouchableOpacity>
             <TextInput
               style={[styles.input, { backgroundColor: surface, color: text, borderColor: `${ACCENT}33` }]}
@@ -1343,6 +1376,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   recBanner: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingVertical: 8,
     alignItems: 'center',
   },

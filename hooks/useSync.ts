@@ -20,7 +20,7 @@ const STORAGE_FAVORITES_SNAPSHOT = '@soz/favoritesSyncSnapshot';
 
 const UPSERT_CONFLICT = 'user_id,verse_id';
 
-type TimestampMap = Record<string, string>;
+export type TimestampMap = Record<string, string>;
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
@@ -51,7 +51,7 @@ function backfillTimestamps(values: Record<string, unknown>, ts: TimestampMap): 
   return next;
 }
 
-type MergePlan = {
+export type MergePlan = {
   push: string[];
   pull: string[];
   deleteRemote: string[];
@@ -68,7 +68,7 @@ type MergePlan = {
  * geri geliyordu (resurrection). Ayrıca iki tarafta da değişen bir kayıtta
  * her zaman yerel veri kazanıyordu; artık daha yeni zaman damgası kazanıyor.
  */
-function planMerge(localTs: TimestampMap, remoteTs: TimestampMap, snapshot: TimestampMap): MergePlan {
+export function planMerge(localTs: TimestampMap, remoteTs: TimestampMap, snapshot: TimestampMap): MergePlan {
   const plan: MergePlan = { push: [], pull: [], deleteRemote: [], deleteLocal: [] };
   const allIds = new Set([...Object.keys(localTs), ...Object.keys(remoteTs), ...Object.keys(snapshot)]);
 
