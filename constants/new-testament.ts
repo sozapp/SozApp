@@ -1,6 +1,7 @@
 /**
  * Yeni Ahit — Türkçe Kutsal Kitap 2001 / Yeni Çeviri
- * Matta, Markos: tam metin (matthew-data, mark-data); Yuhanna: bible.ts; diğer kitaplar placeholder.
+ * Tüm kitaplar tam metin — istisnalar: Elçilerin İşleri 7-28 ve Romalılar 7-16
+ * henüz eklenmedi (bkz. acts-data.ts / romans-data.ts).
  */
 
 import { johnChapters } from './bible';
@@ -70,25 +71,6 @@ function createVerse(
     verse,
     text,
   };
-}
-
-function createPlaceholderBook(
-  id: string,
-  name: string,
-  shortName: string,
-  verseCounts: number[]
-): Book {
-  const chapters: ChapterNT[] = verseCounts.map((count, i) => {
-    const ch = i + 1;
-    const verses: VerseNT[] = [];
-    for (let v = 1; v <= count; v++) {
-      verses.push(
-        createVerse(id, name, shortName, ch, v, `[${name} ${ch}:${v}]`)
-      );
-    }
-    return { book: name, chapter: ch, verses };
-  });
-  return { id, name, shortName, testament: 'new', chapters };
 }
 
 // Yuhanna — mevcut bible.ts verisinden
