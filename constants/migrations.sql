@@ -256,3 +256,11 @@ $$;
 
 REVOKE ALL ON FUNCTION public.increment_daily_ai_usage(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.increment_daily_ai_usage(uuid) TO service_role;
+
+-- Çoklu cihaz senkronu: hangi tarafın değişikliğinin daha yeni olduğunu
+-- bilmek için highlights ve favorites tablolarına da updated_at eklenir
+-- (notes'ta zaten vardı). useSync.ts artık son senkronun anlık görüntüsüyle
+-- üç yönlü birleştirme yapıyor; bu sütunlar olmadan silme/güncelleme
+-- çakışmaları yanlış tarafı kazanıyordu.
+ALTER TABLE highlights ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE favorites ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
