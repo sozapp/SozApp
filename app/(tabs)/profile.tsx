@@ -1498,7 +1498,7 @@ export default function ProfileScreen() {
             <Text style={styles.cardTitle}>{t('accountSupport')}</Text>
             {userEmail ? (
               <>
-                <Pressable style={styles.row} onPress={() => {}}>
+                <Pressable style={styles.row} onPress={() => router.push('/change-email')}>
                   <View style={styles.rowIcon}>
                     <Ionicons name="person-outline" size={18} color={ACCENT} />
                   </View>

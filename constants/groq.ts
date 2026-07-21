@@ -13,6 +13,48 @@ function getAskAiUrl(): string {
   return `${base.replace(/\/$/, '')}/functions/v1/ask-ai`;
 }
 
+function getTranscribeUrl(): string {
+  const base = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  return `${base.replace(/\/$/, '')}/functions/v1/transcribe-audio`;
+}
+
+/** Kaydedilmiş sesi (yerel dosya URI'si) Groq Whisper üzerinden metne çevirir. */
+export async function transcribeAudio(fileUri: string): Promise<string> {
+  if (!isSupabaseConfigured() || !supabase) {
+    throw new Error('SUPABASE_NOT_CONFIGURED');
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (sessionError || !token) {
+    throw new Error('AUTH_REQUIRED');
+  }
+
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+  const form = new FormData();
+  form.append('file', {
+    uri: fileUri,
+    name: 'recording.m4a',
+    type: 'audio/m4a',
+  } as unknown as Blob);
+
+  const res = await fetch(getTranscribeUrl(), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      apikey: anonKey,
+    },
+    body: form,
+  });
+
+  const parsed = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+  if (!res.ok) {
+    throw new Error(parsed.error ?? `API ${res.status}`);
+  }
+  return parsed.text?.trim() ?? '';
+}
+
 type AskAiSuccess = {
   answer: string;
   isPremium: boolean;

@@ -1,13 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/constants/database.types';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 
-let supabase: ReturnType<typeof createClient> | null = null;
+let supabase: ReturnType<typeof createClient<Database>> | null = null;
 
 if (supabaseUrl && supabaseKey) {
   try {
-    supabase = createClient(supabaseUrl, supabaseKey, {
+    supabase = createClient<Database>(supabaseUrl, supabaseKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,

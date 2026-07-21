@@ -1,5 +1,5 @@
 import { parseVerseRefForRead } from '@/constants/ask-verse-parse';
-import { askQuestion, isSupabaseConfigured } from '@/constants/groq';
+import { askQuestion, isSupabaseConfigured, transcribeAudio } from '@/constants/groq';
 import { FREE_AI_QUESTIONS_PER_DAY } from '@/constants/premium';
 import { borderRadius, fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
