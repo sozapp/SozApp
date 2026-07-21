@@ -22,6 +22,8 @@ const tr = {
   share: 'Paylaş',
   favorite: 'Favori',
   memorize: 'Ezberle',
+  copyVerse: 'Kopyala',
+  copied: 'Kopyalandı',
   myNotes: 'Notlarım',
   notes: 'Notlar',
   highlights: 'Vurgular',

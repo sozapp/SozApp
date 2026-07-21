@@ -40,10 +40,10 @@ function sectionLabel(date: Date): string {
   const startWeek = new Date(startToday);
   startWeek.setDate(startWeek.getDate() - 7);
 
-  if (date >= startToday) return 'Bugun';
-  if (date >= startYesterday) return 'Dun';
+  if (date >= startToday) return 'Bugün';
+  if (date >= startYesterday) return 'Dün';
   if (date >= startWeek) return 'Bu Hafta';
-  return 'Daha Once';
+  return 'Daha Önce';
 }
 
 function formatReadTime(iso: string): string {
@@ -107,7 +107,7 @@ export default function ReadingHistoryScreen() {
       grouped[key] = grouped[key] ? [...grouped[key], item] : [item];
     }
 
-    const order = ['Bugun', 'Dun', 'Bu Hafta', 'Daha Once'];
+    const order = ['Bugün', 'Dün', 'Bu Hafta', 'Daha Önce'];
     const result: FlatRow[] = [];
     for (const key of order) {
       const items = grouped[key];
@@ -121,8 +121,8 @@ export default function ReadingHistoryScreen() {
   }, [history]);
 
   const clearHistory = useCallback(() => {
-    showAlert('Gecmis temizlensin mi?', 'Okuma gecmisi silinecek.', [
-      { text: 'Iptal', style: 'cancel' },
+    showAlert('Geçmiş temizlensin mi?', 'Okuma geçmişi silinecek.', [
+      { text: 'İptal', style: 'cancel' },
       {
         text: 'Temizle',
         style: 'destructive',
@@ -218,7 +218,7 @@ export default function ReadingHistoryScreen() {
           <Pressable onPress={() => router.back()} hitSlop={10}>
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
-          <Text style={styles.title}>Okuma Gecmisi</Text>
+          <Text style={styles.title}>Okuma Geçmişi</Text>
         </View>
         <Pressable onPress={clearHistory} hitSlop={10}>
           <Text style={styles.clearBtn}>Temizle</Text>
@@ -229,7 +229,7 @@ export default function ReadingHistoryScreen() {
         <View style={styles.summaryCard}>
           <Ionicons name="book-outline" size={18} color={ACCENT} />
           <Text style={styles.summaryValue}>{summary.totalRead}</Text>
-          <Text style={styles.summaryLabel}>Toplam bolum</Text>
+          <Text style={styles.summaryLabel}>Toplam bölüm</Text>
         </View>
         <View style={styles.summaryCard}>
           <Ionicons name="calendar-outline" size={18} color={ACCENT} />
@@ -241,13 +241,13 @@ export default function ReadingHistoryScreen() {
           <Text style={styles.summaryValue} numberOfLines={1}>
             {summary.topBook}
           </Text>
-          <Text style={styles.summaryLabel}>En cok okunan</Text>
+          <Text style={styles.summaryLabel}>En çok okunan</Text>
         </View>
       </View>
 
       <View style={styles.listHeader}>
         <Text style={styles.listTitle}>Son Okunanlar</Text>
-        <Text style={styles.listCount}>{history.length} kayit</Text>
+        <Text style={styles.listCount}>{history.length} kayıt</Text>
       </View>
 
       <FlatList
@@ -279,7 +279,7 @@ export default function ReadingHistoryScreen() {
               <View style={styles.itemBody}>
                 <Text style={styles.itemBook}>{row.book}</Text>
                 <Text style={styles.itemChapter}>
-                  {row.chapter}. Bolum{left != null ? ` · ${left} bolum kaldi` : ''}
+                  {row.chapter}. Bölüm{left != null ? ` · ${left} bölüm kaldı` : ''}
                 </Text>
                 <Text style={styles.itemDate}>{formatReadTime(row.readAt)}</Text>
               </View>
@@ -290,8 +290,8 @@ export default function ReadingHistoryScreen() {
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Ionicons name="time-outline" size={56} color={colors.border} />
-            <Text style={styles.emptyTitle}>Henuz okuma gecmisi yok</Text>
-            <Text style={styles.emptySub}>Okumaya basladikca burada gorunecek</Text>
+            <Text style={styles.emptyTitle}>Henüz okuma geçmişi yok</Text>
+            <Text style={styles.emptySub}>Okumaya başladıkça burada görünecek</Text>
           </View>
         }
       />

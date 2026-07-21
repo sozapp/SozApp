@@ -1020,7 +1020,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     },
     moodAiBadgeText: {
       fontSize: 10,
-      color: 'ACCENT_LIGHT',
+      color: ACCENT_LIGHT,
       fontFamily: fonts.medium,
       letterSpacing: 0.04,
     },
@@ -1138,18 +1138,6 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       lineHeight: 17,
       fontFamily: fonts.regular,
     },
-    churchSoonBadge: {
-      backgroundColor: `${ACCENT}20`,
-      borderRadius: 10,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-    },
-    churchSoonText: {
-      color: ACCENT,
-      fontSize: 11,
-      fontFamily: fonts.regular,
-    },
-
     recentSection: {
       marginHorizontal: 16,
       marginBottom: 12,
@@ -2154,7 +2142,6 @@ export default function HomeScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[0]}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         refreshControl={
@@ -2614,7 +2601,7 @@ export default function HomeScreen() {
           activeOpacity={0.88}
         >
           <LinearGradient
-            colors={['#2A1F0E', '#1A1500']}
+            colors={[colors.surfaceAlt, colors.card]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={StyleSheet.absoluteFillObject}
@@ -2666,13 +2653,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.churchCard}
-          onPress={() =>
-            showAlert(
-              'Kilise Grubu',
-              'Bu özellik yakında geliyor! Topluluğunla birlikte okuyabilecek, notlarını paylaşabileceksin.',
-              [{ text: 'Tamam', style: 'default' }],
-            )
-          }
+          onPress={() => router.push('/church')}
           activeOpacity={0.85}
         >
           <View style={styles.churchIconWrap}>
@@ -2683,9 +2664,7 @@ export default function HomeScreen() {
             <Text style={styles.churchTitle}>Kilise Grubu</Text>
             <Text style={styles.churchDesc}>Topluluğunla birlikte oku</Text>
           </View>
-          <View style={styles.churchSoonBadge}>
-            <Text style={styles.churchSoonText}>Yakında</Text>
-          </View>
+          <Ionicons name="chevron-forward" size={18} color={ACCENT} />
         </TouchableOpacity>
 
         {isHomeLoading ? (

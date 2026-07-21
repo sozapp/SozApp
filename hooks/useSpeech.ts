@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Speech from 'expo-speech';
+import { Platform } from 'react-native';
 import { useCallback, useState } from 'react';
 import { getTTSLanguage, STORAGE_BIBLE_VERSION } from '@/constants/bibleVersions';
 
@@ -10,11 +11,40 @@ export async function getAvailableVoices() {
 
 export type VerseForSpeech = { text: string };
 
+// iOS'un varsayılan sesleri dile göre kadın — bu isimler bilinen erkek
+// sesler (Cem: Türkçe, Aaron/Fred/Daniel: İngilizce). Cihazda mevcutsa
+// bunlardan biri seçilir, yoksa daha düşük perde ile fallback yapılır.
+const MALE_VOICE_NAME_HINTS: Record<string, string[]> = {
+  'tr-TR': ['cem'],
+  'en-US': ['aaron', 'fred', 'daniel'],
+};
+
+const FALLBACK_PITCH = 0.85;
+
 async function getCurrentVersion(): Promise<string> {
   try {
     return (await AsyncStorage.getItem(STORAGE_BIBLE_VERSION)) ?? 'TR';
   } catch {
     return 'TR';
+  }
+}
+
+async function findMaleVoice(language: string): Promise<string | undefined> {
+  if (Platform.OS !== 'ios') return undefined;
+  const hints = MALE_VOICE_NAME_HINTS[language] ?? [];
+  if (hints.length === 0) return undefined;
+  try {
+    const voices = await Speech.getAvailableVoicesAsync();
+    const langPrefix = language.split('-')[0].toLowerCase();
+    const match = voices.find((v) => {
+      if (!v.language?.toLowerCase().startsWith(langPrefix)) return false;
+      const id = (v.identifier ?? '').toLowerCase();
+      const name = (v.name ?? '').toLowerCase();
+      return hints.some((hint) => id.includes(hint) || name.includes(hint));
+    });
+    return match?.identifier;
+  } catch {
+    return undefined;
   }
 }
 
@@ -26,6 +56,7 @@ export function useSpeech() {
   const speakWithVersion = useCallback(async (text: string, verseId: string | null) => {
     const currentVersion = await getCurrentVersion();
     const language = getTTSLanguage(currentVersion);
+    const maleVoice = await findMaleVoice(language);
     const rate = language === 'tr-TR' ? 0.85 : 0.9;
 
     await Speech.stop();
@@ -34,7 +65,8 @@ export function useSpeech() {
     setIsPaused(false);
     Speech.speak(text, {
       language,
-      pitch: 1.0,
+      voice: maleVoice,
+      pitch: maleVoice ? 1.0 : FALLBACK_PITCH,
       rate,
       onDone: () => {
         setIsSpeaking(false);

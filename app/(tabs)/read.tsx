@@ -46,6 +46,7 @@ import AmbientMusicModal, { MiniWaveBar } from '@/components/AmbientMusicModal';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -221,6 +222,7 @@ export default function ReadScreen() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteDraft, setNoteDraft] = useState('');
+  const [verseCopied, setVerseCopied] = useState(false);
   const [compareMode, setCompareMode] = useState(false);
   const [bibleVersion, setBibleVersion] = useState<BibleVersion>('TR');
   const [parallelRead, setParallelRead] = useState(false);
@@ -1139,6 +1141,7 @@ export default function ReadScreen() {
     setShowColorPicker(false);
     setShowNoteInput(false);
     setNoteDraft('');
+    setVerseCopied(false);
   };
 
   const saveHighlights = useCallback(async (next: Highlights) => {
@@ -1258,6 +1261,15 @@ export default function ReadScreen() {
     const message = `«${selectedVerse.text}»\n\n— ${refStr}\n\nSöz Uygulaması`;
     Share.share({ message });
     setTimeout(() => closeModal(), 300);
+  };
+
+  const handleCopyVerse = async () => {
+    if (!selectedVerse || !selectedVerseId) return;
+    const refStr = getVerseRefFromVerseId(selectedVerseId);
+    await Clipboard.setStringAsync(`${selectedVerse.text} — ${refStr}`);
+    haptics.light();
+    setVerseCopied(true);
+    setTimeout(() => setVerseCopied(false), 1500);
   };
 
   const bumpFontSize = useCallback((delta: number) => {
@@ -2371,6 +2383,24 @@ export default function ReadScreen() {
                           {isFavorite(selectedVerseId ?? '') ? tx('removeFromFavorites') : tx('addToFavorites')}
                         </Text>
                       </Animated.View>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
+                      onPress={handleCopyVerse}
+                    >
+                      <Ionicons
+                        name={verseCopied ? 'checkmark-outline' : 'copy-outline'}
+                        size={20}
+                        color={verseCopied ? CHAPTER_NAV_COLOR : theme.text}
+                      />
+                      <Text
+                        style={[
+                          styles.modalBtnText,
+                          { color: verseCopied ? CHAPTER_NAV_COLOR : theme.text },
+                        ]}
+                      >
+                        {verseCopied ? tx('copied') : tx('copyVerse')}
+                      </Text>
                     </Pressable>
                     <Pressable
                       style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}

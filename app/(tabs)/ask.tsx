@@ -527,6 +527,20 @@ export default function AskScreen() {
     setShowHistory(false);
   }, []);
 
+  const clearAllHistory = useCallback(() => {
+    showAlert('Geçmişi temizle', 'Kayıtlı tüm sohbetler silinsin mi?', [
+      { text: 'İptal', style: 'cancel' },
+      {
+        text: 'Temizle',
+        style: 'destructive',
+        onPress: async () => {
+          setConversations([]);
+          await AsyncStorage.removeItem(CONVERSATIONS_KEY);
+        },
+      },
+    ]);
+  }, []);
+
   const openMsgActions = useCallback(
     (content: string) => {
       slideAnim.setValue(300);
@@ -890,7 +904,14 @@ export default function AskScreen() {
         <Pressable style={styles.actionOverlay} onPress={() => setShowHistory(false)}>
           <Pressable style={[styles.historySheet, { backgroundColor: surface }]} onPress={(e) => e.stopPropagation()}>
             <View style={[styles.historyHandle, { backgroundColor: muted }]} />
-            <Text style={[styles.historyTitle, { color: text }]}>{t('history')}</Text>
+            <View style={styles.historyHeaderRow}>
+              <Text style={[styles.historyTitle, { color: text }]}>{t('history')}</Text>
+              {conversations.length > 0 && (
+                <Pressable onPress={clearAllHistory} hitSlop={10}>
+                  <Text style={styles.historyClearBtn}>Temizle</Text>
+                </Pressable>
+              )}
+            </View>
             <ScrollView style={styles.historyScroll} showsVerticalScrollIndicator={false}>
               {conversations.length === 0 ? (
                 <Text style={[styles.historyEmpty, { color: muted }]}>Henüz konuşma yok</Text>
@@ -1142,10 +1163,20 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 16,
   },
+  historyHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   historyTitle: {
     fontFamily: fonts.medium,
     fontSize: 18,
-    marginBottom: 12,
+  },
+  historyClearBtn: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: '#E57373',
   },
   historyScroll: {
     maxHeight: 400,

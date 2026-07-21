@@ -7,6 +7,7 @@ import * as StoreReview from 'expo-store-review';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Svg, { Circle } from 'react-native-svg';
 import {
   Animated,
   Dimensions,
@@ -53,7 +54,7 @@ import { useTranslation } from '@/context/LanguageContext';
 import { setI18nLocale, type Language } from '@/constants/i18n';
 import type { User } from '@supabase/supabase-js';
 import { useBadges } from '@/hooks/useBadges';
-import type { Badge } from '@/constants/badges';
+import { getBadgeProgress, type Badge } from '@/constants/badges';
 import { exportBackup, importBackup } from '@/constants/backup';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
@@ -130,13 +131,48 @@ const SPEECH_OPTIONS = [
 
 const RESET_KEYS = [
   '@soz/notes',
-  '@soz/favorites',
+  '@soz/noteTimestamps',
+  '@soz/notesSyncSnapshot',
   '@soz/highlights',
+  '@soz/highlightTimestamps',
+  '@soz/highlightsSyncSnapshot',
+  '@soz/favorites',
+  '@soz/favoritesSyncSnapshot',
+  '@soz/favoritedDailyVerse',
   '@soz/streak',
+  '@soz/daysActive',
+  '@soz/streakReminder',
   '@soz/planProgress',
+  '@soz/memorizeList',
   '@soz/memorizeProgress',
+  '@soz/memorizedVerses',
   '@soz/moodHistory',
+  '@soz/lastMood',
+  '@soz/lastMoodAt',
+  '@soz/lastMoodResult',
   '@soz/chatHistory',
+  '@soz/conversations',
+  '@soz/lastAskResult',
+  '@soz/savedAnswers',
+  '@soz/readHistory',
+  '@soz/readingHistory',
+  '@soz/readNtChapters',
+  '@soz/lastRead',
+  '@soz/readingProgress',
+  '@soz/stats/books',
+  '@soz/stats/daily',
+  '@soz/stats/today',
+  '@soz/focusMinutes',
+  '@soz/focusSessions',
+  '@soz/totalGamesPlayed',
+  '@soz/totalReflections',
+  '@soz/earnedBadges',
+  '@soz/prayers',
+  '@soz/searchHistory',
+  '@soz/church',
+  '@soz/lastSyncTime',
+  '@soz/premiumVerifiedCache',
+  '@soz/shareActivity',
 ];
 
 async function loadNotifications(): Promise<{
@@ -382,6 +418,12 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
     },
     badgeScrollContent: { gap: 12, paddingVertical: 8 },
     badgeItem: { width: 70, alignItems: 'center', gap: 6 },
+    badgeRingWrap: {
+      width: 58,
+      height: 58,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     badgeCircle: {
       width: 52,
       height: 52,
@@ -731,7 +773,7 @@ export default function ProfileScreen() {
   const [langToastVisible, setLangToastVisible] = useState(false);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const { currentTrack: ambientTrack, isPlaying: ambientPlaying } = useAmbientMusic();
-  const { earnedBadges, checkBadges, ALL_BADGES } = useBadges();
+  const { earnedBadges, checkBadges, stats: badgeStats, ALL_BADGES } = useBadges();
   const progressAnim = useMemo(() => new Animated.Value(0), []);
 
   const styles = useMemo(() => makeStyles(colors, fonts, insets.bottom), [colors, fonts, insets.bottom]);
@@ -1080,12 +1122,17 @@ export default function ProfileScreen() {
 
   const clearAllData = useCallback(async () => {
     try {
-      await AsyncStorage.multiRemove(RESET_KEYS);
+      await AsyncStorage.multiRemove([
+        ...RESET_KEYS,
+        '@soz/onboarded',
+        '@soz/onboardingComplete',
+        '@soz/onboardingSeen',
+      ]);
     } catch {
       /* ignore */
     }
-    loadAll();
-  }, [loadAll]);
+    router.replace('/onboarding');
+  }, [router]);
 
   const handleReset = useCallback(() => {
     showAlert('Tüm Veriyi Sıfırla', 'Notların, favorilerin ve ilerlemen silinecek. Bu işlem geri alınamaz.', [
@@ -1220,24 +1267,54 @@ export default function ProfileScreen() {
           >
             {ALL_BADGES.map((b) => {
               const earned = earnedBadges.includes(b.id);
+              const progress = earned ? 1 : getBadgeProgress(b, badgeStats);
+              const ringRadius = 27;
+              const ringCircumference = 2 * Math.PI * ringRadius;
               return (
                 <Pressable key={b.id} style={styles.badgeItem} onPress={() => setBadgeTip(b)}>
-                  <View
-                    style={[
-                      styles.badgeCircle,
-                      earned ? styles.badgeCircleEarned : styles.badgeCircleLocked,
-                    ]}
-                  >
-                    <Ionicons
-                      name={b.icon as keyof typeof Ionicons.glyphMap}
-                      size={26}
-                      color={earned ? ACCENT : colors.border}
-                    />
-                    {!earned ? (
-                      <View style={styles.badgeLockOverlay}>
-                        <Ionicons name="lock-closed-outline" size={14} color={colors.border} />
-                      </View>
-                    ) : null}
+                  <View style={styles.badgeRingWrap}>
+                    <Svg width={58} height={58} style={StyleSheet.absoluteFillObject}>
+                      <Circle
+                        cx={29}
+                        cy={29}
+                        r={ringRadius}
+                        stroke={colors.border}
+                        strokeWidth={3}
+                        fill="none"
+                      />
+                      {progress > 0 && (
+                        <Circle
+                          cx={29}
+                          cy={29}
+                          r={ringRadius}
+                          stroke={ACCENT}
+                          strokeWidth={3}
+                          fill="none"
+                          strokeLinecap="round"
+                          strokeDasharray={`${ringCircumference} ${ringCircumference}`}
+                          strokeDashoffset={ringCircumference * (1 - progress)}
+                          rotation={-90}
+                          origin={[29, 29]}
+                        />
+                      )}
+                    </Svg>
+                    <View
+                      style={[
+                        styles.badgeCircle,
+                        earned ? styles.badgeCircleEarned : styles.badgeCircleLocked,
+                      ]}
+                    >
+                      <Ionicons
+                        name={b.icon as keyof typeof Ionicons.glyphMap}
+                        size={26}
+                        color={earned ? ACCENT : colors.border}
+                      />
+                      {!earned ? (
+                        <View style={styles.badgeLockOverlay}>
+                          <Ionicons name="lock-closed-outline" size={14} color={colors.border} />
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
                   <Text
                     style={[styles.badgeName, earned ? styles.badgeNameEarned : styles.badgeNameLocked]}

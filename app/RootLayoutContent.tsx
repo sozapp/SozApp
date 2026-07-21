@@ -20,6 +20,11 @@ import { BlurView } from 'expo-blur';
 import { Animated, StyleSheet } from 'react-native';
 
 const LAST_SYNC_KEY = '@soz/lastSyncTime';
+const LAST_AUTH_USER_KEY = '@soz/lastAuthUserId';
+// Bunlar hiç sunucuya bağlı değil, sadece cihaz-yerel — hesap değişince
+// önceki kullanıcının fotoğrafı/mezhebi yeni hesapta görünmesin diye
+// oturum geçişlerinde temizleniyor.
+const ACCOUNT_LOCAL_KEYS = ['@soz/profileImage', '@soz/userChurch', '@soz/denomination'];
 const ACCENT = '#C4956A';
 const CONFETTI_COLORS = [ACCENT, '#7C9A8A', '#9A7C8A', '#FFF8EE'] as const;
 
@@ -116,8 +121,22 @@ export function RootLayoutContent() {
     }
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       try {
+        if (event === 'SIGNED_OUT') {
+          AsyncStorage.multiRemove([...ACCOUNT_LOCAL_KEYS, LAST_AUTH_USER_KEY]).catch(() => {});
+        }
+        if (event === 'SIGNED_IN') {
+          const uid = session?.user?.id ?? null;
+          AsyncStorage.getItem(LAST_AUTH_USER_KEY)
+            .then(async (lastUid) => {
+              if (uid && lastUid && lastUid !== uid) {
+                await AsyncStorage.multiRemove(ACCOUNT_LOCAL_KEYS);
+              }
+              if (uid) await AsyncStorage.setItem(LAST_AUTH_USER_KEY, uid);
+            })
+            .catch(() => {});
+        }
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           void syncRevenueCatWithSupabase();
           void isOnboardingCompleteInStorage().then((done) => {

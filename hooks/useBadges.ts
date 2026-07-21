@@ -5,6 +5,17 @@ import { ALL_BADGES, checkNewBadges, type UserStats } from '@/constants/badges';
 
 type BadgeItem = (typeof ALL_BADGES)[number];
 
+const EMPTY_STATS: UserStats = {
+  streak: 0,
+  totalVersesRead: 0,
+  totalNotes: 0,
+  totalFavorites: 0,
+  gamesPlayed: 0,
+  daysActive: 1,
+  memorizeCount: 0,
+  reflectionsCompleted: 0,
+};
+
 function parseMaybeArrayLength(raw: string | null): number {
   if (!raw) return 0;
   try {
@@ -20,6 +31,7 @@ function parseMaybeArrayLength(raw: string | null): number {
 export function useBadges() {
   const [earnedBadges, setEarnedBadges] = useState<string[]>([]);
   const [newBadge, setNewBadge] = useState<BadgeItem | null>(null);
+  const [stats, setStats] = useState<UserStats>(EMPTY_STATS);
 
   const loadStats = async (): Promise<UserStats> => {
     try {
@@ -45,25 +57,17 @@ export function useBadges() {
         reflectionsCompleted: Number(reflections[1] ?? 0),
       };
     } catch {
-      return {
-        streak: 0,
-        totalVersesRead: 0,
-        totalNotes: 0,
-        totalFavorites: 0,
-        gamesPlayed: 0,
-        daysActive: 1,
-        memorizeCount: 0,
-        reflectionsCompleted: 0,
-      };
+      return EMPTY_STATS;
     }
   };
 
   const checkBadges = async () => {
-    const stats = await loadStats();
+    const loadedStats = await loadStats();
+    setStats(loadedStats);
     const raw = await AsyncStorage.getItem('@soz/earnedBadges');
     const earned: string[] = raw ? JSON.parse(raw) : [];
 
-    const newOnes = checkNewBadges(stats, earned);
+    const newOnes = checkNewBadges(loadedStats, earned);
 
     if (newOnes.length > 0) {
       const updated = [...earned, ...newOnes.map((b) => b.id)];
@@ -75,5 +79,5 @@ export function useBadges() {
     }
   };
 
-  return { earnedBadges, newBadge, setNewBadge, checkBadges, ALL_BADGES };
+  return { earnedBadges, newBadge, setNewBadge, checkBadges, stats, ALL_BADGES };
 }

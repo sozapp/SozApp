@@ -19,7 +19,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const BG = '#0A0A08';
 const ACCENT = '#C4956A';
@@ -60,6 +60,7 @@ export default function PaywallScreen() {
   const { colors } = useTheme();
   const { refreshPremium } = usePremium();
   const haptics = useHaptics();
+  const insets = useSafeAreaInsets();
   const [period, setPeriod] = useState<BillingPeriod>('yearly');
   const [currency, setCurrency] = useState<Currency>('TRY');
   const [isPurchasing, setIsPurchasing] = useState(false);
@@ -203,7 +204,7 @@ export default function PaywallScreen() {
             <TouchableOpacity
               onPress={() => {
                 setPeriod('yearly');
-                void Haptics.selectionAsync();
+                haptics.selection();
               }}
               style={[styles.priceCard, period === 'yearly' && styles.priceCardActive]}
               activeOpacity={0.85}
@@ -235,7 +236,7 @@ export default function PaywallScreen() {
             <TouchableOpacity
               onPress={() => {
                 setPeriod('monthly');
-                void Haptics.selectionAsync();
+                haptics.selection();
               }}
               style={[styles.priceCard, period === 'monthly' && styles.priceCardActive]}
               activeOpacity={0.85}
@@ -285,7 +286,7 @@ export default function PaywallScreen() {
           </Text>
         </ScrollView>
 
-        <View style={styles.stickyBottom}>
+        <View style={[styles.stickyBottom, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
           <LinearGradient
             colors={['transparent', `${colors.background}CC`, colors.background]}
             style={styles.stickyGradient}
@@ -374,7 +375,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingBottom: 120,
+    paddingBottom: 220,
   },
   featureList: {
     marginTop: 8,
@@ -601,7 +602,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     paddingHorizontal: 16,
-    paddingBottom: 32,
     paddingTop: 0,
   },
   stickyGradient: {
