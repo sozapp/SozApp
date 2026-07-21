@@ -16,7 +16,7 @@ import { AmbientMusicProvider } from '@/context/AmbientMusicContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { NetworkProvider } from '@/context/NetworkContext';
 import { ThemeProvider } from '@/hooks/useTheme';
-import { RootLayoutContent } from './RootLayoutContent';
+import { RootLayoutContent } from '@/components/RootLayoutContent';
 import SozSplashScreen from '@/components/SplashScreen';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
 import { setupNotificationHandler } from '@/constants/notifications';

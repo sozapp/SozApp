@@ -212,9 +212,10 @@ export const ACTS_CHAPTER_VERSES: string[][] = [
     "\"'Şu Nasıralı İsa bu tapınağı yok edecek ve Musa'nın bize verdiği adetleri değiştirecek' dediğini işittik.\"",
     "Meclis'te oturanların hepsi gözlerini İstefanos'un üzerine dikti. Yüzünün bir melek yüzüne benzediğini gördüler.",
   ],
-  // Bölüm 7-28 (22 bölüm) — placeholder
-  ...Array.from({ length: 22 }, (_, i) => {
-    const counts = [60,40,43,48,30,25,52,28,41,40,34,28,41,38,40,30,35,27,27,32,44,31];
-    return Array.from({ length: counts[i] }, () => "—");
-  }),
+  // Bölüm 7-28 (22 bölüm): gerçek "Yeni Çeviri" metni henüz eklenmedi.
+  // Telifli bir çeviri olduğu için doğrulanmamış bir kaynaktan kopyalanmadı —
+  // her bölüm tek, dürüst bir bilgi notuyla temsil ediliyor (bkz. proje notları).
+  ...Array.from({ length: 22 }, (_, i) => [
+    `Elçilerin İşleri ${i + 7}. bölümün metni bu sürümde henüz eklenmedi.`,
+  ]),
 ];
