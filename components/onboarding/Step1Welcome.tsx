@@ -77,38 +77,38 @@ export function Step1Welcome({ onNext, hideFooter }: Props) {
   }, [glowOpacity]);
 
   useEffect(() => {
-    const t1 = Animated.timing(titleY, { toValue: 0, duration: 500, useNativeDriver: true });
-    const t2 = Animated.timing(titleOpacity, { toValue: 1, duration: 500, useNativeDriver: true });
+    const t1 = Animated.timing(titleY, { toValue: 0, duration: 400, useNativeDriver: true });
+    const t2 = Animated.timing(titleOpacity, { toValue: 1, duration: 400, useNativeDriver: true });
     Animated.parallel([
-      Animated.sequence([Animated.delay(600), t1]),
-      Animated.sequence([Animated.delay(600), t2]),
+      Animated.sequence([Animated.delay(120), t1]),
+      Animated.sequence([Animated.delay(120), t2]),
     ]).start();
   }, [titleY, titleOpacity]);
 
   useEffect(() => {
-    const s1 = Animated.timing(subtitleY, { toValue: 0, duration: 400, useNativeDriver: true });
-    const s2 = Animated.timing(subtitleOpacity, { toValue: 1, duration: 400, useNativeDriver: true });
+    const s1 = Animated.timing(subtitleY, { toValue: 0, duration: 350, useNativeDriver: true });
+    const s2 = Animated.timing(subtitleOpacity, { toValue: 1, duration: 350, useNativeDriver: true });
     Animated.parallel([
-      Animated.sequence([Animated.delay(900), s1]),
-      Animated.sequence([Animated.delay(900), s2]),
+      Animated.sequence([Animated.delay(260), s1]),
+      Animated.sequence([Animated.delay(260), s2]),
     ]).start();
   }, [subtitleY, subtitleOpacity]);
 
   useEffect(() => {
-    const v1 = Animated.timing(verseY, { toValue: 0, duration: 400, useNativeDriver: true });
-    const v2 = Animated.timing(verseOpacity, { toValue: 1, duration: 400, useNativeDriver: true });
+    const v1 = Animated.timing(verseY, { toValue: 0, duration: 350, useNativeDriver: true });
+    const v2 = Animated.timing(verseOpacity, { toValue: 1, duration: 350, useNativeDriver: true });
     Animated.parallel([
-      Animated.sequence([Animated.delay(1100), v1]),
-      Animated.sequence([Animated.delay(1100), v2]),
+      Animated.sequence([Animated.delay(380), v1]),
+      Animated.sequence([Animated.delay(380), v2]),
     ]).start();
   }, [verseY, verseOpacity]);
 
   useEffect(() => {
-    const b1 = Animated.timing(btnY, { toValue: 0, duration: 400, useNativeDriver: true });
-    const b2 = Animated.timing(btnOpacity, { toValue: 1, duration: 400, useNativeDriver: true });
+    const b1 = Animated.timing(btnY, { toValue: 0, duration: 350, useNativeDriver: true });
+    const b2 = Animated.timing(btnOpacity, { toValue: 1, duration: 350, useNativeDriver: true });
     Animated.parallel([
-      Animated.sequence([Animated.delay(1200), b1]),
-      Animated.sequence([Animated.delay(1200), b2]),
+      Animated.sequence([Animated.delay(460), b1]),
+      Animated.sequence([Animated.delay(460), b2]),
     ]).start();
   }, [btnY, btnOpacity]);
 

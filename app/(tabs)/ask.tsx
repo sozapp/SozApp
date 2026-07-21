@@ -439,8 +439,12 @@ export default function AskScreen() {
           setMessages((prev) => prev.slice(0, -1));
           setInput(trimmed);
           showAlert(
-            'Söz\'e Sor kullanılamıyor',
-            'Sunucu yapılandırması eksik veya oturum açılamadı. Supabase ayarlarını kontrol edin.'
+            'Giriş gerekiyor',
+            'Söz\'e Sor özelliğini kullanmak için giriş yapmanız gerekiyor.',
+            [
+              { text: 'İptal', style: 'cancel' },
+              { text: 'Giriş Yap', onPress: () => router.push('/auth') },
+            ]
           );
         } else if (msg === 'DAILY_LIMIT_REACHED') {
           const used =
@@ -627,7 +631,10 @@ export default function AskScreen() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       if (msg === 'SUPABASE_NOT_CONFIGURED' || msg === 'AUTH_REQUIRED') {
-        showAlert('Kullanılamıyor', 'Sesli soru için giriş yapmanız gerekiyor.');
+        showAlert('Giriş gerekiyor', 'Sesli soru için giriş yapmanız gerekiyor.', [
+          { text: 'İptal', style: 'cancel' },
+          { text: 'Giriş Yap', onPress: () => router.push('/auth') },
+        ]);
       } else {
         showAlert('Hata', 'Ses metne çevrilemedi, tekrar dener misin?');
       }

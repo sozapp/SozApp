@@ -2,13 +2,11 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { usePremium } from '@/hooks/usePremium';
 import { initPurchases, purchasePremium, restorePurchases } from '@/constants/purchases';
 import { fonts } from '@/constants/theme';
-import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   Linking,
   Pressable,
@@ -57,7 +55,6 @@ const TrialIcon = () => (
 
 export default function PaywallScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
   const { refreshPremium } = usePremium();
   const haptics = useHaptics();
   const insets = useSafeAreaInsets();
@@ -287,11 +284,6 @@ export default function PaywallScreen() {
         </ScrollView>
 
         <View style={[styles.stickyBottom, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
-          <LinearGradient
-            colors={['transparent', `${colors.background}CC`, colors.background]}
-            style={styles.stickyGradient}
-            pointerEvents="none"
-          />
           <TouchableOpacity
             style={styles.mainBtn}
             onPress={handleSubscribe}
@@ -375,7 +367,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingBottom: 220,
+    paddingTop: 4,
+    paddingBottom: 28,
   },
   featureList: {
     marginTop: 8,
@@ -597,19 +590,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
   },
   stickyBottom: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 16,
-    paddingTop: 0,
-  },
-  stickyGradient: {
-    position: 'absolute',
-    top: -60,
-    left: 0,
-    right: 0,
-    height: 80,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(196,149,80,0.2)',
   },
   stickyNote: {
     fontSize: 11,

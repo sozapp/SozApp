@@ -402,3 +402,11 @@ CREATE POLICY "church_plan_completions_insert" ON church_plan_completions FOR IN
 
 CREATE POLICY "church_plan_completions_delete" ON church_plan_completions FOR DELETE
   USING (auth.uid() = user_id);
+
+-- useChurch.ts'in loadPrayers() sorgusu group_id'ye göre filtreleyip
+-- created_at DESC ile sıralıyor (limit 50) — eski tekil-kolon index bunu
+-- karşılayamayıp ayrı bir sort adımı gerektiriyordu. Bileşik index hem
+-- filtreyi hem sıralamayı tek geçişte karşılıyor.
+DROP INDEX IF EXISTS idx_church_prayers_group;
+CREATE INDEX IF NOT EXISTS idx_church_prayers_group_created
+  ON church_prayers(group_id, created_at DESC);

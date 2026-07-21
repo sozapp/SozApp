@@ -24,7 +24,12 @@ const LAST_AUTH_USER_KEY = '@soz/lastAuthUserId';
 // Bunlar hiç sunucuya bağlı değil, sadece cihaz-yerel — hesap değişince
 // önceki kullanıcının fotoğrafı/mezhebi yeni hesapta görünmesin diye
 // oturum geçişlerinde temizleniyor.
-const ACCOUNT_LOCAL_KEYS = ['@soz/profileImage', '@soz/userChurch', '@soz/denomination'];
+const ACCOUNT_LOCAL_KEYS = [
+  '@soz/profileImage',
+  '@soz/userChurch',
+  '@soz/denomination',
+  '@soz/userProfile',
+];
 const ACCENT = '#C4956A';
 const CONFETTI_COLORS = [ACCENT, '#7C9A8A', '#9A7C8A', '#FFF8EE'] as const;
 
@@ -333,6 +338,24 @@ export function RootLayoutContent() {
                 transform: [{ translateY: slideAnim }, { scale: modalScaleAnim }],
               }}
             >
+              <TouchableOpacity
+                onPress={dismissBadgeModal}
+                hitSlop={12}
+                style={{
+                  position: 'absolute',
+                  top: 14,
+                  right: 14,
+                  zIndex: 1,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colors.border,
+                }}
+              >
+                <Ionicons name="close" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
               <View style={{ width: 130, height: 130, alignItems: 'center', justifyContent: 'center' }}>
                 <View
                   style={{
@@ -387,15 +410,26 @@ export function RootLayoutContent() {
               </Text>
               <TouchableOpacity
                 onPress={dismissBadgeModal}
+                activeOpacity={0.88}
                 style={{
                   backgroundColor: ACCENT,
                   borderRadius: 16,
-                  paddingVertical: 14,
+                  paddingVertical: 15,
                   width: '100%',
                   alignItems: 'center',
+                  marginTop: 4,
+                  shadowColor: ACCENT,
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 12,
+                  elevation: 6,
+                  borderWidth: 0.5,
+                  borderColor: 'rgba(255,220,160,0.4)',
                 }}
               >
-                <Text style={{ color: '#FFF8EE', fontSize: 16, fontFamily: fonts.regular }}>Harika!</Text>
+                <Text style={{ color: '#FFF8EE', fontSize: 16, fontFamily: fonts.medium, letterSpacing: 0.02 }}>
+                  Harika!
+                </Text>
               </TouchableOpacity>
             </Animated.View>
           </Animated.View>

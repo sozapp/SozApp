@@ -347,20 +347,32 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       fontFamily: fonts.regular,
     },
     streakZeroCard: {
-      marginTop: 8,
-      backgroundColor: colors.card,
-      borderRadius: 12,
+      marginTop: 10,
+      borderRadius: 16,
       borderWidth: 0.5,
-      borderColor: colors.border,
-      padding: 10,
-      gap: 6,
+      borderColor: `${ACCENT}40`,
+      padding: 14,
       maxWidth: 320,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    streakZeroIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      backgroundColor: `${ACCENT}22`,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+    },
+    streakZeroTextWrap: {
+      gap: 3,
+      marginBottom: 12,
     },
     streakZeroTitle: {
-      fontSize: 14,
+      fontSize: 15,
       color: colors.text,
-      fontFamily: fonts.regular,
-      fontWeight: '700',
+      fontFamily: fonts.medium,
     },
     streakZeroDesc: {
       fontSize: 12,
@@ -370,16 +382,20 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     },
     streakZeroBtn: {
       alignSelf: 'flex-start',
-      marginTop: 2,
       backgroundColor: ACCENT,
       borderRadius: 10,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      shadowColor: ACCENT,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 3,
     },
     streakZeroBtnText: {
       fontSize: 13,
       color: '#FFF8EE',
-      fontFamily: fonts.regular,
+      fontFamily: fonts.medium,
     },
 
     scroll: { flex: 1 },
@@ -2174,8 +2190,19 @@ export default function HomeScreen() {
               </View>
               {streak === 0 ? (
                 <View style={styles.streakZeroCard}>
-                  <Text style={styles.streakZeroTitle}>Bugün başla!</Text>
-                  <Text style={styles.streakZeroDesc}>Her gün okumak ruhsal büyümenin temelidir</Text>
+                  <LinearGradient
+                    colors={[`${ACCENT}22`, `${ACCENT}08`]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                  />
+                  <View style={styles.streakZeroIconWrap}>
+                    <Ionicons name="flame" size={20} color={ACCENT} />
+                  </View>
+                  <View style={styles.streakZeroTextWrap}>
+                    <Text style={styles.streakZeroTitle}>Bugün başla!</Text>
+                    <Text style={styles.streakZeroDesc}>Her gün okumak ruhsal büyümenin temelidir</Text>
+                  </View>
                   <TouchableOpacity
                     style={styles.streakZeroBtn}
                     onPress={() =>
