@@ -46,7 +46,6 @@ import { ThemePickerModal } from '@/components/ThemePickerModal';
 import { fonts as themeFonts } from '@/constants/theme';
 import { parseFavoritesRaw } from '@/hooks/useFavorites';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
-import { useChurch } from '@/hooks/useChurch';
 import { useDenomination } from '@/hooks/useDenomination';
 import { usePremium } from '@/hooks/usePremium';
 import { useTheme, type ThemeColors, type ThemeType } from '@/hooks/useTheme';
@@ -698,7 +697,6 @@ export default function ProfileScreen() {
   const { colors, fonts, activeTheme, changeTheme, loadFromStorage } = useTheme();
   const { isPremium } = usePremium();
   const { denomination, changeDenomination } = useDenomination();
-  const { church } = useChurch();
 
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState('Misafir Kullanıcı');

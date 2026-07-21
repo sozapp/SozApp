@@ -42,21 +42,16 @@ function todayString(): string {
 
 const ACCENT = '#C4956A';
 
-const MOCK_GROUP_PLAN = {
-  title: 'Matta 5-7',
-  reference: 'Matta 5-7',
-  totalDays: 7,
-  completedDays: 4,
-  membersProgress: 72,
-};
-
 export default function PlansScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const { isOnline } = useNetwork();
   const { isPremium } = usePremium();
   const haptics = useHaptics();
-  const { church } = useChurch();
+  const { church, members } = useChurch();
+  const groupCompletedCount = members.filter((m) => m.completed).length;
+  const groupPercent =
+    members.length > 0 ? Math.round((groupCompletedCount / members.length) * 100) : 0;
   const [progressByPlanId, setProgressByPlanId] = useState<Record<string, PlanProgress | null>>({});
 
   const loadProgress = useCallback(async () => {
@@ -158,7 +153,7 @@ export default function PlansScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {church != null && (
+        {church != null && church.planReference != null && (
           <View style={styles.groupSection}>
             <Text style={[styles.groupSectionTitle, { color: theme.text }]}>
               Kilisenizin aktif planı
@@ -168,21 +163,16 @@ export default function PlansScreen() {
               onPress={() => router.push('/church')}
             >
               <Text style={[styles.planTitle, { color: theme.text }]}>
-                {church.groupName} — {MOCK_GROUP_PLAN.title}
+                {church.groupName} — {church.planReference}
               </Text>
               <Text style={[styles.planDesc, { color: theme.textMuted }]}>
-                Grup ortalaması: %{MOCK_GROUP_PLAN.membersProgress} tamamlandı
+                Grup ortalaması: %{groupPercent} tamamlandı
               </Text>
               <View style={[styles.progressBg, { backgroundColor: theme.textMuted }]}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${(MOCK_GROUP_PLAN.completedDays / MOCK_GROUP_PLAN.totalDays) * 100}%` },
-                  ]}
-                />
+                <View style={[styles.progressFill, { width: `${groupPercent}%` }]} />
               </View>
               <Text style={[styles.daysLabel, { color: theme.textMuted }]}>
-                {MOCK_GROUP_PLAN.completedDays} / {MOCK_GROUP_PLAN.totalDays} gün
+                {groupCompletedCount} / {members.length} üye tamamladı
               </Text>
               <Text style={[styles.groupPlanLink, { color: ACCENT }]}>
                 Gruba git →

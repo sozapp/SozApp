@@ -17,6 +17,22 @@ export const VERSION_LANG: Record<BibleVersion, 'tr' | 'en'> = {
   KJV: 'en',
 };
 
+/** expo-speech locale for the selected Bible version */
+export function getTTSLanguage(version: string): string {
+  switch (version) {
+    case 'TR':
+    case 'TR_1878':
+    case 'TR2001':
+    case 'TR1878':
+      return 'tr-TR';
+    case 'WEB':
+    case 'KJV':
+      return 'en-US';
+    default:
+      return 'tr-TR';
+  }
+}
+
 export const STORAGE_BIBLE_VERSION = '@soz/bibleVersion';
 export const STORAGE_PARALLEL_EN = '@soz/bibleParallelEn';
 

@@ -269,3 +269,136 @@ GRANT EXECUTE ON FUNCTION public.increment_daily_ai_usage(uuid) TO service_role;
 -- çakışmaları yanlış tarafı kazanıyordu.
 ALTER TABLE highlights ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE favorites ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Kilise Grubu: önceden tamamen yerel/sahte olan özellik (sabit kodlanmış
+-- "SOZI23" demo kodu, hayalet üye listesi) gerçek çok kullanıcılı bir
+-- gruba çevriliyor. display_name satırlara denormalize ediliyor (friend_activity
+-- ile aynı desen) — profiles tablosuna grup üyeliği üzerinden erişim açmaya
+-- gerek kalmasın diye.
+CREATE TABLE IF NOT EXISTS church_groups (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  code TEXT UNIQUE NOT NULL,
+  group_name TEXT NOT NULL,
+  church_name TEXT NOT NULL,
+  created_by UUID REFERENCES auth.users NOT NULL,
+  plan_reference TEXT,
+  plan_days_left INTEGER,
+  plan_updated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS church_group_members (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  group_id UUID REFERENCES church_groups(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  display_name TEXT NOT NULL,
+  role TEXT DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+  joined_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(group_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS church_prayers (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  group_id UUID REFERENCES church_groups(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  display_name TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS church_plan_completions (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  group_id UUID REFERENCES church_groups(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  plan_reference TEXT NOT NULL,
+  completed_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(group_id, user_id, plan_reference)
+);
+
+CREATE INDEX IF NOT EXISTS idx_church_group_members_group ON church_group_members(group_id);
+CREATE INDEX IF NOT EXISTS idx_church_group_members_user ON church_group_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_church_prayers_group ON church_prayers(group_id);
+CREATE INDEX IF NOT EXISTS idx_church_plan_completions_group ON church_plan_completions(group_id, plan_reference);
+
+ALTER TABLE church_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE church_group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE church_prayers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE church_plan_completions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "church_groups_select" ON church_groups;
+DROP POLICY IF EXISTS "church_groups_insert" ON church_groups;
+DROP POLICY IF EXISTS "church_groups_update" ON church_groups;
+
+-- Kod ile katılabilmek için grup satırı üyelik şartı olmadan okunabilir
+-- olmalı (kodu bilen zaten davetlidir sayılır) — grup adı/kilise adı/kod
+-- hassas veri değil.
+CREATE POLICY "church_groups_select" ON church_groups FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "church_groups_insert" ON church_groups FOR INSERT
+  WITH CHECK (auth.uid() = created_by);
+
+CREATE POLICY "church_groups_update" ON church_groups FOR UPDATE
+  USING (auth.uid() = created_by);
+
+DROP POLICY IF EXISTS "church_group_members_select" ON church_group_members;
+DROP POLICY IF EXISTS "church_group_members_insert" ON church_group_members;
+DROP POLICY IF EXISTS "church_group_members_delete" ON church_group_members;
+
+CREATE POLICY "church_group_members_select" ON church_group_members FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM church_group_members me
+      WHERE me.group_id = church_group_members.group_id AND me.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "church_group_members_insert" ON church_group_members FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "church_group_members_delete" ON church_group_members FOR DELETE
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "church_prayers_select" ON church_prayers;
+DROP POLICY IF EXISTS "church_prayers_insert" ON church_prayers;
+
+CREATE POLICY "church_prayers_select" ON church_prayers FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM church_group_members m
+      WHERE m.group_id = church_prayers.group_id AND m.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "church_prayers_insert" ON church_prayers FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1 FROM church_group_members m
+      WHERE m.group_id = church_prayers.group_id AND m.user_id = auth.uid()
+    )
+  );
+
+DROP POLICY IF EXISTS "church_plan_completions_select" ON church_plan_completions;
+DROP POLICY IF EXISTS "church_plan_completions_insert" ON church_plan_completions;
+DROP POLICY IF EXISTS "church_plan_completions_delete" ON church_plan_completions;
+
+CREATE POLICY "church_plan_completions_select" ON church_plan_completions FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM church_group_members m
+      WHERE m.group_id = church_plan_completions.group_id AND m.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "church_plan_completions_insert" ON church_plan_completions FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (
+      SELECT 1 FROM church_group_members m
+      WHERE m.group_id = church_plan_completions.group_id AND m.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "church_plan_completions_delete" ON church_plan_completions FOR DELETE
+  USING (auth.uid() = user_id);

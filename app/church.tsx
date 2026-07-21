@@ -2,15 +2,17 @@ import { EmptyState } from '@/components/EmptyState';
 import { SozAlert } from '@/components/SozAlert';
 import { useNetwork } from '@/context/NetworkContext';
 import { newTestament } from '@/constants/new-testament';
+import { supabase } from '@/constants/supabase';
 import { colors, fonts, borderRadius } from '@/constants/theme';
-import { useChurch, generateGroupCode } from '@/hooks/useChurch';
+import { useChurch } from '@/hooks/useChurch';
 import { useTheme } from '@/hooks/useTheme';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
@@ -23,123 +25,68 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ACCENT = '#C4956A';
 
-const STORAGE_PRAYERS = '@soz/church/prayers';
-const STORAGE_GROUP_PLAN = '@soz/church/groupPlan';
-
-const DEMO_JOIN_CODE = 'SOZI23';
-const MOCK_MEMBERS: { initials: string; percent: number; done?: boolean }[] = [
-  { initials: 'AY', percent: 80 },
-  { initials: 'MK', percent: 45 },
-  { initials: 'SB', percent: 100, done: true },
-  { initials: 'EÖ', percent: 60 },
-  { initials: 'TK', percent: 100, done: true },
-];
-const DEFAULT_GROUP_PLAN = { reference: 'Matta 5-7', daysLeft: 3 };
-
-type PrayerEntry = { id: string; initials: string; text: string; time: string };
-type GroupPlan = { reference: string; daysLeft: number };
+function initialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[1][0]).toUpperCase();
+}
 
 export default function ChurchScreen() {
   const { theme } = useTheme();
   const { isOffline } = useNetwork();
   const router = useRouter();
-  const { church, setChurch, leaveGroup } = useChurch();
+  const {
+    church,
+    members,
+    prayers,
+    loading,
+    joinGroup,
+    createGroup,
+    leaveGroup,
+    setWeeklyPlan,
+    sendPrayer,
+    toggleMyCompletion,
+  } = useChurch();
+  const [myUserId, setMyUserId] = useState<string | null>(null);
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [groupName, setGroupName] = useState('');
   const [churchName, setChurchName] = useState('');
   const [copied, setCopied] = useState(false);
-  const [prayers, setPrayers] = useState<PrayerEntry[]>([]);
   const [prayerInput, setPrayerInput] = useState('');
-  const [groupPlan, setGroupPlan] = useState<GroupPlan>(DEFAULT_GROUP_PLAN);
   const [planModalVisible, setPlanModalVisible] = useState(false);
   const [planBookId, setPlanBookId] = useState('mat');
   const [planChStart, setPlanChStart] = useState(1);
   const [planChEnd, setPlanChEnd] = useState(7);
+  const [busy, setBusy] = useState(false);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
 
-  const loadPrayers = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(STORAGE_PRAYERS);
-      if (raw != null) setPrayers(JSON.parse(raw) as PrayerEntry[]);
-      else setPrayers([]);
-    } catch (_) {
-      setPrayers([]);
-    }
-  }, []);
-
-  const loadGroupPlan = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(STORAGE_GROUP_PLAN);
-      if (raw != null) setGroupPlan(JSON.parse(raw) as GroupPlan);
-      else setGroupPlan(DEFAULT_GROUP_PLAN);
-    } catch (_) {
-      setGroupPlan(DEFAULT_GROUP_PLAN);
-    }
-  }, []);
-
   useEffect(() => {
-    if (church != null) {
-      loadPrayers();
-      loadGroupPlan();
-    }
-  }, [church != null, loadPrayers, loadGroupPlan]);
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => setMyUserId(data.user?.id ?? null));
+  }, []);
 
-  const sendPrayer = useCallback(async () => {
-    const text = prayerInput.trim();
-    if (!text) return;
-    const entry: PrayerEntry = {
-      id: Date.now().toString(),
-      initials: 'S',
-      text,
-      time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-    };
-    const next = [entry, ...prayers];
-    setPrayers(next);
-    setPrayerInput('');
-    try {
-      await AsyncStorage.setItem(STORAGE_PRAYERS, JSON.stringify(next));
-    } catch (_) {}
-  }, [prayerInput, prayers]);
-
-  const setPlanAndNotify = useCallback(async () => {
-    const book = newTestament.find((b) => b.id === planBookId);
-    const name = book?.name ?? planBookId;
-    const reference = `${name} ${planChStart}-${planChEnd}`;
-    const plan: GroupPlan = { reference, daysLeft: 7 };
-    setGroupPlan(plan);
-    setPlanModalVisible(false);
-    try {
-      await AsyncStorage.setItem(STORAGE_GROUP_PLAN, JSON.stringify(plan));
-    } catch (_) {}
-    showAlert('Plan kaydedildi', `Grup üyelerine "${reference}" haftalık okuma planı bildirildi.`);
-  }, [planBookId, planChStart, planChEnd]);
-
-  const handleJoin = useCallback(() => {
+  const handleJoin = useCallback(async () => {
     if (isOffline) {
       showAlert('İnternet gerekli', 'Kilise modu için bağlantı gerekir.');
       return;
     }
     const code = joinCode.trim().toUpperCase();
     if (code.length !== 6) return;
-    if (code === DEMO_JOIN_CODE) {
-      setChurch({
-        groupName: 'Söz Kilise Grubu',
-        churchName: 'Demo Kilise',
-        code: DEMO_JOIN_CODE,
-        role: 'member',
-        joinedAt: new Date().toISOString(),
-        members: 12,
-      });
+    setBusy(true);
+    const result = await joinGroup(code);
+    setBusy(false);
+    if (result.ok) {
       setJoinModalVisible(false);
       setJoinCode('');
     } else {
-      showAlert('Geçersiz kod', 'Girdiğiniz kod geçerli değil. Demo için "SOZI23" kullanın.');
+      showAlert('Katılınamadı', result.error ?? 'Bir hata oluştu.');
     }
-  }, [joinCode, setChurch, isOffline]);
+  }, [joinCode, joinGroup, isOffline, showAlert]);
 
-  const handleCreate = useCallback(() => {
+  const handleCreate = useCallback(async () => {
     if (isOffline) {
       showAlert('İnternet gerekli', 'Kilise modu için bağlantı gerekir.');
       return;
@@ -147,35 +94,61 @@ export default function ChurchScreen() {
     const name = groupName.trim();
     const churchNameTrimmed = churchName.trim();
     if (!name || !churchNameTrimmed) return;
-    const code = generateGroupCode();
-    setChurch({
-      groupName: name,
-      churchName: churchNameTrimmed,
-      code,
-      role: 'admin',
-      joinedAt: new Date().toISOString(),
-      members: 1,
-    });
-    setCreateModalVisible(false);
-    setGroupName('');
-    setChurchName('');
-  }, [groupName, churchName, setChurch, isOffline]);
+    setBusy(true);
+    const result = await createGroup(name, churchNameTrimmed);
+    setBusy(false);
+    if (result.ok) {
+      setCreateModalVisible(false);
+      setGroupName('');
+      setChurchName('');
+    } else {
+      showAlert('Oluşturulamadı', result.error ?? 'Bir hata oluştu.');
+    }
+  }, [groupName, churchName, createGroup, isOffline, showAlert]);
 
-  const handleCopyCode = useCallback(() => {
+  const handleCopyCode = useCallback(async () => {
     if (!church) return;
+    await Clipboard.setStringAsync(church.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    // Optional: add expo-clipboard and use Clipboard.setStringAsync(church.code)
   }, [church]);
+
+  const handleSendPrayer = useCallback(async () => {
+    const text = prayerInput.trim();
+    if (!text) return;
+    setPrayerInput('');
+    const result = await sendPrayer(text);
+    if (!result.ok) {
+      showAlert('Gönderilemedi', result.error ?? 'Bir hata oluştu.');
+      setPrayerInput(text);
+    }
+  }, [prayerInput, sendPrayer, showAlert]);
+
+  const setPlanAndNotify = useCallback(async () => {
+    const book = newTestament.find((b) => b.id === planBookId);
+    const name = book?.name ?? planBookId;
+    const reference = `${name} ${planChStart}-${planChEnd}`;
+    const result = await setWeeklyPlan(reference, 7);
+    if (result.ok) {
+      setPlanModalVisible(false);
+      showAlert('Plan kaydedildi', `Grup üyelerine "${reference}" haftalık okuma planı bildirildi.`);
+    } else {
+      showAlert('Kaydedilemedi', result.error ?? 'Bir hata oluştu.');
+    }
+  }, [planBookId, planChStart, planChEnd, setWeeklyPlan, showAlert]);
 
   const handleLeave = useCallback(() => {
     showAlert('Grubu terk et', 'Gruptan ayrılmak istediğinize emin misiniz?', [
       { text: 'İptal', style: 'cancel' },
-      { text: 'Terk Et', style: 'destructive', onPress: async () => {
-        await leaveGroup();
-      } },
+      {
+        text: 'Terk Et',
+        style: 'destructive',
+        onPress: async () => {
+          await leaveGroup();
+        },
+      },
     ]);
-  }, [leaveGroup]);
+  }, [leaveGroup, showAlert]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -195,7 +168,11 @@ export default function ChurchScreen() {
         </View>
       ) : null}
 
-      {church == null ? (
+      {loading && church == null ? (
+        <View style={styles.emptyWrap}>
+          <ActivityIndicator color={ACCENT} />
+        </View>
+      ) : church == null ? (
         <View style={styles.emptyWrap}>
           <EmptyState
             icon="people-outline"
@@ -247,14 +224,10 @@ export default function ChurchScreen() {
         >
           <View style={[styles.statsStrip, { backgroundColor: 'rgba(196,149,80,0.06)' }]}>
             <View style={styles.statsStripRow}>
-              <Ionicons name="book-outline" size={14} color={ACCENT} />
-              <Text style={[styles.statsStripText, { color: theme.textMuted }]}>42 ayet okundu</Text>
-              <Text style={[styles.statsStripText, { color: theme.textMuted }]}> · </Text>
-              <Ionicons name="flame-outline" size={14} color={ACCENT} />
-              <Text style={[styles.statsStripText, { color: theme.textMuted }]}>5 gün seri</Text>
-              <Text style={[styles.statsStripText, { color: theme.textMuted }]}> · </Text>
               <Ionicons name="people-outline" size={14} color={ACCENT} />
-              <Text style={[styles.statsStripText, { color: theme.textMuted }]}>{church.members} üye</Text>
+              <Text style={[styles.statsStripText, { color: theme.textMuted }]}>
+                {members.length} üye
+              </Text>
             </View>
           </View>
 
@@ -278,11 +251,19 @@ export default function ChurchScreen() {
               </Pressable>
             </View>
 
-            <View style={[styles.planChip, { backgroundColor: colors.accentBadgeBg, borderColor: colors.accentBadgeBorder }]}>
-              <Text style={[styles.planChipText, { color: theme.text }]}>
-                Bu hafta: {groupPlan.reference} · {groupPlan.daysLeft} gün kaldı
-              </Text>
-            </View>
+            {church.planReference ? (
+              <View
+                style={[
+                  styles.planChip,
+                  { backgroundColor: colors.accentBadgeBg, borderColor: colors.accentBadgeBorder },
+                ]}
+              >
+                <Text style={[styles.planChipText, { color: theme.text }]}>
+                  Bu hafta: {church.planReference}
+                  {church.planDaysLeft != null ? ` · ${church.planDaysLeft} gün kaldı` : ''}
+                </Text>
+              </View>
+            ) : null}
 
             {church.role === 'admin' && (
               <Pressable
@@ -290,6 +271,27 @@ export default function ChurchScreen() {
                 onPress={() => setPlanModalVisible(true)}
               >
                 <Text style={styles.planSetBtnText}>Bu hafta okuma planı belirle</Text>
+              </Pressable>
+            )}
+
+            {church.planReference && (
+              <Pressable
+                style={[
+                  styles.planSetBtn,
+                  {
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderColor: ACCENT,
+                    marginTop: church.role === 'admin' ? -10 : 0,
+                  },
+                ]}
+                onPress={toggleMyCompletion}
+              >
+                <Text style={[styles.planSetBtnText, { color: ACCENT }]}>
+                  {members.find((m) => m.userId === myUserId)?.completed
+                    ? '✓ Bu haftayı tamamladım'
+                    : 'Bu haftayı tamamladım olarak işaretle'}
+                </Text>
               </Pressable>
             )}
 
@@ -301,45 +303,51 @@ export default function ChurchScreen() {
                 onChangeText={setPrayerInput}
                 placeholder="Dua isteği yazın..."
                 placeholderTextColor={theme.textMuted}
-                onSubmitEditing={sendPrayer}
+                onSubmitEditing={handleSendPrayer}
               />
-              <Pressable style={[styles.prayerSendBtn, { backgroundColor: ACCENT }]} onPress={sendPrayer}>
+              <Pressable style={[styles.prayerSendBtn, { backgroundColor: ACCENT }]} onPress={handleSendPrayer}>
                 <Text style={styles.prayerSendBtnText}>Gönder</Text>
               </Pressable>
             </View>
             {prayers.map((p) => (
               <View key={p.id} style={styles.prayerItem}>
                 <View style={[styles.prayerAvatar, { backgroundColor: 'rgba(196,149,80,0.2)' }]}>
-                  <Text style={[styles.prayerInitials, { color: ACCENT }]}>{p.initials}</Text>
+                  <Text style={[styles.prayerInitials, { color: ACCENT }]}>
+                    {initialsFromName(p.displayName)}
+                  </Text>
                 </View>
                 <View style={styles.prayerBody}>
                   <Text style={[styles.prayerText, { color: theme.text }]}>{p.text}</Text>
-                  <Text style={[styles.prayerTime, { color: theme.textMuted }]}>{p.time}</Text>
+                  <Text style={[styles.prayerTime, { color: theme.textMuted }]}>
+                    {p.displayName} ·{' '}
+                    {new Date(p.createdAt).toLocaleTimeString('tr-TR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
                 </View>
               </View>
             ))}
 
             <Text style={[styles.progressTitle, { color: theme.text }]}>Üye ilerlemesi</Text>
-            {MOCK_MEMBERS.map((m) => (
-              <View key={m.initials} style={styles.memberRow}>
-                <Text style={[styles.memberInitials, { color: theme.text }]}>{m.initials}</Text>
-                <View style={styles.memberProgressWrap}>
-                  <View style={[styles.memberProgressBg, { backgroundColor: 'rgba(196,149,80,0.12)' }]}>
-                    <View
-                      style={[
-                        styles.memberProgressFill,
-                        {
-                          width: `${m.percent}%`,
-                          backgroundColor: m.done ? '#2E7D32' : ACCENT,
-                        },
-                      ]}
-                    />
-                  </View>
+            {members.map((m) => (
+              <View key={m.userId} style={styles.memberRow}>
+                <View style={[styles.memberAvatar, { backgroundColor: 'rgba(196,149,80,0.2)' }]}>
+                  <Text style={[styles.memberInitials, { color: ACCENT }]}>
+                    {initialsFromName(m.displayName)}
+                  </Text>
                 </View>
-                <View style={styles.memberPercentRow}>
-                  <Text style={[styles.memberPercent, { color: theme.textMuted }]}>%{m.percent}</Text>
-                  {m.done ? <Ionicons name="checkmark-circle-outline" size={18} color={ACCENT} style={styles.memberPercentCheck} /> : null}
-                </View>
+                <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
+                  {m.displayName}
+                  {m.userId === myUserId ? ' (sen)' : ''}
+                </Text>
+                {church.planReference ? (
+                  m.completed ? (
+                    <Ionicons name="checkmark-circle" size={18} color="#2E7D32" />
+                  ) : (
+                    <Text style={[styles.memberWaiting, { color: theme.textMuted }]}>Bekliyor</Text>
+                  )
+                ) : null}
               </View>
             ))}
 
@@ -369,17 +377,22 @@ export default function ChurchScreen() {
               style={[styles.codeInput, { backgroundColor: theme.background, color: theme.text }]}
               value={joinCode}
               onChangeText={(t) => setJoinCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-              placeholder="SOZI23"
+              placeholder="ABC123"
               placeholderTextColor={theme.textMuted}
               maxLength={6}
               autoCapitalize="characters"
               autoCorrect={false}
             />
             <Pressable
-              style={[styles.modalBtn, { backgroundColor: ACCENT }]}
+              style={[styles.modalBtn, { backgroundColor: ACCENT, opacity: busy ? 0.6 : 1 }]}
               onPress={handleJoin}
+              disabled={busy}
             >
-              <Text style={styles.modalBtnText}>Katıl</Text>
+              {busy ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.modalBtnText}>Katıl</Text>
+              )}
             </Pressable>
           </Pressable>
         </Pressable>
@@ -417,10 +430,15 @@ export default function ChurchScreen() {
               placeholderTextColor={theme.textMuted}
             />
             <Pressable
-              style={[styles.modalBtn, { backgroundColor: ACCENT }]}
+              style={[styles.modalBtn, { backgroundColor: ACCENT, opacity: busy ? 0.6 : 1 }]}
               onPress={handleCreate}
+              disabled={busy}
             >
-              <Text style={styles.modalBtnText}>Oluştur</Text>
+              {busy ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.modalBtnText}>Oluştur</Text>
+              )}
             </Pressable>
           </Pressable>
         </Pressable>
@@ -533,22 +551,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 32,
   },
-  churchIcon: {
-    fontSize: 64,
-    marginBottom: 24,
-  },
-  emptyTitle: {
-    fontFamily: fonts.thin,
-    fontSize: 24,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  emptySubtitle: {
-    fontFamily: fonts.italic,
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 32,
-  },
   emptyButtons: {
     width: '100%',
     gap: 12,
@@ -631,11 +633,6 @@ const styles = StyleSheet.create({
   copyBtnText: {
     fontFamily: fonts.regular,
     fontSize: 12,
-  },
-  membersLabel: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    marginBottom: 16,
   },
   planChip: {
     alignSelf: 'flex-start',
@@ -728,37 +725,25 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(196,149,80,0.15)',
     gap: 10,
   },
+  memberAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   memberInitials: {
     fontFamily: fonts.medium,
-    fontSize: 14,
-    width: 28,
+    fontSize: 11,
   },
-  memberProgressWrap: {
+  memberName: {
     flex: 1,
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  memberProgressBg: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
-  memberProgressFill: {
-    height: 4,
-    borderRadius: 2,
-  },
-  memberPercentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 36,
-  },
-  memberPercentCheck: {
-    marginLeft: 4,
-  },
-  memberPercent: {
     fontFamily: fonts.regular,
     fontSize: 14,
+  },
+  memberWaiting: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
   },
   leaveBtn: {
     marginTop: 24,

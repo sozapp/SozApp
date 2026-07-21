@@ -21,6 +21,7 @@ import {
 import { getEnglishChapterTexts } from '@/constants/bibleLoader';
 import {
   type BibleVersion,
+  getTTSLanguage,
   STORAGE_BIBLE_VERSION,
   STORAGE_PARALLEL_EN,
   VERSION_LABELS,
@@ -582,6 +583,14 @@ export default function ReadScreen() {
 
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_BIBLE_VERSION, bibleVersion).catch(() => {});
+  }, [bibleVersion]);
+
+  useEffect(() => {
+    if (isSpeaking) {
+      void stop();
+    }
+    // Stop TTS when Bible version changes; do not depend on isSpeaking/stop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bibleVersion]);
 
   useEffect(() => {
@@ -2076,6 +2085,9 @@ export default function ReadScreen() {
               <Text style={[styles.toolbarLabel, { color: isSpeaking ? CHAPTER_NAV_COLOR : theme.textMuted }]}>
                 {tx('listen')}
               </Text>
+              <Text style={[styles.toolbarLangHint, { color: theme.textMuted }]}>
+                {getTTSLanguage(bibleVersion) === 'tr-TR' ? 'TR' : 'EN'}
+              </Text>
             </Pressable>
             <Pressable
               style={styles.toolbarIcon}
@@ -2901,6 +2913,11 @@ const styles = StyleSheet.create({
     fontSize: 9,
     letterSpacing: 0.45,
     marginTop: 2,
+  },
+  toolbarLangHint: {
+    fontFamily: fonts.regular,
+    fontSize: 9,
+    marginTop: 0,
   },
   langSelectorRow: {
     flexDirection: 'row',
