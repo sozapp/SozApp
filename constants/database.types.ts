@@ -23,6 +23,7 @@ export type Database = {
           is_premium: boolean;
           premium_expires_at: string | null;
           revenuecat_app_user_id: string | null;
+          avatar_url: string | null;
         };
         Insert: {
           id: string;
@@ -32,6 +33,7 @@ export type Database = {
           is_premium?: boolean;
           premium_expires_at?: string | null;
           revenuecat_app_user_id?: string | null;
+          avatar_url?: string | null;
         };
         Update: {
           id?: string;
@@ -41,6 +43,7 @@ export type Database = {
           is_premium?: boolean;
           premium_expires_at?: string | null;
           revenuecat_app_user_id?: string | null;
+          avatar_url?: string | null;
         };
         Relationships: [];
       };

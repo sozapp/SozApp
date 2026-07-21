@@ -410,3 +410,42 @@ CREATE POLICY "church_plan_completions_delete" ON church_plan_completions FOR DE
 DROP INDEX IF EXISTS idx_church_prayers_group;
 CREATE INDEX IF NOT EXISTS idx_church_prayers_group_created
   ON church_prayers(group_id, created_at DESC);
+
+-- Profil fotoğrafı: önceden sadece cihaz-yerel (@soz/profileImage) olduğu
+-- için telefon değişince / uygulama silinip yüklenince kayboluyordu.
+-- Şimdi Supabase Storage'a yükleniyor, profiles.avatar_url'de tutuluyor.
+-- Bucket public-read (profil fotoğrafı hassas veri değil, ileride arkadaş/
+-- grup üyesi fotoğrafı gösterme ihtimaline karşı imzalı URL karmaşıklığından
+-- kaçınıldı) — yazma/güncelleme/silme sadece dosyanın kendi klasöründeki
+-- (user_id) sahibine açık.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_owner_insert" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_owner_update" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_owner_delete" ON storage.objects;
+
+CREATE POLICY "avatars_public_read" ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "avatars_owner_insert" ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "avatars_owner_update" ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+CREATE POLICY "avatars_owner_delete" ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'avatars'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;

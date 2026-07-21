@@ -796,6 +796,7 @@ export default function ProfileScreen() {
   const denomName = denomMeta?.name ?? 'Diğer';
 
   const loadAll = useCallback(async () => {
+    let avatarFromServer = false;
     try {
       if (!supabase) {
         console.log('Supabase not available, using local storage');
@@ -818,7 +819,7 @@ export default function ProfileScreen() {
           try {
             const { data: prof } = await supabase
               .from('profiles')
-              .select('display_name')
+              .select('display_name, avatar_url')
               .eq('id', u.id)
               .maybeSingle();
             const name =
@@ -827,6 +828,11 @@ export default function ProfileScreen() {
               u.email?.split('@')[0] ||
               'Kullanıcı';
             setUserName(name);
+            if (prof?.avatar_url) {
+              avatarFromServer = true;
+              setProfileImage(prof.avatar_url as string);
+              await AsyncStorage.setItem(STORAGE_PROFILE_IMAGE, prof.avatar_url as string).catch(() => {});
+            }
           } catch {
             setUserName(u.email?.split('@')[0] ?? 'Kullanıcı');
           }
@@ -852,11 +858,13 @@ export default function ProfileScreen() {
         }
       }
 
-      try {
-        const img = await AsyncStorage.getItem(STORAGE_PROFILE_IMAGE);
-        setProfileImage(img ?? null);
-      } catch {
-        setProfileImage(null);
+      if (!avatarFromServer) {
+        try {
+          const img = await AsyncStorage.getItem(STORAGE_PROFILE_IMAGE);
+          setProfileImage(img ?? null);
+        } catch {
+          setProfileImage(null);
+        }
       }
 
       try {
@@ -1011,19 +1019,51 @@ export default function ProfileScreen() {
         aspect: [1, 1],
         quality: 0.7,
       });
-      if (!result.canceled && result.assets[0]) {
-        const uri = result.assets[0].uri;
-        try {
-          await AsyncStorage.setItem(STORAGE_PROFILE_IMAGE, uri);
-        } catch {
-          /* ignore */
-        }
-        setProfileImage(uri);
+      if (result.canceled || !result.assets[0]) return;
+      const uri = result.assets[0].uri;
+      // Sunucuya yüklenene kadar ekranda hemen görünsün diye önce yerel gösterim.
+      setProfileImage(uri);
+      try {
+        await AsyncStorage.setItem(STORAGE_PROFILE_IMAGE, uri);
+      } catch {
+        /* ignore */
+      }
+
+      if (!supabase) return;
+      const {
+        data: { user: u },
+      } = await supabase.auth.getUser();
+      if (!u || !isRealAccount(u)) return;
+
+      try {
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const path = `${u.id}/avatar.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        // Aynı yoldaki eski dosyanın cache'lenmiş görüntüsü yerine yenisi gösterilsin.
+        const bustedUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ avatar_url: bustedUrl })
+          .eq('id', u.id);
+        if (updateError) throw updateError;
+
+        setProfileImage(bustedUrl);
+        await AsyncStorage.setItem(STORAGE_PROFILE_IMAGE, bustedUrl).catch(() => {});
+      } catch (e) {
+        console.log('Avatar upload error:', e);
+        showAlert('Yüklenemedi', 'Fotoğraf sunucuya yüklenemedi, bu cihazda görünmeye devam edecek.');
       }
     } catch {
       /* ignore */
     }
-  }, [t]);
+  }, [t, showAlert]);
 
   const openEditProfile = useCallback(() => {
     setEditNameDraft(userName);
