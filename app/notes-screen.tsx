@@ -358,8 +358,34 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
     return favorites.filter((f: FavoriteItem) => new Date(f.addedAt).getTime() >= cutoff).length;
   }, [favorites]);
 
-  const activityThisWeek = notesThisWeek + highlightsThisWeek + favoritesThisWeek;
-  const totalActivityCount = noteEntries.length + highlightEntries.length + favorites.length;
+  const prayersThisWeek = useMemo(() => {
+    const cutoff = Date.now() - SEVEN_DAYS_MS;
+    return prayers.filter((p) => new Date(p.createdAt).getTime() >= cutoff).length;
+  }, [prayers]);
+
+  const activeTabStats = useMemo(() => {
+    switch (activeTab) {
+      case 'highlights':
+        return { thisWeek: highlightsThisWeek, total: highlightEntries.length, noun: 'vurgu' };
+      case 'favorites':
+        return { thisWeek: favoritesThisWeek, total: favorites.length, noun: 'favori' };
+      case 'prayers':
+        return { thisWeek: prayersThisWeek, total: prayers.length, noun: 'dua' };
+      case 'notes':
+      default:
+        return { thisWeek: notesThisWeek, total: noteEntries.length, noun: 'not' };
+    }
+  }, [
+    activeTab,
+    notesThisWeek,
+    noteEntries.length,
+    highlightsThisWeek,
+    highlightEntries.length,
+    favoritesThisWeek,
+    favorites.length,
+    prayersThisWeek,
+    prayers.length,
+  ]);
 
   const searchAnimatedStyle = useAnimatedStyle(() => ({
     height: searchHeight.value,
@@ -722,18 +748,18 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
           </View>
         </Animated.View>
 
-        {!searchVisible && totalActivityCount > 0 && (
+        {!searchVisible && activeTabStats.total > 0 && (
           <>
             <View style={styles.statsBanner}>
               <View style={styles.statsBannerLeft}>
                 <Ionicons name="create-outline" size={18} color={ACCENT} />
                 <Text style={styles.statsBannerText}>
-                  {activityThisWeek > 0
-                    ? `Bu hafta ${activityThisWeek} öğe ekledin`
-                    : 'Bu hafta henüz not, favori ya da vurgu eklemedin'}
+                  {activeTabStats.thisWeek > 0
+                    ? `Bu hafta ${activeTabStats.thisWeek} ${activeTabStats.noun} ekledin`
+                    : `Bu hafta henüz ${activeTabStats.noun} eklemedin`}
                 </Text>
               </View>
-              <Text style={styles.statsBannerTotal}>{totalActivityCount} toplam</Text>
+              <Text style={styles.statsBannerTotal}>{activeTabStats.total} toplam</Text>
             </View>
             {atNotesLimit && (
               <Text style={[styles.limitWarning, { color: colors.textMuted }]}>
