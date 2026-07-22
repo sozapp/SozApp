@@ -347,12 +347,12 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       fontFamily: fonts.regular,
     },
     streakZeroCard: {
-      marginTop: 10,
+      marginHorizontal: 16,
+      marginBottom: 12,
       borderRadius: 16,
       borderWidth: 0.5,
       borderColor: `${ACCENT}40`,
       padding: 14,
-      maxWidth: 320,
       overflow: 'hidden',
       position: 'relative',
     },
@@ -2188,35 +2188,6 @@ export default function HomeScreen() {
                   </View>
                 ) : null}
               </View>
-              {streak === 0 ? (
-                <View style={styles.streakZeroCard}>
-                  <LinearGradient
-                    colors={[`${ACCENT}22`, `${ACCENT}08`]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                  />
-                  <View style={styles.streakZeroIconWrap}>
-                    <Ionicons name="flame" size={20} color={ACCENT} />
-                  </View>
-                  <View style={styles.streakZeroTextWrap}>
-                    <Text style={styles.streakZeroTitle}>Bugün başla!</Text>
-                    <Text style={styles.streakZeroDesc}>Her gün okumak ruhsal büyümenin temelidir</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.streakZeroBtn}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(tabs)/read',
-                        params: { bookId: DEFAULT_READ_BOOK_ID, chapter: '1' },
-                      })
-                    }
-                    activeOpacity={0.86}
-                  >
-                    <Text style={styles.streakZeroBtnText}>İlk Bölümü Oku →</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
               {!isPremium ? (
                 <TouchableOpacity
                   style={styles.proLink}
@@ -2262,6 +2233,36 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </View>
+
+        {streak === 0 ? (
+          <View style={styles.streakZeroCard}>
+            <LinearGradient
+              colors={[`${ACCENT}22`, `${ACCENT}08`]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.streakZeroIconWrap}>
+              <Ionicons name="flame" size={20} color={ACCENT} />
+            </View>
+            <View style={styles.streakZeroTextWrap}>
+              <Text style={styles.streakZeroTitle}>Bugün başla!</Text>
+              <Text style={styles.streakZeroDesc}>Her gün okumak ruhsal büyümenin temelidir</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.streakZeroBtn}
+              onPress={() =>
+                router.push({
+                  pathname: '/(tabs)/read',
+                  params: { bookId: DEFAULT_READ_BOOK_ID, chapter: '1' },
+                })
+              }
+              activeOpacity={0.86}
+            >
+              <Text style={styles.streakZeroBtnText}>İlk Bölümü Oku →</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <TouchableOpacity
           style={styles.greetingBanner}
