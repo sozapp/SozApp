@@ -4,12 +4,13 @@ import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { supabase } from '@/constants/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { useSwipeBack } from '@/hooks/useSwipeBack';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -150,13 +151,49 @@ export default function AuthScreen() {
   const surface = theme.surface ?? '#1A1612';
   const text = theme.text ?? '#E8E0D0';
   const muted = theme.textMuted ?? 'rgba(232,224,208,0.5)';
-  const swipeBack = useSwipeBack();
+  const haptics = useHaptics();
+
+  // Tek parmak sağa kaydırma → geri; iki parmakla yana kaydırma → Giriş/Kayıt
+  // sekmesi değiştir. İkisi de PanResponder olduğu için tek bir responder'da
+  // birleştirildi (iki farklı panHandlers aynı View'a spread edilemez).
+  const gestureResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 30 && Math.abs(g.dy) < 50,
+        onPanResponderRelease: (_, g) => {
+          if (Math.abs(g.dx) < 80 || Math.abs(g.dy) >= 50) return;
+          if (g.numberActiveTouches >= 2) {
+            try {
+              haptics.selection();
+            } catch {
+              /* ignore */
+            }
+            setMode(g.dx < 0 ? 'signup' : 'signin');
+          } else if (g.dx > 0) {
+            try {
+              haptics.light();
+            } catch {
+              /* ignore */
+            }
+            router.canGoBack() ? router.back() : router.replace('/(tabs)');
+          }
+        },
+      }).panHandlers,
+    [haptics, router]
+  );
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top']}>
-      <View style={styles.safeInner} {...swipeBack}>
+      <View style={styles.safeInner} {...gestureResponder}>
       <View style={styles.header}>
-        <View style={styles.headerLeft} />
+        <Pressable
+          style={styles.headerLeft}
+          hitSlop={12}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+        >
+          <Ionicons name="arrow-back" size={22} color={text} />
+        </Pressable>
         <Text style={[styles.headerTitle, { color: text }]}>Hesap</Text>
         <View style={styles.headerRight} />
       </View>
@@ -239,8 +276,8 @@ export default function AuthScreen() {
             >
               <Ionicons
                 name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
-                size={22}
-                color={muted}
+                size={20}
+                color={text}
               />
             </Pressable>
           </View>
@@ -274,15 +311,18 @@ export default function AuthScreen() {
           </Pressable>
 
           <Pressable onPress={() => setMode(mode === 'signup' ? 'signin' : 'signup')} style={styles.switchMode}>
-            <Text style={[styles.switchModeText, { color: muted }]}>
-              {mode === 'signup'
-                ? 'Zaten hesabın var mı? Giriş Yap'
-                : 'Hesabın yok mu? Kayıt Ol'}
+            <Text style={styles.switchModeText}>
+              <Text style={{ color: muted }}>
+                {mode === 'signup' ? 'Zaten hesabın var mı? ' : 'Hesabın yok mu? '}
+              </Text>
+              <Text style={{ color: ACCENT, fontFamily: fonts.medium }}>
+                {mode === 'signup' ? 'Giriş Yap' : 'Kayıt Ol'}
+              </Text>
             </Text>
           </Pressable>
 
           <Pressable onPress={handleGuestContinue} style={styles.guestWrap}>
-            <Text style={[styles.guestText, { color: muted }]}>Hesap olmadan devam et →</Text>
+            <Text style={[styles.guestText, { color: text }]}>Hesap olmadan devam et →</Text>
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -338,9 +378,11 @@ const styles = StyleSheet.create({
   passwordInput: { paddingRight: 48 },
   eyeBtn: {
     position: 'absolute',
-    right: 12,
+    right: 14,
     top: 0,
     bottom: 0,
+    width: 28,
+    alignItems: 'center',
     justifyContent: 'center',
   },
   forgotWrap: { alignItems: 'flex-end', marginBottom: 16 },
@@ -353,7 +395,12 @@ const styles = StyleSheet.create({
   },
   submitBtnText: { fontFamily: fonts.medium, fontSize: 16, color: colors.white },
   switchMode: { marginTop: 20, alignItems: 'center' },
-  switchModeText: { fontFamily: fonts.regular, fontSize: 14 },
-  guestWrap: { marginTop: 24, alignItems: 'center' },
-  guestText: { fontFamily: fonts.regular, fontSize: 13 },
+  switchModeText: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center' },
+  guestWrap: {
+    marginTop: 24,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  guestText: { fontFamily: fonts.medium, fontSize: 14 },
 });
