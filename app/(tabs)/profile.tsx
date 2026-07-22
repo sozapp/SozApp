@@ -18,6 +18,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -733,6 +734,7 @@ export default function ProfileScreen() {
   const { isPremium } = usePremium();
   const { denomination, changeDenomination } = useDenomination();
 
+  const [refreshing, setRefreshing] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [userName, setUserName] = useState('Misafir Kullanıcı');
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -1219,7 +1221,25 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              try {
+                await loadAll();
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+            tintColor={ACCENT}
+          />
+        }
+      >
         {/* BÖLÜM 1 — Profil Header */}
         <View style={styles.header}>
           <Pressable style={styles.avatarWrap} onPress={pickImage}>
