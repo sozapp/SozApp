@@ -969,15 +969,11 @@ export default function ProfileScreen() {
       try {
         const [modernRaw, legacyRaw] = await AsyncStorage.multiGet(['@soz/planProgress', '@soz/plan-progress']);
         const planRaw = modernRaw[1] ?? legacyRaw[1];
-        const chapters = getPlanCompletedChapters(planRaw);
-        if (chapters > 0) {
-          setPlanChaptersRead(chapters);
-          setNtChaptersRead(chapters);
-        } else {
-          const n = await getNtChaptersReadCount();
-          setPlanChaptersRead(n);
-          setNtChaptersRead(n);
-        }
+        const planChapters = getPlanCompletedChapters(planRaw);
+        const readChapters = await getNtChaptersReadCount();
+        const chapters = Math.max(planChapters, readChapters);
+        setPlanChaptersRead(chapters);
+        setNtChaptersRead(chapters);
       } catch {
         setPlanChaptersRead(0);
         setNtChaptersRead(0);
