@@ -42,6 +42,15 @@ function todayString(): string {
 
 const ACCENT = '#C4956A';
 
+// plans.ts'teki bookShort (Türkçe kısaltma) -> read.tsx'in beklediği bookId.
+// Çoğu zaten küçük harfle eşleşiyor, Yuhanna ("Yuh") tek istisna ("joh").
+const BOOK_SHORT_TO_ID: Record<string, string> = {
+  Mat: 'mat',
+  Mar: 'mar',
+  Luk: 'luk',
+  Yuh: 'joh',
+};
+
 export default function PlansScreen() {
   const { theme } = useTheme();
   const router = useRouter();
@@ -137,7 +146,16 @@ export default function PlansScreen() {
       } catch (_) {
         // ignore
       }
-      router.push('/(tabs)/read');
+      const dayInfo = plan.days.find((d) => d.day === currentDay);
+      const bookId = dayInfo ? BOOK_SHORT_TO_ID[dayInfo.bookShort] : undefined;
+      if (dayInfo && bookId) {
+        router.push({
+          pathname: '/(tabs)/read',
+          params: { bookId, chapter: String(dayInfo.chapter) },
+        });
+      } else {
+        router.push('/(tabs)/read');
+      }
     },
     [progressByPlanId, router, loadProgress, haptics, isOnline]
   );
