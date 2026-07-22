@@ -345,13 +345,25 @@ DROP POLICY IF EXISTS "church_group_members_select" ON church_group_members;
 DROP POLICY IF EXISTS "church_group_members_insert" ON church_group_members;
 DROP POLICY IF EXISTS "church_group_members_delete" ON church_group_members;
 
-CREATE POLICY "church_group_members_select" ON church_group_members FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM church_group_members me
-      WHERE me.group_id = church_group_members.group_id AND me.user_id = auth.uid()
-    )
+-- church_group_members_select'in kendi tablosuna EXISTS ile bakması
+-- Postgres'te "infinite recursion detected in policy" (42P17) hatasına yol
+-- açıyordu — RLS, alt sorgudaki church_group_members erişimi için politikayı
+-- tekrar tetikliyor. SECURITY DEFINER fonksiyon RLS'i atlayarak döngüyü kırar.
+CREATE OR REPLACE FUNCTION public.is_church_group_member(p_group_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM church_group_members
+    WHERE group_id = p_group_id AND user_id = auth.uid()
   );
+$$;
+
+CREATE POLICY "church_group_members_select" ON church_group_members FOR SELECT
+  USING (public.is_church_group_member(group_id));
 
 CREATE POLICY "church_group_members_insert" ON church_group_members FOR INSERT
   WITH CHECK (auth.uid() = user_id);
