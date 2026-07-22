@@ -29,6 +29,9 @@ export default {
       usesCleartextTraffic: true,
     },
     plugins: [
+      'expo-font',
+      'expo-router',
+      'expo-web-browser',
       [
         'expo-notifications',
         {
