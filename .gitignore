@@ -45,3 +45,6 @@ app-example
 
 # Claude Code tooling (worktrees, local state)
 .claude/
+
+# Supabase CLI local state
+supabase/.temp/

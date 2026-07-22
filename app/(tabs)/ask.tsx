@@ -483,7 +483,7 @@ export default function AskScreen() {
               },
             ]);
           } else {
-            showAlert('Hata', `Bağlantı hatası, tekrar deneyin.\n\n[debug: ${msg || 'bilinmeyen hata'}]`);
+            showAlert('Hata', 'Bağlantı hatası, tekrar deneyin.');
             setLastFailedQuestion(trimmed);
             setMessages((prev) => [
               ...prev,
