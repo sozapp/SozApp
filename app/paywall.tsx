@@ -9,7 +9,6 @@ import {
 } from '@/constants/purchases';
 import { fonts } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -131,7 +130,6 @@ export default function PaywallScreen() {
   }, []);
 
   const handleSubscribe = handleActivate;
-  const swipeBack = useSwipeBack();
 
   const onPagerScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
@@ -144,7 +142,7 @@ export default function PaywallScreen() {
   }, []);
 
   return (
-    <View style={styles.safe} {...swipeBack}>
+    <View style={styles.safe}>
       <SafeAreaView style={styles.safeInner} edges={['top']}>
         <View style={styles.headerRow}>
           <View style={styles.headerSpacer} />
