@@ -804,22 +804,22 @@ export default function ReadScreen() {
           toValue: toX,
           duration: 200,
           easing: Easing.in(Easing.quad),
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(pageScale, {
           toValue: 0.96,
           duration: 200,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(pageOpacity, {
           toValue: 0.3,
           duration: 180,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
         Animated.timing(overlayOpacity, {
           toValue: 1,
           duration: 200,
-          useNativeDriver: false,
+          useNativeDriver: true,
         }),
       ]).start(() => {
         onComplete();
@@ -833,24 +833,24 @@ export default function ReadScreen() {
             toValue: 0,
             tension: 70,
             friction: 11,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.spring(pageScale, {
             toValue: 1,
             tension: 70,
             friction: 11,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(pageOpacity, {
             toValue: 1,
             duration: 220,
             easing: Easing.out(Easing.quad),
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(overlayOpacity, {
             toValue: 0,
             duration: 200,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ]).start(() => setIsPageTurning(false));
       });
@@ -2809,17 +2809,23 @@ const styles = StyleSheet.create({
   },
   readProgressWrap: {
     width: '100%',
+    paddingHorizontal: 16,
+    paddingBottom: 6,
   },
   readProgressBg: {
-    height: 2,
+    height: 3,
     backgroundColor: 'rgba(196,149,80,0.15)',
-    borderRadius: 0,
+    borderRadius: 2,
     overflow: 'hidden',
   },
   readProgressFill: {
     height: '100%',
     backgroundColor: CHAPTER_NAV_COLOR,
-    borderRadius: 0,
+    borderRadius: 2,
+    shadowColor: CHAPTER_NAV_COLOR,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 3,
   },
   listWrap: {
     flex: 1,
