@@ -41,11 +41,12 @@ import ShareVerseModal from '@/components/ShareVerseModal';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
-import { usePremium } from '@/hooks/usePremium';
 
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
 const TUTORIAL_SEEN_KEY = '@soz/tutorialSeen';
+const STREAK_CARD_DISMISSED_AT_KEY = '@soz/streakCardDismissedAt';
+const STREAK_CARD_COOLDOWN_MS = 4 * 24 * 60 * 60 * 1000;
 
 const HOME_TUTORIAL_STEPS = [
   {
@@ -338,43 +339,59 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     streakZeroCard: {
       marginHorizontal: 16,
       marginBottom: 12,
-      borderRadius: 16,
+      borderRadius: 18,
       borderWidth: 0.5,
       borderColor: `${ACCENT}40`,
-      padding: 14,
+      padding: 16,
       overflow: 'hidden',
       position: 'relative',
     },
+    streakZeroCloseBtn: {
+      position: 'absolute',
+      top: 12,
+      right: 12,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0,0,0,0.06)',
+      zIndex: 1,
+    },
+    streakZeroHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingRight: 30,
+      marginBottom: 6,
+    },
     streakZeroIconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
+      width: 34,
+      height: 34,
+      borderRadius: 11,
       backgroundColor: `${ACCENT}22`,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 10,
-    },
-    streakZeroTextWrap: {
-      gap: 3,
-      marginBottom: 12,
     },
     streakZeroTitle: {
-      fontSize: 15,
+      fontSize: 16,
       color: colors.text,
       fontFamily: fonts.medium,
     },
     streakZeroDesc: {
-      fontSize: 12,
+      fontSize: 13,
       color: textSecondary,
       fontFamily: fonts.regular,
-      lineHeight: 18,
+      lineHeight: 19,
+      marginBottom: 14,
+      paddingRight: 16,
     },
     streakZeroBtn: {
       alignSelf: 'flex-start',
       backgroundColor: ACCENT,
-      borderRadius: 10,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 11,
       shadowColor: ACCENT,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.3,
@@ -382,7 +399,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       elevation: 3,
     },
     streakZeroBtnText: {
-      fontSize: 13,
+      fontSize: 13.5,
       color: '#FFF8EE',
       fontFamily: fonts.medium,
     },
@@ -1588,8 +1605,8 @@ export default function HomeScreen() {
   const { colors, fonts } = useTheme();
   const { t, language } = useTranslation();
   const [userName, setUserName] = useState('');
-  const { isPremium } = usePremium();
   const [streak, setStreak] = useState(0);
+  const [streakCardDismissed, setStreakCardDismissed] = useState(false);
   const { isOnline } = useNetwork();
   const [planDay, setPlanDay] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
@@ -2052,8 +2069,11 @@ export default function HomeScreen() {
             '@soz/lastMood',
             '@soz/lastMoodAt',
             `@soz/reflectionDone/${todayDevotional.day}`,
+            STREAK_CARD_DISMISSED_AT_KEY,
           ]);
           setStreak(parseInt(vals[0][1] ?? '0', 10));
+          const dismissedAt = vals[6][1] ? parseInt(vals[6][1], 10) : 0;
+          setStreakCardDismissed(Boolean(dismissedAt) && Date.now() - dismissedAt < STREAK_CARD_COOLDOWN_MS);
           const planVal = vals[1][1];
           if (planVal != null) {
             try {
@@ -2089,6 +2109,11 @@ export default function HomeScreen() {
       return () => {};
     }, [todayDevotional.day])
   );
+
+  const dismissStreakCard = useCallback(() => {
+    setStreakCardDismissed(true);
+    AsyncStorage.setItem(STREAK_CARD_DISMISSED_AT_KEY, String(Date.now())).catch(() => {});
+  }, []);
 
   const finishTutorial = useCallback(async () => {
     setShowTutorial(false);
@@ -2214,7 +2239,7 @@ export default function HomeScreen() {
           ) : null}
         </View>
 
-        {streak === 0 ? (
+        {streak === 0 && !streakCardDismissed ? (
           <View style={styles.streakZeroCard}>
             <LinearGradient
               colors={[`${ACCENT}22`, `${ACCENT}08`]}
@@ -2222,13 +2247,21 @@ export default function HomeScreen() {
               end={{ x: 1, y: 1 }}
               style={StyleSheet.absoluteFillObject}
             />
-            <View style={styles.streakZeroIconWrap}>
-              <Ionicons name="flame" size={20} color={ACCENT} />
-            </View>
-            <View style={styles.streakZeroTextWrap}>
+            <TouchableOpacity
+              style={styles.streakZeroCloseBtn}
+              onPress={dismissStreakCard}
+              hitSlop={10}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={styles.streakZeroHeaderRow}>
+              <View style={styles.streakZeroIconWrap}>
+                <Ionicons name="flame" size={18} color={ACCENT} />
+              </View>
               <Text style={styles.streakZeroTitle}>Bugün başla!</Text>
-              <Text style={styles.streakZeroDesc}>Her gün okumak ruhsal büyümenin temelidir</Text>
             </View>
+            <Text style={styles.streakZeroDesc}>Her gün okumak ruhsal büyümenin temelidir</Text>
             <TouchableOpacity
               style={styles.streakZeroBtn}
               onPress={() =>
