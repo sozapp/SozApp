@@ -1899,9 +1899,10 @@ export default function HomeScreen() {
       params: {
         book: dailyVerse.book,
         chapter: String(dailyVerse.chapter),
+        highlightVerse: String(dailyVerse.verse),
       },
     });
-  }, [dailyVerse.book, dailyVerse.chapter]);
+  }, [dailyVerse.book, dailyVerse.chapter, dailyVerse.verse]);
 
   const trimmedUserName = userName?.trim() ?? '';
   const profileInitial =
