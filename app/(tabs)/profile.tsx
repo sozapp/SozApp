@@ -588,13 +588,6 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
       padding: 14,
     },
     shareBtnText: { fontSize: 15, color: ACCENT, fontFamily: fonts.regular },
-    resetText: {
-      marginTop: 16,
-      textAlign: 'center',
-      fontSize: 13,
-      color: '#E57373',
-      fontFamily: fonts.regular,
-    },
 
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
     sheet: {
@@ -1529,9 +1522,9 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Kart 4 — Hesap & Destek */}
+          {/* Kart 4 — Hesap */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('accountSupport')}</Text>
+            <Text style={styles.cardTitle}>HESAP</Text>
             {userEmail ? (
               <>
                 <Pressable style={styles.row} onPress={() => router.push('/change-email')}>
@@ -1553,7 +1546,7 @@ export default function ProfileScreen() {
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
                 <Pressable
-                  style={[styles.row, styles.rowLast]}
+                  style={[styles.row, isPremium && styles.rowLast]}
                   onPress={async () => {
                     try {
                       if (supabase) await supabase.auth.signOut();
@@ -1590,7 +1583,7 @@ export default function ProfileScreen() {
             )}
 
             {!isPremium && (
-              <Pressable style={styles.row} onPress={() => router.push('/paywall')}>
+              <Pressable style={[styles.row, styles.rowLast]} onPress={() => router.push('/paywall')}>
                 <View style={styles.rowIcon}>
                   <Ionicons name="diamond-outline" size={18} color={ACCENT} />
                 </View>
@@ -1600,6 +1593,11 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
             )}
+          </View>
+
+          {/* Kart 5 — Veri */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>VERİ</Text>
             <TouchableOpacity
               style={styles.row}
               activeOpacity={0.8}
@@ -1646,6 +1644,20 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
+            <Pressable style={[styles.row, styles.rowLast]} onPress={handleReset}>
+              <View style={styles.rowIcon}>
+                <Ionicons name="trash-outline" size={18} color={DANGER} />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={styles.dangerText}>Veriyi Sıfırla</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </Pressable>
+          </View>
+
+          {/* Kart 6 — Destek & Hakkında */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>DESTEK & HAKKINDA</Text>
             <Pressable style={styles.row} onPress={() => router.push('/donate')}>
               <View style={styles.rowIcon}>
                 <Ionicons name="heart-outline" size={18} color={ACCENT} />
@@ -1733,9 +1745,6 @@ export default function ProfileScreen() {
           <Pressable style={styles.shareBtn} onPress={shareProgress}>
             <Ionicons name="share-outline" size={18} color={ACCENT} />
             <Text style={styles.shareBtnText}>İlerlemeni Paylaş</Text>
-          </Pressable>
-          <Pressable onPress={handleReset}>
-            <Text style={styles.resetText}>Veriyi Sıfırla</Text>
           </Pressable>
         </View>
       </ScrollView>
