@@ -461,3 +461,37 @@ CREATE POLICY "avatars_owner_delete" ON storage.objects FOR DELETE
   );
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+-- Hesabı Sil özelliği: auth.users satırı admin.deleteUser() ile silinince
+-- kullanıcının tüm verisi otomatik temizlensin diye eksik ON DELETE CASCADE'ler
+-- eklendi. Bunlar olmadan silme, ilgili tablolarda satırı olan her kullanıcı
+-- için FK ihlaliyle başarısız olurdu.
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
+ALTER TABLE profiles ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE notes DROP CONSTRAINT IF EXISTS notes_user_id_fkey;
+ALTER TABLE notes ADD CONSTRAINT notes_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE highlights DROP CONSTRAINT IF EXISTS highlights_user_id_fkey;
+ALTER TABLE highlights ADD CONSTRAINT highlights_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE favorites DROP CONSTRAINT IF EXISTS favorites_user_id_fkey;
+ALTER TABLE favorites ADD CONSTRAINT favorites_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE plan_progress DROP CONSTRAINT IF EXISTS plan_progress_user_id_fkey;
+ALTER TABLE plan_progress ADD CONSTRAINT plan_progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE ai_usage DROP CONSTRAINT IF EXISTS ai_usage_user_id_fkey;
+ALTER TABLE ai_usage ADD CONSTRAINT ai_usage_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE church_groups DROP CONSTRAINT IF EXISTS church_groups_created_by_fkey;
+ALTER TABLE church_groups ADD CONSTRAINT church_groups_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE church_group_members DROP CONSTRAINT IF EXISTS church_group_members_user_id_fkey;
+ALTER TABLE church_group_members ADD CONSTRAINT church_group_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE church_prayers DROP CONSTRAINT IF EXISTS church_prayers_user_id_fkey;
+ALTER TABLE church_prayers ADD CONSTRAINT church_prayers_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+ALTER TABLE church_plan_completions DROP CONSTRAINT IF EXISTS church_plan_completions_user_id_fkey;
+ALTER TABLE church_plan_completions ADD CONSTRAINT church_plan_completions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;

@@ -39,7 +39,7 @@ import {
 } from '@/constants/read-history';
 import { getDailyStats } from '@/constants/stats-storage';
 import type { PlanProgress } from '@/constants/storage';
-import { supabase } from '@/constants/supabase';
+import { deleteAccount, supabase } from '@/constants/supabase';
 import AmbientMusicModal from '@/components/AmbientMusicModal';
 import { FontSizeModal } from '@/components/FontSizeModal';
 import { LineSpacingModal, type LineSpacingId } from '@/components/LineSpacingModal';
@@ -1170,6 +1170,33 @@ export default function ProfileScreen() {
     ]);
   }, [clearAllData, showAlert]);
 
+  const handleDeleteAccount = useCallback(() => {
+    showAlert(
+      'Hesabı Sil',
+      'Hesabın ve sunucudaki tüm verilerin (notlar, favoriler, ilerleme, kilise grubu üyeliği) kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Hesabımı Sil',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteAccount();
+            if (!result.ok) {
+              showAlert('Silinemedi', result.error ?? 'Bir hata oluştu, tekrar dene.');
+              return;
+            }
+            try {
+              if (supabase) await supabase.auth.signOut();
+            } catch {
+              /* ignore */
+            }
+            await clearAllData();
+          },
+        },
+      ]
+    );
+  }, [clearAllData, showAlert]);
+
   const shareProgress = useCallback(() => {
     Share.share({
       message: `Söz uygulamasında ${streak} günlük serim var! 📖 sozapp.com`,
@@ -1644,7 +1671,7 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
-            <Pressable style={[styles.row, styles.rowLast]} onPress={handleReset}>
+            <Pressable style={[styles.row, !userEmail && styles.rowLast]} onPress={handleReset}>
               <View style={styles.rowIcon}>
                 <Ionicons name="trash-outline" size={18} color={DANGER} />
               </View>
@@ -1653,6 +1680,17 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
+            {userEmail ? (
+              <Pressable style={[styles.row, styles.rowLast]} onPress={handleDeleteAccount}>
+                <View style={styles.rowIcon}>
+                  <Ionicons name="person-remove-outline" size={18} color={DANGER} />
+                </View>
+                <View style={styles.rowBody}>
+                  <Text style={styles.dangerText}>Hesabı Sil</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </Pressable>
+            ) : null}
           </View>
 
           {/* Kart 6 — Destek & Hakkında */}
