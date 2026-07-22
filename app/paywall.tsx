@@ -1,14 +1,22 @@
 import { useHaptics } from '@/hooks/useHaptics';
 import { usePremium } from '@/hooks/usePremium';
-import { initPurchases, purchasePremium, restorePurchases } from '@/constants/purchases';
+import {
+  getPremiumPricing,
+  initPurchases,
+  purchasePremium,
+  restorePurchases,
+  type PremiumPricing,
+} from '@/constants/purchases';
 import { fonts } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Dimensions,
   Linking,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,7 +31,7 @@ const BG = '#0A0A08';
 const ACCENT = '#C4956A';
 const TEXT = '#E8E0D0';
 const MUTED = 'rgba(232,224,208,0.5)';
-const STORAGE_CURRENCY = '@soz/currency';
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const FEATURE_LINES = [
   "Sınırsız AI sohbet (Söz'e Sor)",
@@ -35,10 +43,14 @@ const FEATURE_LINES = [
   'Cloud sync (tüm cihazlar)',
 ];
 
+// Mağazadan gerçek fiyat çekilemediğinde (örn. Expo Go / geliştirme ortamı)
+// gösterilecek yaklaşık değerler — gerçek fiyat App/Play Store'dan gelir.
+const FALLBACK_YEARLY_PRICE = '₺499/yıl';
+const FALLBACK_MONTHLY_PRICE = '₺79/ay';
+
 const DONATION_URL = 'https://sozapp.com/bagis';
 
 type BillingPeriod = 'monthly' | 'yearly';
-type Currency = 'TRY' | 'EUR';
 
 const TrialIcon = () => (
   <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
@@ -53,38 +65,27 @@ const TrialIcon = () => (
   </Svg>
 );
 
+const PAGE_COUNT = 3;
+
 export default function PaywallScreen() {
   const router = useRouter();
   const { refreshPremium } = usePremium();
   const haptics = useHaptics();
   const insets = useSafeAreaInsets();
   const [period, setPeriod] = useState<BillingPeriod>('yearly');
-  const [currency, setCurrency] = useState<Currency>('TRY');
+  const [pricing, setPricing] = useState<PremiumPricing | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0);
+  const pagerRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     initPurchases();
+    getPremiumPricing().then(setPricing);
   }, []);
 
-  useEffect(() => {
-    try {
-      AsyncStorage.getItem(STORAGE_CURRENCY).then((val) => {
-        if (val === 'EUR' || val === 'TRY') setCurrency(val);
-      });
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const setCurrencyAndSave = useCallback((c: Currency) => {
-    try {
-      setCurrency(c);
-      AsyncStorage.setItem(STORAGE_CURRENCY, c).catch(() => {});
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const yearlyPrice = pricing?.yearly?.priceString ?? FALLBACK_YEARLY_PRICE;
+  const monthlyPrice = pricing?.monthly?.priceString ?? FALLBACK_MONTHLY_PRICE;
 
   const handleActivate = useCallback(async () => {
     if (isPurchasing) return;
@@ -129,9 +130,18 @@ export default function PaywallScreen() {
     }
   }, []);
 
-  const isTRY = currency === 'TRY';
   const handleSubscribe = handleActivate;
   const swipeBack = useSwipeBack();
+
+  const onPagerScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    setPageIndex(idx);
+  }, []);
+
+  const goToPage = useCallback((idx: number) => {
+    pagerRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: true });
+    setPageIndex(idx);
+  }, []);
 
   return (
     <View style={styles.safe} {...swipeBack}>
@@ -159,129 +169,123 @@ export default function PaywallScreen() {
         </View>
 
         <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={onPagerScroll}
+          style={styles.pager}
         >
-          <View style={styles.featureList}>
-            {FEATURE_LINES.map((line) => (
-              <View key={line} style={styles.featureRow}>
-                <Ionicons name="checkmark-circle" size={22} color={ACCENT} style={styles.featureCheck} />
-                <Text style={styles.featureText}>{line}</Text>
-              </View>
-            ))}
+          <View style={[styles.page, { width: SCREEN_WIDTH }]}>
+            <Text style={styles.pageTitle}>Ne kazanıyorsun?</Text>
+            <View style={styles.featureList}>
+              {FEATURE_LINES.map((line) => (
+                <View key={line} style={styles.featureRow}>
+                  <Ionicons name="checkmark-circle" size={22} color={ACCENT} style={styles.featureCheck} />
+                  <Text style={styles.featureText}>{line}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
-          <View style={styles.currencyRow}>
-            <Pressable
-              style={[styles.currencyBtn, isTRY && styles.currencyBtnActive]}
-              onPress={() => setCurrencyAndSave('TRY')}
-            >
-              <Text style={[styles.currencyBtnText, isTRY && styles.currencyBtnTextActive]}>₺ TRY</Text>
+          <View style={[styles.page, { width: SCREEN_WIDTH }]}>
+            <Text style={styles.pageTitle}>Planını seç</Text>
+            <View style={styles.trialBanner}>
+              <View style={styles.trialIconWrap}>
+                <TrialIcon />
+              </View>
+              <View style={styles.trialTextWrap}>
+                <Text style={styles.trialTitle}>7 Gün Tamamen Ücretsiz</Text>
+                <Text style={styles.trialDesc}>Kart bilgisi gerekli · İstediğinde iptal</Text>
+              </View>
+            </View>
+
+            <View style={styles.periodRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  setPeriod('yearly');
+                  haptics.selection();
+                }}
+                style={[styles.priceCard, period === 'yearly' && styles.priceCardActive]}
+                activeOpacity={0.85}
+              >
+                {period === 'yearly' && (
+                  <View style={styles.planCheck}>
+                    <Ionicons name="checkmark-circle" size={20} color="#C4956A" />
+                  </View>
+                )}
+                <View style={styles.popularBadge}>
+                  <Text style={styles.popularText}>EN POPÜLER</Text>
+                </View>
+                <View style={styles.priceCardTop}>
+                  <Text style={styles.planName}>Yıllık</Text>
+                  <Text style={styles.priceAmount}>{yearlyPrice}</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setPeriod('monthly');
+                  haptics.selection();
+                }}
+                style={[styles.priceCard, period === 'monthly' && styles.priceCardActive]}
+                activeOpacity={0.85}
+              >
+                {period === 'monthly' && (
+                  <View style={styles.planCheck}>
+                    <Ionicons name="checkmark-circle" size={20} color="#C4956A" />
+                  </View>
+                )}
+                <View style={styles.priceCardTop}>
+                  <Text style={styles.planName}>Aylık</Text>
+                  <Text style={styles.priceAmount}>{monthlyPrice}</Text>
+                  <Text style={styles.priceMonthly}>İstediğin zaman iptal</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.priceHint}>
+              Fiyat, hesabının bağlı olduğu App Store/Play Store bölgesine göre gösterilir.
+            </Text>
+          </View>
+
+          <View style={[styles.page, { width: SCREEN_WIDTH }]}>
+            <Text style={styles.pageTitle}>Güven & alternatifler</Text>
+            <Pressable style={styles.donateBlock} onPress={openDonation}>
+              <Text style={styles.donateLine1}>Premium almak istemiyor musun?</Text>
+              <Text style={styles.donateLine2}>Bağış yaparak da destekleyebilirsin →</Text>
             </Pressable>
-            <Pressable
-              style={[styles.currencyBtn, !isTRY && styles.currencyBtnActive]}
-              onPress={() => setCurrencyAndSave('EUR')}
-            >
-              <Text style={[styles.currencyBtnText, !isTRY && styles.currencyBtnTextActive]}>€ EUR</Text>
-            </Pressable>
-          </View>
 
-          <View style={styles.trialBanner}>
-            <View style={styles.trialIconWrap}>
-              <TrialIcon />
-            </View>
-            <View style={styles.trialTextWrap}>
-              <Text style={styles.trialTitle}>7 Gün Tamamen Ücretsiz</Text>
-              <Text style={styles.trialDesc}>Kart bilgisi gerekli · İstediğinde iptal</Text>
-            </View>
-          </View>
-
-          <View style={styles.periodRow}>
-            <TouchableOpacity
-              onPress={() => {
-                setPeriod('yearly');
-                haptics.selection();
-              }}
-              style={[styles.priceCard, period === 'yearly' && styles.priceCardActive]}
-              activeOpacity={0.85}
-            >
-              {period === 'yearly' && (
-                <View style={styles.planCheck}>
-                  <Ionicons name="checkmark-circle" size={20} color="#C4956A" />
-                </View>
-              )}
-              <View style={styles.popularBadge}>
-                <Text style={styles.popularText}>EN POPÜLER</Text>
+            <View style={styles.trustRow}>
+              <View style={styles.trustItemRow}>
+                <Ionicons name="lock-closed-outline" size={16} color={ACCENT} />
+                <Text style={styles.trustItem}>Güvenli ödeme</Text>
               </View>
-              <View style={styles.priceCardTop}>
-                <Text style={styles.planName}>Yıllık</Text>
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceCurrency}>{isTRY ? '₺' : '€'}</Text>
-                  <Text style={styles.priceAmount}>{isTRY ? '499' : '24,99'}</Text>
-                  <Text style={styles.pricePeriod}>/yıl</Text>
-                </View>
-                <Text style={styles.priceMonthly}>
-                  {isTRY ? 'Aylık yalnızca ₺41,58' : 'Aylık yalnızca €2,08'}
-                </Text>
+              <Text style={styles.trustSep}> · </Text>
+              <View style={styles.trustItemRow}>
+                <Ionicons name="arrow-undo-outline" size={16} color={ACCENT} />
+                <Text style={styles.trustItem}>İptal istediğinde</Text>
               </View>
-              <View style={styles.saveBadge}>
-                <Text style={styles.saveText}>{isTRY ? '%47 tasarruf' : '%74 tasarruf'}</Text>
+              <Text style={styles.trustSep}> · </Text>
+              <View style={styles.trustItemRow}>
+                <Ionicons name="star-outline" size={16} color={ACCENT} />
+                <Text style={styles.trustItem}>7 gün ücretsiz dene</Text>
               </View>
-            </TouchableOpacity>
+            </View>
 
-            <TouchableOpacity
-              onPress={() => {
-                setPeriod('monthly');
-                haptics.selection();
-              }}
-              style={[styles.priceCard, period === 'monthly' && styles.priceCardActive]}
-              activeOpacity={0.85}
-            >
-              {period === 'monthly' && (
-                <View style={styles.planCheck}>
-                  <Ionicons name="checkmark-circle" size={20} color="#C4956A" />
-                </View>
-              )}
-              <View style={styles.priceCardTop}>
-                <Text style={styles.planName}>Aylık</Text>
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceCurrency}>{isTRY ? '₺' : '€'}</Text>
-                  <Text style={styles.priceAmount}>{isTRY ? '79' : '7,99'}</Text>
-                  <Text style={styles.pricePeriod}>/ay</Text>
-                </View>
-                <Text style={styles.priceMonthly}>İstediğin zaman iptal</Text>
-              </View>
-            </TouchableOpacity>
+            <Text style={styles.legal}>
+              Abonelik otomatik yenilenir.{'\n'}
+              İstediğiniz zaman iptal edebilirsiniz.
+            </Text>
           </View>
-
-          <Pressable style={styles.donateBlock} onPress={openDonation}>
-            <Text style={styles.donateLine1}>Premium almak istemiyor musun?</Text>
-            <Text style={styles.donateLine2}>Bağış yaparak da destekleyebilirsin →</Text>
-          </Pressable>
-
-          <View style={styles.trustRow}>
-            <View style={styles.trustItemRow}>
-              <Ionicons name="lock-closed-outline" size={16} color={ACCENT} />
-              <Text style={styles.trustItem}>Güvenli ödeme</Text>
-            </View>
-            <Text style={styles.trustSep}> · </Text>
-            <View style={styles.trustItemRow}>
-              <Ionicons name="arrow-undo-outline" size={16} color={ACCENT} />
-              <Text style={styles.trustItem}>İptal istediğinde</Text>
-            </View>
-            <Text style={styles.trustSep}> · </Text>
-            <View style={styles.trustItemRow}>
-              <Ionicons name="star-outline" size={16} color={ACCENT} />
-              <Text style={styles.trustItem}>7 gün ücretsiz dene</Text>
-            </View>
-          </View>
-
-          <Text style={styles.legal}>
-            Abonelik otomatik yenilenir.{'\n'}
-            İstediğiniz zaman iptal edebilirsiniz.
-          </Text>
         </ScrollView>
+
+        <View style={styles.dotsRow}>
+          {Array.from({ length: PAGE_COUNT }, (_, i) => (
+            <Pressable key={i} onPress={() => goToPage(i)} hitSlop={8}>
+              <View style={[styles.dot, i === pageIndex && styles.dotActive]} />
+            </Pressable>
+          ))}
+        </View>
 
         <View style={[styles.stickyBottom, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
           <TouchableOpacity
@@ -362,13 +366,37 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
   },
-  scroll: {
+  pager: {
     flex: 1,
   },
-  scrollContent: {
+  page: {
     paddingHorizontal: 24,
-    paddingTop: 4,
-    paddingBottom: 28,
+    paddingTop: 8,
+  },
+  pageTitle: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: ACCENT,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(196,149,80,0.25)',
+  },
+  dotActive: {
+    backgroundColor: ACCENT,
+    width: 20,
   },
   featureList: {
     marginTop: 8,
@@ -391,35 +419,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     color: TEXT,
   },
-  currencyRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  currencyBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(196,149,80,0.35)',
-    alignItems: 'center',
-  },
-  currencyBtnActive: {
-    backgroundColor: 'rgba(196,149,80,0.15)',
-    borderColor: ACCENT,
-  },
-  currencyBtnText: {
-    fontFamily: fonts.medium,
-    fontSize: 14,
-    color: MUTED,
-  },
-  currencyBtnTextActive: {
-    color: ACCENT,
-  },
   periodRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  priceHint: {
+    fontFamily: fonts.italic,
+    fontSize: 11,
+    color: MUTED,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   trialBanner: {
     flexDirection: 'row',
@@ -512,52 +522,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 6,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 1,
-    marginTop: 4,
-  },
-  priceCurrency: {
-    fontSize: 18,
-    color: TEXT,
-    fontFamily: fonts.regular,
-    marginBottom: 3,
-  },
   priceAmount: {
-    fontSize: 36,
+    fontSize: 26,
     color: TEXT,
     fontFamily: fonts.medium,
-    letterSpacing: -0.03,
-    lineHeight: 40,
-  },
-  pricePeriod: {
-    fontSize: 14,
-    color: MUTED,
-    fontFamily: fonts.regular,
-    marginBottom: 6,
+    letterSpacing: -0.02,
+    lineHeight: 30,
   },
   priceMonthly: {
     fontSize: 12,
     color: '#C4956A',
     fontFamily: fonts.regular,
     fontStyle: 'italic',
-    marginTop: 2,
-  },
-  saveBadge: {
-    marginTop: 10,
-    backgroundColor: 'rgba(124,184,124,0.12)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderWidth: 0.5,
-    borderColor: 'rgba(124,184,124,0.3)',
-    alignSelf: 'flex-start',
-  },
-  saveText: {
-    fontSize: 11,
-    color: '#7CB87C',
-    fontFamily: fonts.regular,
+    marginTop: 6,
   },
   mainBtn: {
     backgroundColor: ACCENT,
@@ -591,7 +568,7 @@ const styles = StyleSheet.create({
   },
   stickyBottom: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(196,149,80,0.2)',
   },

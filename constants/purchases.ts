@@ -58,6 +58,30 @@ const findPackageByType = (
   );
 };
 
+export type PremiumPricing = {
+  monthly: { priceString: string } | null;
+  yearly: { priceString: string } | null;
+};
+
+/** Mağazadan gerçek, yerelleştirilmiş fiyatları çeker (kullanıcının ülkesine göre App/Play Store belirler). */
+export const getPremiumPricing = async (): Promise<PremiumPricing | null> => {
+  try {
+    initPurchases();
+    if (!purchasesInitialized) return null;
+    const offerings = await Purchases.getOfferings();
+    const monthlyPkg = findPackageByType(offerings, 'monthly');
+    const yearlyPkg = findPackageByType(offerings, 'yearly');
+    if (!monthlyPkg && !yearlyPkg) return null;
+    return {
+      monthly: monthlyPkg ? { priceString: monthlyPkg.product.priceString } : null,
+      yearly: yearlyPkg ? { priceString: yearlyPkg.product.priceString } : null,
+    };
+  } catch (e) {
+    console.warn('getPremiumPricing error:', e);
+    return null;
+  }
+};
+
 export const purchasePremium = async (
   packageType: 'monthly' | 'yearly'
 ): Promise<boolean> => {
