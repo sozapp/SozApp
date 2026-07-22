@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useState } from 'react';
 
 import { ALL_BADGES, checkNewBadges, type UserStats } from '@/constants/badges';
+import { getDailyStats } from '@/constants/stats-storage';
 
 type BadgeItem = (typeof ALL_BADGES)[number];
 
@@ -45,10 +46,12 @@ export function useBadges() {
           '@soz/memorizeList',
           '@soz/totalReflections',
         ]);
+      const dailyStats = await getDailyStats();
+      const totalVersesRead = Object.values(dailyStats).reduce((sum, n) => sum + (n ?? 0), 0);
 
       return {
         streak: Number(streak[1] ?? 0),
-        totalVersesRead: Number(days[1] ?? 0) * 10,
+        totalVersesRead,
         totalNotes: parseMaybeArrayLength(notes[1]),
         totalFavorites: parseMaybeArrayLength(favorites[1]),
         gamesPlayed: Number(games[1] ?? 0),

@@ -22,6 +22,7 @@ export type Badge = {
 };
 
 export const ALL_BADGES: Badge[] = [
+  // daysActive — sadakat
   {
     id: 'first_step',
     name: 'İlk Adım',
@@ -32,6 +33,35 @@ export const ALL_BADGES: Badge[] = [
     target: 1,
   },
   {
+    id: 'regular',
+    name: 'Düzenli',
+    description: '7 gün uygulamayı kullandın',
+    icon: 'calendar-outline',
+    color: '#B08968',
+    statKey: 'daysActive',
+    target: 7,
+  },
+  {
+    id: 'devoted',
+    name: 'Sadık',
+    description: '30 gün uygulamayı kullandın',
+    icon: 'ribbon-outline',
+    color: '#A67C52',
+    statKey: 'daysActive',
+    target: 30,
+  },
+  {
+    id: 'veteran',
+    name: 'Kıdemli',
+    description: '100 gün uygulamayı kullandın',
+    icon: 'medal-outline',
+    color: '#8B5E34',
+    statKey: 'daysActive',
+    target: 100,
+  },
+
+  // totalVersesRead — okuma
+  {
     id: 'reader',
     name: 'Okuyucu',
     description: '50 ayet okudun',
@@ -39,6 +69,15 @@ export const ALL_BADGES: Badge[] = [
     color: '#7C9A8A',
     statKey: 'totalVersesRead',
     target: 50,
+  },
+  {
+    id: 'devoted_reader',
+    name: 'Meraklı Okuyucu',
+    description: '200 ayet okudun',
+    icon: 'reader-outline',
+    color: '#6B8A78',
+    statKey: 'totalVersesRead',
+    target: 200,
   },
   {
     id: 'scholar',
@@ -49,6 +88,26 @@ export const ALL_BADGES: Badge[] = [
     statKey: 'totalVersesRead',
     target: 500,
   },
+  {
+    id: 'sage',
+    name: 'Bilge',
+    description: '1000 ayet okudun',
+    icon: 'school-outline',
+    color: '#8A7A6A',
+    statKey: 'totalVersesRead',
+    target: 1000,
+  },
+  {
+    id: 'devotee',
+    name: 'Adanmış',
+    description: '2500 ayet okudun',
+    icon: 'infinite-outline',
+    color: '#6A5A4A',
+    statKey: 'totalVersesRead',
+    target: 2500,
+  },
+
+  // streak — seri
   {
     id: 'streak_3',
     name: '3 Gün',
@@ -68,6 +127,15 @@ export const ALL_BADGES: Badge[] = [
     target: 7,
   },
   {
+    id: 'streak_14',
+    name: 'İki Hafta',
+    description: '14 günlük seri yaptın',
+    icon: 'flame',
+    color: '#E06060',
+    statKey: 'streak',
+    target: 14,
+  },
+  {
     id: 'streak_30',
     name: 'Bir Ay',
     description: '30 günlük seri yaptın',
@@ -76,6 +144,17 @@ export const ALL_BADGES: Badge[] = [
     statKey: 'streak',
     target: 30,
   },
+  {
+    id: 'streak_100',
+    name: 'Demir İrade',
+    description: '100 günlük seri yaptın',
+    icon: 'shield-checkmark-outline',
+    color: '#D4AF37',
+    statKey: 'streak',
+    target: 100,
+  },
+
+  // totalNotes — not alma
   {
     id: 'note_taker',
     name: 'Not Alan',
@@ -95,6 +174,17 @@ export const ALL_BADGES: Badge[] = [
     target: 10,
   },
   {
+    id: 'note_chronicler',
+    name: 'Vakanüvis',
+    description: '50 not aldın',
+    icon: 'library',
+    color: '#4A6A8A',
+    statKey: 'totalNotes',
+    target: 50,
+  },
+
+  // totalFavorites — favoriler
+  {
     id: 'favorite',
     name: 'Sevgili Ayet',
     description: 'İlk favorini ekledin',
@@ -103,6 +193,17 @@ export const ALL_BADGES: Badge[] = [
     statKey: 'totalFavorites',
     target: 1,
   },
+  {
+    id: 'collector',
+    name: 'Koleksiyoncu',
+    description: '25 favori ayet topladın',
+    icon: 'heart',
+    color: '#8A6A7A',
+    statKey: 'totalFavorites',
+    target: 25,
+  },
+
+  // gamesPlayed — oyunlar
   {
     id: 'gamer',
     name: 'Oyuncu',
@@ -113,6 +214,17 @@ export const ALL_BADGES: Badge[] = [
     target: 10,
   },
   {
+    id: 'game_master',
+    name: 'Oyun Ustası',
+    description: '50 oyun oynadın',
+    icon: 'game-controller',
+    color: '#7A8A6C',
+    statKey: 'gamesPlayed',
+    target: 50,
+  },
+
+  // memorizeCount — ezber
+  {
     id: 'memorizer',
     name: 'Ezberci',
     description: 'İlk ayeti ezberledin',
@@ -122,6 +234,17 @@ export const ALL_BADGES: Badge[] = [
     target: 1,
   },
   {
+    id: 'memory_keeper',
+    name: 'Hafız',
+    description: '10 ayet ezberledin',
+    icon: 'bulb',
+    color: '#B4995A',
+    statKey: 'memorizeCount',
+    target: 10,
+  },
+
+  // reflectionsCompleted — günlük yansıma
+  {
     id: 'reflector',
     name: 'Yansıyan',
     description: '7 günlük yansıma yaptın',
@@ -129,6 +252,15 @@ export const ALL_BADGES: Badge[] = [
     color: '#7C9A7C',
     statKey: 'reflectionsCompleted',
     target: 7,
+  },
+  {
+    id: 'contemplative',
+    name: 'Derin Düşünür',
+    description: '30 günlük yansıma yaptın',
+    icon: 'leaf',
+    color: '#6C8A6C',
+    statKey: 'reflectionsCompleted',
+    target: 30,
   },
 ];
 
