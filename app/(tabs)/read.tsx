@@ -892,12 +892,12 @@ export default function ReadScreen() {
       Animated.timing(flashOpacity, {
         toValue: 1,
         duration: 80,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }),
       Animated.timing(flashOpacity, {
         toValue: 0,
         duration: 120,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }),
     ]).start();
     goToNextChapter();
