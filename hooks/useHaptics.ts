@@ -1,35 +1,39 @@
 import * as Haptics from 'expo-haptics';
+import { useCallback, useMemo } from 'react';
 
 export function useHaptics() {
-  const light = () => {
+  const light = useCallback(() => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch (_) {}
-  };
+  }, []);
 
-  const medium = () => {
+  const medium = useCallback(() => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (_) {}
-  };
+  }, []);
 
-  const success = () => {
+  const success = useCallback(() => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (_) {}
-  };
+  }, []);
 
-  const error = () => {
+  const error = useCallback(() => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } catch (_) {}
-  };
+  }, []);
 
-  const selection = () => {
+  const selection = useCallback(() => {
     try {
       Haptics.selectionAsync();
     } catch (_) {}
-  };
+  }, []);
 
-  return { light, medium, success, error, selection };
+  return useMemo(
+    () => ({ light, medium, success, error, selection }),
+    [light, medium, success, error, selection]
+  );
 }
