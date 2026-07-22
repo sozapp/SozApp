@@ -207,6 +207,7 @@ export default function ReadScreen() {
   const [lineSpacing, setLineSpacing] = useState<LineSpacingId>('normal');
   const [fontSize, setFontSize] = useState(18);
   const [selectedVerse, setSelectedVerse] = useState<VerseItem | null>(null);
+  const [tappedVerseId, setTappedVerseId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
   const [shareVerse, setShareVerse] = useState({ text: '', ref: '' });
@@ -642,6 +643,7 @@ export default function ReadScreen() {
     setReadProgress(0);
     readProgressAnim.setValue(0);
     lastProgressRef.current = 0;
+    setTappedVerseId(null);
     const posKey = `@soz/readPosition/${currentBook.id}/${chapter.chapterNumber}`;
     let cancelled = false;
     AsyncStorage.getItem(posKey).then((raw) => {
@@ -1653,7 +1655,7 @@ export default function ReadScreen() {
           isSelected && highlightEntry == null && !isHighlightedFromParams && styles.verseRowSelected,
           isSpeakingThis && styles.verseRowSpeaking,
         ]}
-        onPress={() => speak(item.text, verseId)}
+        onPress={() => setTappedVerseId((prev) => (prev === verseId ? null : verseId))}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={400}
       >
@@ -1662,6 +1664,18 @@ export default function ReadScreen() {
             <View style={styles.soundBarsWrap}>
               <SoundBars />
             </View>
+          )}
+          {!isSpeakingThis && tappedVerseId === verseId && (
+            <Pressable
+              style={styles.verseSpeakBtn}
+              onPress={() => {
+                setTappedVerseId(null);
+                speak(item.text, verseId);
+              }}
+              hitSlop={8}
+            >
+              <Ionicons name="volume-medium-outline" size={16} color={ACCENT} />
+            </Pressable>
           )}
           <Text
             style={[
@@ -1773,7 +1787,7 @@ export default function ReadScreen() {
           isSelected && highlightEntry == null && !isHighlightedFromParams && styles.verseRowSelected,
           isSpeakingThis && styles.verseRowSpeaking,
         ]}
-        onPress={() => speak(item.text, verseId)}
+        onPress={() => setTappedVerseId((prev) => (prev === verseId ? null : verseId))}
         onLongPress={() => handleLongPress(item)}
         delayLongPress={400}
       >
@@ -1782,6 +1796,18 @@ export default function ReadScreen() {
             <View style={styles.soundBarsWrap}>
               <SoundBars />
             </View>
+          )}
+          {!isSpeakingThis && tappedVerseId === verseId && (
+            <Pressable
+              style={styles.verseSpeakBtn}
+              onPress={() => {
+                setTappedVerseId(null);
+                speak(item.text, verseId);
+              }}
+              hitSlop={8}
+            >
+              <Ionicons name="volume-medium-outline" size={16} color={ACCENT} />
+            </Pressable>
           )}
           <Text
             style={[
@@ -3186,6 +3212,15 @@ const styles = StyleSheet.create({
   },
   soundBarsWrap: {
     marginRight: 4,
+  },
+  verseSpeakBtn: {
+    marginRight: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(196,149,80,0.12)',
   },
   soundBars: {
     flexDirection: 'row',
