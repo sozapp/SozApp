@@ -14,8 +14,10 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 export default function DonateScreen() {
+  const safeBack = useSafeBack();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
@@ -42,7 +44,7 @@ export default function DonateScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
@@ -169,7 +171,7 @@ export default function DonateScreen() {
             Güvenli ödeme · İstediğin kadar ·{'\n'}Tek seferlik veya aylık
           </Text>
 
-          <TouchableOpacity style={styles.skipBtn} onPress={() => router.back()}>
+          <TouchableOpacity style={styles.skipBtn} onPress={() => safeBack()}>
             <Text style={styles.skipBtnText}>Şimdi değil</Text>
           </TouchableOpacity>
         </View>

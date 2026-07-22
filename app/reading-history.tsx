@@ -15,6 +15,7 @@ import { SozAlert } from '@/components/SozAlert';
 import { newTestament } from '@/constants/new-testament';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 const STORAGE_KEY = '@soz/readingHistory';
@@ -63,6 +64,7 @@ function getBookChapterTotal(bookName: string): number {
 
 export default function ReadingHistoryScreen() {
   const router = useRouter();
+  const safeBack = useSafeBack();
   const { colors, fonts } = useTheme();
   const textSecondary = colors.textSecondary ?? colors.textMuted ?? '#999';
   const [history, setHistory] = useState<ReadingHistoryItem[]>([]);
@@ -215,7 +217,7 @@ export default function ReadingHistoryScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Pressable onPress={() => safeBack()} hitSlop={10}>
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
           <Text style={styles.title}>Okuma Geçmişi</Text>

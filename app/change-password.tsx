@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 
@@ -38,6 +39,7 @@ export default function ChangePasswordScreen() {
   const { theme } = useTheme();
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const swipeBack = useSwipeBack();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -68,7 +70,7 @@ export default function ChangePasswordScreen() {
       const { error } = await supabase.auth.updateUser({ password: p });
       if (error) throw new Error(error.message);
       showAlert('Şifre güncellendi', 'Şifreniz başarıyla değiştirildi.', [
-        { text: 'Tamam', onPress: () => router.back() },
+        { text: 'Tamam', onPress: () => safeBack() },
       ]);
     } catch (err) {
       showAlert('Hata', getErrorMessage(err));
@@ -81,7 +83,7 @@ export default function ChangePasswordScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top']}>
       <View style={styles.safeInner} {...swipeBack}>
         <View style={styles.header}>
-          <Pressable style={styles.headerLeft} onPress={() => router.back()} hitSlop={12}>
+          <Pressable style={styles.headerLeft} onPress={() => safeBack()} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color={text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: text }]}>Şifremi Değiştir</Text>

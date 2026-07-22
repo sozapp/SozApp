@@ -21,6 +21,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const SEARCH_HISTORY_KEY = '@soz/searchHistory';
 const MAX_HISTORY = 8;
@@ -96,6 +97,7 @@ export default function SearchScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const [searchText, setSearchText] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
@@ -218,7 +220,7 @@ export default function SearchScreen() {
         keyboardVerticalOffset={0}
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+          <TouchableOpacity onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <View

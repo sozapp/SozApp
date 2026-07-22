@@ -52,6 +52,7 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const STORAGE_NOTES = '@soz/notes';
 const STORAGE_NOTE_TIMESTAMPS = '@soz/noteTimestamps';
@@ -158,6 +159,7 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
   const { colors, fonts } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const haptics = useHaptics();
   const { isPremium } = usePremium();
   const { favorites, refreshFavorites, removeFavorite } = useFavorites();
@@ -679,7 +681,7 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
           {asTab ? (
             <View style={styles.backBtn} />
           ) : (
-            <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+            <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </Pressable>
           )}

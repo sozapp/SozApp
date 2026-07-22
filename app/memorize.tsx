@@ -34,6 +34,7 @@ import {
   getVerseRefFromVerseId,
 } from '@/constants/bible-index';
 import { parseFavoritesRaw } from '@/hooks/useFavorites';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STORAGE_PROGRESS = '@soz/memorizeProgress';
@@ -606,6 +607,7 @@ const makeStyles = (colors: {
 export default function MemorizeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   // App-level state
@@ -1045,7 +1047,7 @@ export default function MemorizeScreen() {
   const renderList = () => (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: 'rgba(196,149,80,0.12)' }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}
+        <TouchableOpacity onPress={() => safeBack()} style={styles.backBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="arrow-back" size={22} color={colors.textMuted} />
         </TouchableOpacity>

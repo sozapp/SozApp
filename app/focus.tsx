@@ -30,6 +30,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import * as Notifications from 'expo-notifications';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 const BG = '#0A0A08';
@@ -278,6 +279,7 @@ function makeExitSheetStyles(colors: ThemeColors) {
 
 export default function FocusScreen() {
   const router = useRouter();
+  const safeBack = useSafeBack();
   const { theme } = useTheme();
   const exitSheetStyles = useMemo(() => makeExitSheetStyles(theme), [theme]);
   const { isFavorite, toggleFavorite } = useFavorites();
@@ -518,7 +520,7 @@ export default function FocusScreen() {
       if (mins > 0) {
         void saveFocusComplete(mins);
       }
-      router.back();
+      safeBack();
     }, 250);
   }, [closeExitSheet, suspendPlayback, router]);
 
@@ -780,7 +782,7 @@ export default function FocusScreen() {
       <SafeAreaView style={styles.configSafe} edges={['top']}>
         <TouchableOpacity
           style={styles.configBackBtn}
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           activeOpacity={0.8}
         >
           <Ionicons name="arrow-back" size={24} color={colors.textMuted} />

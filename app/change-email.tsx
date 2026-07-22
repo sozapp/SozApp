@@ -19,6 +19,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 
@@ -38,6 +39,7 @@ export default function ChangeEmailScreen() {
   const { theme } = useTheme();
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const swipeBack = useSwipeBack();
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [newEmail, setNewEmail] = useState('');
@@ -74,7 +76,7 @@ export default function ChangeEmailScreen() {
       showAlert(
         'Onay bekleniyor',
         `${e} adresine bir onay bağlantısı gönderildi. Değişikliğin geçerli olması için o bağlantıya tıklamanız gerekiyor.`,
-        [{ text: 'Tamam', onPress: () => router.back() }]
+        [{ text: 'Tamam', onPress: () => safeBack() }]
       );
     } catch (err) {
       showAlert('Hata', getErrorMessage(err));
@@ -87,7 +89,7 @@ export default function ChangeEmailScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top']}>
       <View style={styles.safeInner} {...swipeBack}>
         <View style={styles.header}>
-          <Pressable style={styles.headerLeft} onPress={() => router.back()} hitSlop={12}>
+          <Pressable style={styles.headerLeft} onPress={() => safeBack()} hitSlop={12}>
             <Ionicons name="chevron-back" size={24} color={text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: text }]}>E-postamı Değiştir</Text>

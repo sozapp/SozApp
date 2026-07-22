@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 
@@ -14,13 +15,14 @@ export default function DevotionalScreen() {
   const { theme } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const today = useMemo(() => new Date(), []);
   const devotional = useMemo(() => getTodaysDevotional(today), [today]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={8}>
+        <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={8}>
           <Ionicons name="chevron-back" size={24} color={ACCENT} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Günlük Yansıma</Text>

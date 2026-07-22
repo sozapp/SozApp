@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const BG = '#0A0A08';
 const ACCENT = '#C4956A';
@@ -68,6 +69,7 @@ const PAGE_COUNT = 3;
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const safeBack = useSafeBack();
   const { refreshPremium } = usePremium();
   const haptics = useHaptics();
   const insets = useSafeAreaInsets();
@@ -98,7 +100,7 @@ export default function PaywallScreen() {
       const success = await purchasePremium(period);
       if (!success) return;
       await refreshPremium();
-      router.back();
+      safeBack();
     } catch {
       /* ignore */
     } finally {
@@ -113,7 +115,7 @@ export default function PaywallScreen() {
       const restored = await restorePurchases();
       if (!restored) return;
       await refreshPremium();
-      router.back();
+      safeBack();
     } catch {
       /* ignore */
     } finally {
@@ -161,7 +163,7 @@ export default function PaywallScreen() {
             <Text style={styles.headTitle}>Premium&apos;a Geç</Text>
             <Text style={styles.headSubtitle}>Tüm özelliklerin kilidini aç</Text>
           </View>
-          <Pressable onPress={() => router.back()} style={styles.closeBtn} hitSlop={14}>
+          <Pressable onPress={() => safeBack()} style={styles.closeBtn} hitSlop={14}>
             <Ionicons name="close" size={28} color={TEXT} />
           </Pressable>
         </View>

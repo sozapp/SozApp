@@ -24,6 +24,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 const MUTED = 'rgba(232,224,208,0.5)';
@@ -61,6 +62,7 @@ function ThumbnailImage({ uri }: { uri: string }) {
 
 export default function VideosScreen() {
   const router = useRouter();
+  const safeBack = useSafeBack();
   const { isPremium } = usePremium();
   const [category, setCategory] = useState<VideoCategory | 'all'>('all');
   const swipeBack = useSwipeBack();
@@ -134,7 +136,7 @@ export default function VideosScreen() {
     <View style={styles.safe} {...swipeBack}>
       <SafeAreaView style={styles.safeInner} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+          <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
             <Ionicons name="arrow-back" size={24} color={TEXT} />
           </Pressable>
           <View style={styles.headerCenter}>

@@ -22,6 +22,7 @@ import { useTheme, type ThemeColors } from '@/hooks/useTheme';
 import { fonts as appFonts } from '@/constants/theme';
 import { groqChat } from '@/constants/groq';
 import { useNetwork } from '@/context/NetworkContext';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
@@ -346,6 +347,7 @@ async function readLastMoodResult(): Promise<MoodAnalysis | null> {
 }
 
 export default function MoodScreen() {
+  const safeBack = useSafeBack();
   const { colors, fonts } = useTheme();
   const { isOnline } = useNetwork();
   const { isFavorite, refreshFavorites } = useFavorites();
@@ -534,7 +536,7 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >

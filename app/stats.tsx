@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 
@@ -98,6 +99,7 @@ function computeBadgeProgress(badge: Badge, stats: UserStats): { current: number
 export default function StatsScreen() {
   const { colors, fonts } = useTheme();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const [summary, setSummary] = useState<SummaryStats>({
     totalVersesRead: 0,
     totalChaptersRead: 0,
@@ -209,7 +211,7 @@ export default function StatsScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+        <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
         <Text style={[styles.title, { color: colors.text, fontFamily: fonts.regular }]}>İstatistikler</Text>

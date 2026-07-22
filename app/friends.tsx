@@ -30,6 +30,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 
@@ -64,6 +65,7 @@ function initials(name: string, email: string | null): string {
 export default function FriendsScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const { isOnline } = useNetwork();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -334,7 +336,7 @@ export default function FriendsScreen() {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={12}>
+          <Pressable onPress={() => safeBack()} hitSlop={12}>
             <Ionicons name="chevron-back" size={28} color={theme.text} />
           </Pressable>
           <Text style={[styles.title, { color: theme.text }]}>Arkadaşlar</Text>
@@ -358,7 +360,7 @@ export default function FriendsScreen() {
     <>
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={28} color={theme.text} />
         </Pressable>
         <Text style={[styles.title, { color: theme.text }]}>Arkadaşlar</Text>

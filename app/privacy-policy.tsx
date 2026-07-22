@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 
@@ -13,11 +14,12 @@ export default function PrivacyPolicyScreen() {
   const isDark = colorScheme === 'dark';
   const theme = isDark ? colors.dark : colors.light;
   const router = useRouter();
+  const safeBack = useSafeBack();
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+        <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
           <View style={styles.backLabelRow}>
             <Ionicons name="arrow-back" size={18} color={ACCENT} />
             <Text style={[styles.backLabel, { color: ACCENT }]}>Geri</Text>

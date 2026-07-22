@@ -22,6 +22,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ViewShot from 'react-native-view-shot';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 type FontSizeKey = 'sm' | 'md' | 'lg';
 
@@ -158,6 +159,7 @@ function CardCorners({ accent, size }: { accent: string; size: number }) {
 export default function ShareCardScreen() {
   const params = useLocalSearchParams<{ text?: string; ref?: string }>();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const insets = useSafeAreaInsets();
   const { isPremium } = usePremium();
   const exportShotRef = useRef<ViewShot>(null);
@@ -256,7 +258,7 @@ export default function ShareCardScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { borderBottomColor: colors.dark.surface, paddingTop: insets.top > 0 ? 8 : 14 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+        <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={colors.dark.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.dark.text }]}>Paylaşım kartı</Text>

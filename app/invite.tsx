@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 
@@ -21,6 +22,7 @@ const INVITE_MESSAGE = `Söz uygulamasını keşfet — Türkçe Kutsal Kitap, g
 export default function InviteScreen() {
   const { theme } = useTheme();
   const router = useRouter();
+  const safeBack = useSafeBack();
 
   const handleShare = useCallback(async () => {
     try {
@@ -37,7 +39,7 @@ export default function InviteScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.flex1} {...swipeBack}>
       <View style={[styles.header, { borderBottomColor: colors.accentBorder }]}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={12}>
+        <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Arkadaşını Davet Et</Text>

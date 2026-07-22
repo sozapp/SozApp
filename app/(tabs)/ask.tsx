@@ -32,6 +32,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const CONVERSATIONS_KEY = '@soz/conversations';
 const SAVED_ANSWERS_KEY = '@soz/savedAnswers';
@@ -231,6 +232,7 @@ export default function AskScreen() {
   const { isOffline } = useNetwork();
   const { isPremium } = usePremium();
   const router = useRouter();
+  const safeBack = useSafeBack();
   const { prefill } = useLocalSearchParams<{ prefill?: string }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -653,7 +655,7 @@ export default function AskScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => safeBack()}
           style={styles.headerLeft}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >

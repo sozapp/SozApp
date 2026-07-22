@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/useTheme';
+import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 const SUCCESS = '#4CAF50';
@@ -59,6 +60,7 @@ function pickQuestions(): Question[] {
 
 export default function WhoSaid() {
   const router = useRouter();
+  const safeBack = useSafeBack();
   const { colors, fonts } = useTheme();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -173,7 +175,7 @@ export default function WhoSaid() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+        <Pressable onPress={() => safeBack()} style={styles.iconBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </Pressable>
         <Text style={[styles.title, { color: colors.text, fontFamily: fonts.regular }]}>Kim Söyledi?</Text>
