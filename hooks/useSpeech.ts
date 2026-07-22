@@ -48,7 +48,7 @@ async function findMaleVoice(language: string): Promise<string | undefined> {
   }
 }
 
-export function useSpeech() {
+export function useSpeechInternal() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentVerseId, setCurrentVerseId] = useState<string | null>(null);

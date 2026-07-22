@@ -32,7 +32,7 @@ import { type ThemeType } from '@/hooks/useTheme';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useHaptics } from '@/hooks/useHaptics';
 import { usePremium } from '@/hooks/usePremium';
-import { useSpeech } from '@/hooks/useSpeech';
+import { useSpeech } from '@/context/SpeechContext';
 import { useSync } from '@/hooks/useSync';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
 import { useNetwork } from '@/context/NetworkContext';
@@ -2174,20 +2174,6 @@ export default function ReadScreen() {
         )}
       </View>
 
-      {isSpeaking && (
-        <View
-          style={[
-            styles.speechBar,
-            { backgroundColor: theme.surface, borderBottomColor: 'rgba(196,149,106,0.2)' },
-          ]}
-        >
-          <Text style={styles.speechBarLabel}>▶ Bölüm okunuyor...</Text>
-          <Pressable onPress={stop} style={styles.speechBarStop}>
-            <Text style={styles.speechBarStopText}>■ Durdur</Text>
-          </Pressable>
-        </View>
-      )}
-
       <View style={styles.listWrap} {...chapterSwipePanResponder.panHandlers}>
         <Animated.View
           style={[
@@ -3235,28 +3221,6 @@ const styles = StyleSheet.create({
     height: 14,
     backgroundColor: CHAPTER_NAV_COLOR,
     borderRadius: 2,
-  },
-  speechBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    height: 36,
-    borderBottomWidth: 0.5,
-  },
-  speechBarLabel: {
-    fontFamily: fonts.italic,
-    fontSize: 12,
-    color: CHAPTER_NAV_COLOR,
-  },
-  speechBarStop: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  speechBarStopText: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: CHAPTER_NAV_COLOR,
   },
   verseTextBlock: {
     flex: 1,

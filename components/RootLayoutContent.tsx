@@ -1,4 +1,5 @@
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { SpeechBar } from '@/components/SpeechBar';
 import { isOnlineFromNetInfo, useNetwork } from '@/context/NetworkContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useBadges } from '@/hooks/useBadges';
@@ -268,6 +269,7 @@ export function RootLayoutContent() {
   return (
     <View style={{ flex: 1 }}>
       {isOffline ? <OfflineBanner /> : null}
+      <SpeechBar />
       <Stack
         screenOptions={{
           headerShown: false,

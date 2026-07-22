@@ -14,6 +14,7 @@ import { incrementOpenCount, requestReviewIfAppropriate } from '@/hooks/useStore
 import { AmbientMusicProvider } from '@/context/AmbientMusicContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { NetworkProvider } from '@/context/NetworkContext';
+import { SpeechProvider } from '@/context/SpeechContext';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { RootLayoutContent } from '@/components/RootLayoutContent';
 import SozSplashScreen from '@/components/SplashScreen';
@@ -87,11 +88,13 @@ export default function RootLayout() {
       {fontsReady ? (
         <ThemeProvider>
           <AmbientMusicProvider>
-            <LanguageProvider>
-              <NetworkProvider>
-                <RootLayoutContent />
-              </NetworkProvider>
-            </LanguageProvider>
+            <SpeechProvider>
+              <LanguageProvider>
+                <NetworkProvider>
+                  <RootLayoutContent />
+                </NetworkProvider>
+              </LanguageProvider>
+            </SpeechProvider>
           </AmbientMusicProvider>
         </ThemeProvider>
       ) : null}
