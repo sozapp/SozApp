@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { ALL_BADGES, checkNewBadges, type UserStats } from '@/constants/badges';
 
@@ -33,7 +33,7 @@ export function useBadges() {
   const [newBadge, setNewBadge] = useState<BadgeItem | null>(null);
   const [stats, setStats] = useState<UserStats>(EMPTY_STATS);
 
-  const loadStats = async (): Promise<UserStats> => {
+  const loadStats = useCallback(async (): Promise<UserStats> => {
     try {
       const [streak, notes, favorites, games, days, memorize, reflections] =
         await AsyncStorage.multiGet([
@@ -59,9 +59,9 @@ export function useBadges() {
     } catch {
       return EMPTY_STATS;
     }
-  };
+  }, []);
 
-  const checkBadges = async () => {
+  const checkBadges = useCallback(async () => {
     const loadedStats = await loadStats();
     setStats(loadedStats);
     const raw = await AsyncStorage.getItem('@soz/earnedBadges');
@@ -77,7 +77,7 @@ export function useBadges() {
     } else {
       setEarnedBadges(earned);
     }
-  };
+  }, [loadStats]);
 
   return { earnedBadges, newBadge, setNewBadge, checkBadges, stats, ALL_BADGES };
 }
