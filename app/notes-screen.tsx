@@ -343,6 +343,22 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
     }).length;
   }, [noteEntries, noteTimestamps]);
 
+  const highlightsThisWeek = useMemo(() => {
+    const cutoff = Date.now() - SEVEN_DAYS_MS;
+    return highlightEntries.filter(([id]) => {
+      const t = highlightTimestamps[id];
+      return t && new Date(t).getTime() >= cutoff;
+    }).length;
+  }, [highlightEntries, highlightTimestamps]);
+
+  const favoritesThisWeek = useMemo(() => {
+    const cutoff = Date.now() - SEVEN_DAYS_MS;
+    return favorites.filter((f: FavoriteItem) => new Date(f.addedAt).getTime() >= cutoff).length;
+  }, [favorites]);
+
+  const activityThisWeek = notesThisWeek + highlightsThisWeek + favoritesThisWeek;
+  const totalActivityCount = noteEntries.length + highlightEntries.length + favorites.length;
+
   const searchAnimatedStyle = useAnimatedStyle(() => ({
     height: searchHeight.value,
     overflow: 'hidden' as const,
@@ -704,16 +720,18 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
           </View>
         </Animated.View>
 
-        {!searchVisible && (
+        {!searchVisible && totalActivityCount > 0 && (
           <>
             <View style={styles.statsBanner}>
               <View style={styles.statsBannerLeft}>
                 <Ionicons name="create-outline" size={18} color={ACCENT} />
                 <Text style={styles.statsBannerText}>
-                  Bu hafta {notesThisWeek} not aldın
+                  {activityThisWeek > 0
+                    ? `Bu hafta ${activityThisWeek} öğe ekledin`
+                    : 'Bu hafta henüz not, favori ya da vurgu eklemedin'}
                 </Text>
               </View>
-              <Text style={styles.statsBannerTotal}>{noteEntries.length} toplam</Text>
+              <Text style={styles.statsBannerTotal}>{totalActivityCount} toplam</Text>
             </View>
             {atNotesLimit && (
               <Text style={[styles.limitWarning, { color: colors.textMuted }]}>
