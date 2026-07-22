@@ -1056,6 +1056,39 @@ export default function ProfileScreen() {
     }
   }, [t, showAlert]);
 
+  const removeProfileImage = useCallback(async () => {
+    setProfileImage(null);
+    try {
+      await AsyncStorage.removeItem(STORAGE_PROFILE_IMAGE);
+    } catch {
+      /* ignore */
+    }
+
+    if (!supabase) return;
+    try {
+      const {
+        data: { user: u },
+      } = await supabase.auth.getUser();
+      if (!u || !isRealAccount(u)) return;
+      await supabase.storage.from('avatars').remove([`${u.id}/avatar.jpg`]).catch(() => {});
+      await supabase.from('profiles').update({ avatar_url: null }).eq('id', u.id);
+    } catch (e) {
+      console.log('Avatar remove error:', e);
+    }
+  }, []);
+
+  const handleAvatarPress = useCallback(() => {
+    if (profileImage) {
+      showAlert('Profil Fotoğrafı', undefined, [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Fotoğrafı Kaldır', style: 'destructive', onPress: removeProfileImage },
+        { text: 'Yeni Fotoğraf Seç', onPress: pickImage },
+      ]);
+    } else {
+      pickImage();
+    }
+  }, [profileImage, showAlert, removeProfileImage, pickImage]);
+
   const openEditProfile = useCallback(() => {
     setEditNameDraft(userName);
     setEditModalVisible(true);
@@ -1242,7 +1275,7 @@ export default function ProfileScreen() {
       >
         {/* BÖLÜM 1 — Profil Header */}
         <View style={styles.header}>
-          <Pressable style={styles.avatarWrap} onPress={pickImage}>
+          <Pressable style={styles.avatarWrap} onPress={handleAvatarPress}>
             <View style={styles.avatarCircle}>
               {profileImage ? (
                 <Image source={{ uri: profileImage }} style={styles.avatarImage} />
@@ -1260,14 +1293,14 @@ export default function ProfileScreen() {
           {userEmail ? <Text style={styles.userEmail}>{userEmail}</Text> : null}
 
           <View style={styles.badgeRow}>
-            <View style={styles.badgePill}>
+            <Pressable style={styles.badgePill} onPress={() => setDenomModalVisible(true)}>
               <Ionicons
                 name={(denomMeta?.icon ?? 'ellipse-outline') as keyof typeof Ionicons.glyphMap}
                 size={12}
                 color={ACCENT}
               />
               <Text style={styles.badgePillText}>{denomName}</Text>
-            </View>
+            </Pressable>
             {isPremium ? (
               <View style={[styles.badgePill, styles.badgePillPremium]}>
                 <View style={styles.badgePillPremiumRow}>
