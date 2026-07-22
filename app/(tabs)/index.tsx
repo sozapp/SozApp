@@ -319,17 +319,6 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       fontFamily: fonts.medium,
       fontWeight: '600',
     },
-    proLink: {
-      alignSelf: 'flex-start',
-      marginTop: 8,
-      paddingVertical: 4,
-      paddingRight: 8,
-    },
-    proLinkText: {
-      fontSize: 13,
-      color: ACCENT,
-      fontFamily: fonts.medium ?? fonts.regular,
-    },
     streakPill: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -2188,15 +2177,6 @@ export default function HomeScreen() {
                   </View>
                 ) : null}
               </View>
-              {!isPremium ? (
-                <TouchableOpacity
-                  style={styles.proLink}
-                  onPress={() => router.push('/premium')}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.proLinkText}>👑 Premium</Text>
-                </TouchableOpacity>
-              ) : null}
             </View>
             <View style={styles.headerIcons}>
               <TouchableOpacity
