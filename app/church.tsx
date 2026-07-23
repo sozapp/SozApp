@@ -7,6 +7,7 @@ import { colors, fonts, borderRadius } from '@/constants/theme';
 import { useChurch } from '@/hooks/useChurch';
 import { useTheme } from '@/hooks/useTheme';
 import { useSozAlert } from '@/hooks/useSozAlert';
+import { useTranslation } from '@/context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
@@ -34,6 +35,7 @@ function initialsFromName(name: string): string {
 
 export default function ChurchScreen() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { isOffline } = useNetwork();
   const router = useRouter();
   const {
@@ -70,7 +72,7 @@ export default function ChurchScreen() {
 
   const handleJoin = useCallback(async () => {
     if (isOffline) {
-      showAlert('İnternet gerekli', 'Kilise modu için bağlantı gerekir.');
+      showAlert(t('internetRequired'), t('churchConnectionRequiredMsg'));
       return;
     }
     const code = joinCode.trim().toUpperCase();
@@ -82,13 +84,13 @@ export default function ChurchScreen() {
       setJoinModalVisible(false);
       setJoinCode('');
     } else {
-      showAlert('Katılınamadı', result.error ?? 'Bir hata oluştu.');
+      showAlert(t('couldNotJoinTitle'), result.error ?? t('genericErrorOccurred'));
     }
-  }, [joinCode, joinGroup, isOffline, showAlert]);
+  }, [joinCode, joinGroup, isOffline, showAlert, t]);
 
   const handleCreate = useCallback(async () => {
     if (isOffline) {
-      showAlert('İnternet gerekli', 'Kilise modu için bağlantı gerekir.');
+      showAlert(t('internetRequired'), t('churchConnectionRequiredMsg'));
       return;
     }
     const name = groupName.trim();
@@ -102,9 +104,9 @@ export default function ChurchScreen() {
       setGroupName('');
       setChurchName('');
     } else {
-      showAlert('Oluşturulamadı', result.error ?? 'Bir hata oluştu.');
+      showAlert(t('couldNotCreateTitle'), result.error ?? t('genericErrorOccurred'));
     }
-  }, [groupName, churchName, createGroup, isOffline, showAlert]);
+  }, [groupName, churchName, createGroup, isOffline, showAlert, t]);
 
   const handleCopyCode = useCallback(async () => {
     if (!church) return;
@@ -119,10 +121,10 @@ export default function ChurchScreen() {
     setPrayerInput('');
     const result = await sendPrayer(text);
     if (!result.ok) {
-      showAlert('Gönderilemedi', result.error ?? 'Bir hata oluştu.');
+      showAlert(t('couldNotSendTitle'), result.error ?? t('genericErrorOccurred'));
       setPrayerInput(text);
     }
-  }, [prayerInput, sendPrayer, showAlert]);
+  }, [prayerInput, sendPrayer, showAlert, t]);
 
   const setPlanAndNotify = useCallback(async () => {
     const book = newTestament.find((b) => b.id === planBookId);
@@ -131,24 +133,24 @@ export default function ChurchScreen() {
     const result = await setWeeklyPlan(reference, 7);
     if (result.ok) {
       setPlanModalVisible(false);
-      showAlert('Plan kaydedildi', `Grup üyelerine "${reference}" haftalık okuma planı bildirildi.`);
+      showAlert(t('planSavedTitle'), t('planNotifiedMsg', { reference }));
     } else {
-      showAlert('Kaydedilemedi', result.error ?? 'Bir hata oluştu.');
+      showAlert(t('couldNotSaveTitle'), result.error ?? t('genericErrorOccurred'));
     }
-  }, [planBookId, planChStart, planChEnd, setWeeklyPlan, showAlert]);
+  }, [planBookId, planChStart, planChEnd, setWeeklyPlan, showAlert, t]);
 
   const handleLeave = useCallback(() => {
-    showAlert('Grubu terk et', 'Gruptan ayrılmak istediğinize emin misiniz?', [
-      { text: 'İptal', style: 'cancel' },
+    showAlert(t('leaveGroupConfirmTitle'), t('leaveGroupConfirmMsg'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Terk Et',
+        text: t('leaveShort'),
         style: 'destructive',
         onPress: async () => {
           await leaveGroup();
         },
       },
     ]);
-  }, [leaveGroup, showAlert]);
+  }, [leaveGroup, showAlert, t]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -160,14 +162,14 @@ export default function ChurchScreen() {
         >
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Kilise Modu</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{t('churchModeTitle')}</Text>
         <View style={styles.headerRight} />
       </View>
 
       {isOffline ? (
         <View style={[styles.offlineBanner, { backgroundColor: 'rgba(196,149,80,0.1)' }]}>
           <Text style={[styles.offlineBannerText, { color: theme.textMuted }]}>
-            İnternet gerekli — kilise özellikleri çevrimiçi kullanılabilir
+            {t('offlineChurchBannerMsg')}
           </Text>
         </View>
       ) : null}
@@ -180,11 +182,11 @@ export default function ChurchScreen() {
         <View style={styles.emptyWrap}>
           <EmptyState
             icon="people-outline"
-            title={isOffline ? 'İnternet gerekli' : 'Kilisenizle birlikte okuyun'}
+            title={isOffline ? t('internetRequired') : t('readWithChurch')}
             description={
               isOffline
-                ? 'Gruba katılmak veya grup oluşturmak için bağlanın.'
-                : 'Papazınızdan grup kodunu alın veya yeni grup oluşturun.'
+                ? t('joinOrCreateHint')
+                : t('askPastorForCode')
             }
           />
           <View style={styles.emptyButtons}>
@@ -195,13 +197,13 @@ export default function ChurchScreen() {
               ]}
               onPress={() => {
                 if (isOffline) {
-                  showAlert('İnternet gerekli', 'Kilise modu için bağlantı gerekir.');
+                  showAlert(t('internetRequired'), t('churchConnectionRequiredMsg'));
                 } else {
                   setJoinModalVisible(true);
                 }
               }}
             >
-              <Text style={[styles.btnOutlineText, { color: theme.text }]}>Gruba Katıl</Text>
+              <Text style={[styles.btnOutlineText, { color: theme.text }]}>{t('joinGroup')}</Text>
             </Pressable>
             <Pressable
               style={[
@@ -210,13 +212,13 @@ export default function ChurchScreen() {
               ]}
               onPress={() => {
                 if (isOffline) {
-                  showAlert('İnternet gerekli', 'Kilise modu için bağlantı gerekir.');
+                  showAlert(t('internetRequired'), t('churchConnectionRequiredMsg'));
                 } else {
                   setCreateModalVisible(true);
                 }
               }}
             >
-              <Text style={styles.btnPrimaryText}>Grup Oluştur</Text>
+              <Text style={styles.btnPrimaryText}>{t('createGroup')}</Text>
             </Pressable>
           </View>
         </View>
@@ -230,7 +232,7 @@ export default function ChurchScreen() {
             <View style={styles.statsStripRow}>
               <Ionicons name="people-outline" size={14} color={ACCENT} />
               <Text style={[styles.statsStripText, { color: theme.textMuted }]}>
-                {members.length} üye
+                {members.length} {t('members')}
               </Text>
             </View>
           </View>
@@ -241,7 +243,7 @@ export default function ChurchScreen() {
 
             <View style={styles.codeRow}>
               <Text style={[styles.codeLabel, { color: theme.textMuted }]}>
-                Grup Kodu: {church.code}
+                {t('groupCode')}: {church.code}
               </Text>
               <Pressable onPress={handleCopyCode} style={styles.copyBtn} hitSlop={8}>
                 <Ionicons
@@ -250,7 +252,7 @@ export default function ChurchScreen() {
                   color={copied ? ACCENT : theme.textMuted}
                 />
                 <Text style={[styles.copyBtnText, { color: copied ? ACCENT : theme.textMuted }]}>
-                  {copied ? 'Kopyalandı' : 'Kopyala'}
+                  {copied ? t('copied') : t('copyVerse')}
                 </Text>
               </Pressable>
             </View>
@@ -263,8 +265,8 @@ export default function ChurchScreen() {
                 ]}
               >
                 <Text style={[styles.planChipText, { color: theme.text }]}>
-                  Bu hafta: {church.planReference}
-                  {church.planDaysLeft != null ? ` · ${church.planDaysLeft} gün kaldı` : ''}
+                  {t('weeklyReading')}: {church.planReference}
+                  {church.planDaysLeft != null ? ` · ${t('daysLeftCount', { n: church.planDaysLeft })}` : ''}
                 </Text>
               </View>
             ) : null}
@@ -274,7 +276,7 @@ export default function ChurchScreen() {
                 style={[styles.planSetBtn, { backgroundColor: ACCENT }]}
                 onPress={() => setPlanModalVisible(true)}
               >
-                <Text style={styles.planSetBtnText}>Bu hafta okuma planı belirle</Text>
+                <Text style={styles.planSetBtnText}>{t('setWeeklyPlanCta')}</Text>
               </Pressable>
             )}
 
@@ -293,24 +295,24 @@ export default function ChurchScreen() {
               >
                 <Text style={[styles.planSetBtnText, { color: ACCENT }]}>
                   {members.find((m) => m.userId === myUserId)?.completed
-                    ? '✓ Bu haftayı tamamladım'
-                    : 'Bu haftayı tamamladım olarak işaretle'}
+                    ? t('weekCompletedMark')
+                    : t('markWeekCompleteCta')}
                 </Text>
               </Pressable>
             )}
 
-            <Text style={[styles.sectionLabel, { color: theme.text }]}>Dua İstekleri</Text>
+            <Text style={[styles.sectionLabel, { color: theme.text }]}>{t('prayerRequests')}</Text>
             <View style={styles.prayerRow}>
               <TextInput
                 style={[styles.prayerInput, { backgroundColor: theme.background, color: theme.text }]}
                 value={prayerInput}
                 onChangeText={setPrayerInput}
-                placeholder="Dua isteği yazın..."
+                placeholder={t('prayerRequestPlaceholder')}
                 placeholderTextColor={theme.textMuted}
                 onSubmitEditing={handleSendPrayer}
               />
               <Pressable style={[styles.prayerSendBtn, { backgroundColor: ACCENT }]} onPress={handleSendPrayer}>
-                <Text style={styles.prayerSendBtnText}>Gönder</Text>
+                <Text style={styles.prayerSendBtnText}>{t('send')}</Text>
               </Pressable>
             </View>
             {prayers.map((p) => (
@@ -333,7 +335,7 @@ export default function ChurchScreen() {
               </View>
             ))}
 
-            <Text style={[styles.progressTitle, { color: theme.text }]}>Üye ilerlemesi</Text>
+            <Text style={[styles.progressTitle, { color: theme.text }]}>{t('memberProgressTitle')}</Text>
             {members.map((m) => (
               <View key={m.userId} style={styles.memberRow}>
                 <View style={[styles.memberAvatar, { backgroundColor: 'rgba(196,149,80,0.2)' }]}>
@@ -343,20 +345,20 @@ export default function ChurchScreen() {
                 </View>
                 <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
                   {m.displayName}
-                  {m.userId === myUserId ? ' (sen)' : ''}
+                  {m.userId === myUserId ? ` ${t('youSuffix')}` : ''}
                 </Text>
                 {church.planReference ? (
                   m.completed ? (
                     <Ionicons name="checkmark-circle" size={18} color="#2E7D32" />
                   ) : (
-                    <Text style={[styles.memberWaiting, { color: theme.textMuted }]}>Bekliyor</Text>
+                    <Text style={[styles.memberWaiting, { color: theme.textMuted }]}>{t('waitingStatus')}</Text>
                   )
                 ) : null}
               </View>
             ))}
 
             <Pressable onPress={handleLeave} style={styles.leaveBtn}>
-              <Text style={styles.leaveBtnText}>Grubu Terk Et</Text>
+              <Text style={styles.leaveBtnText}>{t('leaveGroup')}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -376,11 +378,11 @@ export default function ChurchScreen() {
             style={[styles.modalContent, { backgroundColor: theme.surface }]}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Grup Kodunu Girin</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>{t('enterGroupCodeTitle')}</Text>
             <TextInput
               style={[styles.codeInput, { backgroundColor: theme.background, color: theme.text }]}
               value={joinCode}
-              onChangeText={(t) => setJoinCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+              onChangeText={(txt) => setJoinCode(txt.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
               placeholder="ABC123"
               placeholderTextColor={theme.textMuted}
               maxLength={6}
@@ -395,7 +397,7 @@ export default function ChurchScreen() {
               {busy ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={styles.modalBtnText}>Katıl</Text>
+                <Text style={styles.modalBtnText}>{t('joinShort')}</Text>
               )}
             </Pressable>
           </Pressable>
@@ -416,21 +418,21 @@ export default function ChurchScreen() {
             style={[styles.modalContent, { backgroundColor: theme.surface }]}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Grup Oluştur</Text>
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Grup Adı</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>{t('createGroup')}</Text>
+            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('groupNameLabel')}</Text>
             <TextInput
               style={[styles.textInput, { backgroundColor: theme.background, color: theme.text }]}
               value={groupName}
               onChangeText={setGroupName}
-              placeholder="Örn: Gençlik Grubu"
+              placeholder={t('groupNameExample')}
               placeholderTextColor={theme.textMuted}
             />
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Kilise Adı</Text>
+            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('churchNameLabel')}</Text>
             <TextInput
               style={[styles.textInput, { backgroundColor: theme.background, color: theme.text }]}
               value={churchName}
               onChangeText={setChurchName}
-              placeholder="Örn: İstanbul Kilisesi"
+              placeholder={t('churchNameExample')}
               placeholderTextColor={theme.textMuted}
             />
             <Pressable
@@ -441,7 +443,7 @@ export default function ChurchScreen() {
               {busy ? (
                 <ActivityIndicator color={colors.white} />
               ) : (
-                <Text style={styles.modalBtnText}>Oluştur</Text>
+                <Text style={styles.modalBtnText}>{t('createShort')}</Text>
               )}
             </Pressable>
           </Pressable>
@@ -459,8 +461,8 @@ export default function ChurchScreen() {
             style={[styles.modalContent, { backgroundColor: theme.surface }]}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>Haftalık okuma planı</Text>
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Kitap</Text>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>{t('weeklyPlanModalTitle')}</Text>
+            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('book')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planBookScroll}>
               {newTestament.map((b) => (
                 <Pressable
@@ -482,23 +484,23 @@ export default function ChurchScreen() {
                 </Pressable>
               ))}
             </ScrollView>
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Bölüm aralığı</Text>
+            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('chapterRangeLabel')}</Text>
             <View style={styles.planChRow}>
               <TextInput
                 style={[styles.planChInput, { backgroundColor: theme.background, color: theme.text }]}
                 value={String(planChStart)}
-                onChangeText={(t) => setPlanChStart(Math.max(1, parseInt(t, 10) || 1))}
+                onChangeText={(txt) => setPlanChStart(Math.max(1, parseInt(txt, 10) || 1))}
                 keyboardType="number-pad"
-                placeholder="Başlangıç"
+                placeholder={t('startRangeLabel')}
                 placeholderTextColor={theme.textMuted}
               />
               <Text style={[styles.planChDash, { color: theme.textMuted }]}>–</Text>
               <TextInput
                 style={[styles.planChInput, { backgroundColor: theme.background, color: theme.text }]}
                 value={String(planChEnd)}
-                onChangeText={(t) => setPlanChEnd(Math.max(1, parseInt(t, 10) || 1))}
+                onChangeText={(txt) => setPlanChEnd(Math.max(1, parseInt(txt, 10) || 1))}
                 keyboardType="number-pad"
-                placeholder="Bitiş"
+                placeholder={t('endRangeLabel')}
                 placeholderTextColor={theme.textMuted}
               />
             </View>
@@ -506,7 +508,7 @@ export default function ChurchScreen() {
               style={[styles.modalBtn, { backgroundColor: ACCENT }]}
               onPress={setPlanAndNotify}
             >
-              <Text style={styles.modalBtnText}>Kaydet ve bildir</Text>
+              <Text style={styles.modalBtnText}>{t('saveAndNotifyCta')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>

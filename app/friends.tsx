@@ -16,6 +16,7 @@ import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
 import { useUnreadMessageCounts } from '@/hooks/useMessages';
+import { useTranslation } from '@/context/LanguageContext';
 import type { User } from '@supabase/supabase-js';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -65,6 +66,7 @@ function initials(name: string, email: string | null): string {
 
 export default function FriendsScreen() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
   const safeBack = useSafeBack();
   const { isOnline } = useNetwork();
@@ -214,7 +216,7 @@ export default function FriendsScreen() {
 
   const displayName = (id: string) => {
     const p = profileMap[id];
-    return (p?.display_name?.trim() || p?.email?.split('@')[0] || 'Arkadaş') as string;
+    return (p?.display_name?.trim() || p?.email?.split('@')[0] || t('defaultFriendName')) as string;
   };
 
   const goAuth = () => {
@@ -228,11 +230,11 @@ export default function FriendsScreen() {
   const sendInvite = async () => {
     const email = inviteEmail.trim().toLowerCase();
     if (!supabase) {
-      showAlert('Söz', 'Sunucuya bağlanılamıyor. Çevrimdışı moddasınız.');
+      showAlert('Söz', t('serverOfflineMsg'));
       return;
     }
     if (!email || !isRealAccount(user) || !isOnline) {
-      if (!isOnline) showAlert('Söz', 'İnternet bağlantısı gerekli.');
+      if (!isOnline) showAlert('Söz', t('internetRequiredMsg'));
       return;
     }
     setInviteBusy(true);
@@ -243,12 +245,12 @@ export default function FriendsScreen() {
       if (error) throw error;
       const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
       if (!row?.uid) {
-        showAlert('Söz', 'Bu e-posta ile kayıtlı kullanıcı bulunamadı.');
+        showAlert('Söz', t('userNotFoundByEmail'));
         return;
       }
       const targetId = row.uid as string;
       if (targetId === user!.id) {
-        showAlert('Söz', 'Kendinize davet gönderemezsiniz.');
+        showAlert('Söz', t('cannotInviteSelf'));
         return;
       }
       const { error: insErr } = await supabase.from('friendships').insert({
@@ -258,17 +260,17 @@ export default function FriendsScreen() {
       });
       if (insErr) {
         if (insErr.code === '23505') {
-          showAlert('Söz', 'Zaten bir istek mevcut veya arkadaşsınız.');
+          showAlert('Söz', t('requestAlreadyExists'));
         } else {
           throw insErr;
         }
         return;
       }
       setInviteEmail('');
-      showAlert('Söz', 'Davet gönderildi.');
+      showAlert('Söz', t('inviteSent'));
       loadAll();
     } catch (e) {
-      showAlert('Söz', 'Davet gönderilemedi. Tekrar deneyin.');
+      showAlert('Söz', t('inviteSendFailed'));
     } finally {
       setInviteBusy(false);
     }
@@ -285,7 +287,7 @@ export default function FriendsScreen() {
       if (error) throw error;
       loadAll();
     } catch {
-      showAlert('Söz', 'İstek kabul edilemedi.');
+      showAlert('Söz', t('requestAcceptFailed'));
     }
   };
 
@@ -300,7 +302,7 @@ export default function FriendsScreen() {
       if (error) throw error;
       loadAll();
     } catch {
-      showAlert('Söz', 'İstek reddedilemedi.');
+      showAlert('Söz', t('requestRejectFailed'));
     }
   };
 
@@ -347,15 +349,15 @@ export default function FriendsScreen() {
           <Pressable onPress={() => safeBack()} hitSlop={12}>
             <Ionicons name="chevron-back" size={28} color={theme.text} />
           </Pressable>
-          <Text style={[styles.title, { color: theme.text }]}>Arkadaşlar</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{t('friends')}</Text>
           <View style={{ width: 28 }} />
         </View>
         <View style={styles.guestBox}>
           <Text style={[styles.guestText, { color: theme.textMuted }]}>
-            Arkadaş özellikleri için hesap oluşturun veya giriş yapın.
+            {t('friendFeatureSignInPrompt')}
           </Text>
           <Pressable style={styles.authBtn} onPress={goAuth}>
-            <Text style={styles.authBtnText}>Giriş / Kayıt</Text>
+            <Text style={styles.authBtnText}>{t('signInShort')}</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -369,7 +371,7 @@ export default function FriendsScreen() {
         <Pressable onPress={() => safeBack()} hitSlop={12}>
           <Ionicons name="chevron-back" size={28} color={theme.text} />
         </Pressable>
-        <Text style={[styles.title, { color: theme.text }]}>Arkadaşlar</Text>
+        <Text style={[styles.title, { color: theme.text }]}>{t('friends')}</Text>
         <Pressable
           onPress={() => {
             /* scroll to invite — already visible */
@@ -392,10 +394,10 @@ export default function FriendsScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.cardTitle, { color: theme.text }]}>Arkadaş daveti</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>{t('friendInviteCardTitle')}</Text>
             <TextInput
               style={[styles.input, { color: theme.text, borderColor: theme.textMuted }]}
-              placeholder="E-posta adresi"
+              placeholder={t('emailAddressPlaceholder')}
               placeholderTextColor={theme.textMuted}
               value={inviteEmail}
               onChangeText={setInviteEmail}
@@ -408,14 +410,14 @@ export default function FriendsScreen() {
               disabled={inviteBusy || !isOnline}
             >
               <Text style={styles.primaryBtnText}>
-                {inviteBusy ? 'Gönderiliyor…' : 'Davet Gönder'}
+                {inviteBusy ? t('sendingEllipsis') : t('sendInviteCta')}
               </Text>
             </Pressable>
           </View>
 
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
-              {pendingIn.length > 0 ? `${pendingIn.length} arkadaşlık isteği` : 'Bekleyen istek yok'}
+              {pendingIn.length > 0 ? t('pendingFriendRequestsCount', { n: pendingIn.length }) : t('noPendingRequests')}
             </Text>
           </View>
           {pendingIn.map((row) => {
@@ -434,20 +436,20 @@ export default function FriendsScreen() {
                   ) : null}
                 </View>
                 <Pressable style={styles.acceptBtn} onPress={() => acceptRequest(row)}>
-                  <Text style={styles.acceptBtnText}>Kabul Et</Text>
+                  <Text style={styles.acceptBtnText}>{t('acceptCta')}</Text>
                 </Pressable>
                 <Pressable style={styles.rejectBtn} onPress={() => rejectRequest(row)}>
-                  <Text style={[styles.rejectBtnText, { color: theme.textMuted }]}>Reddet</Text>
+                  <Text style={[styles.rejectBtnText, { color: theme.textMuted }]}>{t('declineCta')}</Text>
                 </Pressable>
               </View>
             );
           })}
 
           <Text style={[styles.sectionLabel, { color: theme.textMuted, marginTop: 20 }]}>
-            Arkadaşların
+            {t('yourFriendsLabel')}
           </Text>
           {friendsRows.length === 0 ? (
-            <Text style={[styles.empty, { color: theme.textMuted }]}>Henüz arkadaşın yok.</Text>
+            <Text style={[styles.empty, { color: theme.textMuted }]}>{t('noFriendsYet')}</Text>
           ) : (
             friendsRows.map((row) => {
               const fid = row.user_id === uid ? row.friend_id : row.user_id;
@@ -456,7 +458,7 @@ export default function FriendsScreen() {
               const last = lastByUser[fid];
               const sub = last
                 ? `${lastActivityLine(last.type, last.verse_id, last.book, last.chapter, last.note)} · ${formatActivityTimeLong(last.created_at)}`
-                : 'Henüz aktivite yok';
+                : t('noActivityYet');
               const unread = unreadCounts[fid] ?? 0;
               return (
                 <View key={row.id} style={[styles.friendRow, { backgroundColor: theme.surface }]}>
@@ -488,7 +490,7 @@ export default function FriendsScreen() {
           )}
 
           <View style={[styles.shareRow, { backgroundColor: theme.surface }]}>
-            <Text style={[styles.shareLabel, { color: theme.text }]}>Aktivitemi arkadaşlarımla paylaş</Text>
+            <Text style={[styles.shareLabel, { color: theme.text }]}>{t('shareActivityToggleLabel')}</Text>
             <Switch
               value={shareActivity}
               onValueChange={onShareToggle}
@@ -497,10 +499,10 @@ export default function FriendsScreen() {
             />
           </View>
 
-          <Text style={[styles.feedTitle, { color: theme.textMuted }]}>ARKADAŞ AKTİVİTESİ</Text>
+          <Text style={[styles.feedTitle, { color: theme.textMuted }]}>{t('friendActivityCaps')}</Text>
           {activities.length === 0 ? (
             <Text style={[styles.empty, { color: theme.textMuted }]}>
-              {friendsRows.length === 0 ? 'Arkadaş ekleyince burada görünür.' : 'Henüz paylaşılan aktivite yok.'}
+              {friendsRows.length === 0 ? t('addFriendToSeeHere') : t('noSharedActivityYet')}
             </Text>
           ) : (
             activities.map((a) => {

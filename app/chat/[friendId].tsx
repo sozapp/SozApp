@@ -1,6 +1,7 @@
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeBack } from '@/hooks/useSafeBack';
 import { useChatThread, type ChatMessage } from '@/hooks/useMessages';
+import { useTranslation } from '@/context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -37,12 +38,13 @@ function timeOfDay(iso: string): string {
 export default function ChatThreadScreen() {
   const { colors, fonts } = useTheme();
   const safeBack = useSafeBack();
+  const { t } = useTranslation();
   const { friendId, friendName } = useLocalSearchParams<{ friendId: string; friendName?: string }>();
   const { messages, loading, myId, sendMessage, markRead } = useChatThread(friendId ?? '');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
-  const name = friendName?.trim() || 'Arkadaş';
+  const name = friendName?.trim() || t('defaultFriendName');
 
   useFocusEffect(
     useCallback(() => {
@@ -97,7 +99,7 @@ export default function ChatThreadScreen() {
         ) : messages.length === 0 ? (
           <View style={styles.centerBox}>
             <Ionicons name="chatbubbles-outline" size={36} color={colors.textMuted} />
-            <Text style={styles.emptyText}>Henüz mesaj yok. İlk mesajı sen gönder!</Text>
+            <Text style={styles.emptyText}>{t('noMessagesYet')}</Text>
           </View>
         ) : (
           <FlatList
@@ -125,7 +127,7 @@ export default function ChatThreadScreen() {
             style={styles.input}
             value={input}
             onChangeText={setInput}
-            placeholder="Mesaj yaz..."
+            placeholder={t('messagePlaceholder')}
             placeholderTextColor={colors.textMuted}
             multiline
             maxLength={2000}

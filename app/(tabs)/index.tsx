@@ -36,6 +36,7 @@ import { devotionals, getTodaysDevotional } from '@/constants/devotionals';
 import { fonts as appFonts } from '@/constants/theme';
 import { useTheme, type ThemeColors } from '@/hooks/useTheme';
 import { useTranslation } from '@/context/LanguageContext';
+import type { TranslationKey } from '@/constants/i18n';
 import AmbientMusicModal from '@/components/AmbientMusicModal';
 import ShareVerseModal from '@/components/ShareVerseModal';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
@@ -48,23 +49,25 @@ const TUTORIAL_SEEN_KEY = '@soz/tutorialSeen';
 const STREAK_CARD_DISMISSED_AT_KEY = '@soz/streakCardDismissedAt';
 const STREAK_CARD_COOLDOWN_MS = 4 * 24 * 60 * 60 * 1000;
 
-const HOME_TUTORIAL_STEPS = [
-  {
-    id: 'daily-verse',
-    message: 'Günün ayetini buradan oku veya favorile',
-    target: 'verse' as const,
-  },
-  {
-    id: 'tab-bar',
-    message: '5 ana bölüm — Oku, Keşfet, Notlar, Profil',
-    target: 'tabbar' as const,
-  },
-  {
-    id: 'mood-card',
-    message: 'Nasıl hissettiğini söyle, sana özel ayet al',
-    target: 'mood' as const,
-  },
-];
+function getHomeTutorialSteps(t: (key: TranslationKey) => string) {
+  return [
+    {
+      id: 'daily-verse',
+      message: t('tutorialVerseMsg'),
+      target: 'verse' as const,
+    },
+    {
+      id: 'tab-bar',
+      message: t('tutorialTabbarMsg'),
+      target: 'tabbar' as const,
+    },
+    {
+      id: 'mood-card',
+      message: t('tutorialMoodMsg'),
+      target: 'mood' as const,
+    },
+  ];
+}
 
 type AppFonts = typeof appFonts;
 
@@ -123,45 +126,45 @@ function parseLastMoodPayload(raw: string | null): { summary: string; hasData: b
   }
 }
 
-function formatMoodRecency(iso: string | null): string {
-  if (!iso?.trim()) return 'Bugün';
+function formatMoodRecency(iso: string | null, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+  if (!iso?.trim()) return t('today');
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Bugün';
+  if (Number.isNaN(d.getTime())) return t('today');
   const now = new Date();
   const sod = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diffDays = Math.round((sod(now) - sod(d)) / 86400000);
-  if (diffDays <= 0) return 'bugün';
-  if (diffDays === 1) return 'dün';
-  if (diffDays < 7) return `${diffDays} gün önce`;
+  if (diffDays <= 0) return t('todayLower');
+  if (diffDays === 1) return t('yesterdayLower');
+  if (diffDays < 7) return t('agoDays', { n: diffDays });
   return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 }
 
-function getGreetingBannerContent() {
+function getGreetingBannerContent(t: (key: TranslationKey) => string) {
   const hour = new Date().getHours();
   if (hour >= 5 && hour <= 11) {
     return {
-      title: 'Günaydın',
-      subtitle: 'Bugün Söz ile başla',
+      title: t('goodMorning'),
+      subtitle: t('morningSubtitle'),
       icon: 'sunny-outline' as keyof typeof Ionicons.glyphMap,
     };
   }
   if (hour >= 12 && hour <= 17) {
     return {
-      title: 'İyi günler',
-      subtitle: 'Bir mola ver, bir ayet oku',
+      title: t('noonGreeting'),
+      subtitle: t('noonSubtitle'),
       icon: 'partly-sunny-outline' as keyof typeof Ionicons.glyphMap,
     };
   }
   if (hour >= 18 && hour <= 21) {
     return {
-      title: 'İyi akşamlar',
-      subtitle: "Günü Tanrı'nın Sözü ile tamamla",
+      title: t('goodEvening'),
+      subtitle: t('eveningSubtitle'),
       icon: 'moon-outline' as keyof typeof Ionicons.glyphMap,
     };
   }
   return {
-    title: 'İyi geceler',
-    subtitle: 'Yatmadan önce bir ayet',
+    title: t('goodNight'),
+    subtitle: t('nightSubtitle'),
     icon: 'moon-outline' as keyof typeof Ionicons.glyphMap,
   };
 }
@@ -1421,18 +1424,18 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     },
     tooltip: {
       position: 'absolute',
-      bottom: 6,
-      right: 64,
+      bottom: 10,
+      right: 60,
     },
     tooltipInner: {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: 'rgba(196,149,80,0.3)',
-      borderRadius: 14,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      borderRadius: 12,
+      paddingHorizontal: 13,
+      paddingVertical: 9,
       minWidth: 0,
-      maxWidth: 200,
+      maxWidth: 175,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.15,
@@ -1442,18 +1445,18 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 7,
     },
     tooltipIconWrap: {
-      width: 26,
-      height: 26,
-      borderRadius: 8,
+      width: 22,
+      height: 22,
+      borderRadius: 7,
       backgroundColor: 'rgba(196,149,80,0.1)',
       alignItems: 'center',
       justifyContent: 'center',
     },
     tooltipTitle: {
-      fontSize: 15,
+      fontSize: 14,
       color: colors.text,
       fontFamily: fonts.regular,
     },
@@ -1468,7 +1471,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipArrowBorder: {
       position: 'absolute',
       right: -7,
-      bottom: 19,
+      bottom: 14,
       width: 0,
       height: 0,
       borderTopWidth: 6,
@@ -1481,7 +1484,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipArrowFill: {
       position: 'absolute',
       right: -5,
-      bottom: 20,
+      bottom: 15,
       width: 0,
       height: 0,
       borderTopWidth: 5,
@@ -1918,7 +1921,8 @@ export default function HomeScreen() {
 
   const lastMoodPreview = useMemo(() => parseLastMoodPayload(lastMood), [lastMood]);
   const hasLastMoodSession = lastMoodPreview.hasData;
-  const greetingBanner = useMemo(() => getGreetingBannerContent(), []);
+  const greetingBanner = useMemo(() => getGreetingBannerContent(t), [t]);
+  const homeTutorialSteps = useMemo(() => getHomeTutorialSteps(t), [t]);
 
   const SkeletonCard = () => (
     <View style={{ backgroundColor: colors.card, borderRadius: 16, height: 120, marginBottom: 12, overflow: 'hidden' }}>
@@ -2126,16 +2130,16 @@ export default function HomeScreen() {
   }, []);
 
   const nextTutorialStep = useCallback(() => {
-    if (tutorialStep >= HOME_TUTORIAL_STEPS.length - 1) {
+    if (tutorialStep >= homeTutorialSteps.length - 1) {
       void finishTutorial();
       return;
     }
     setTutorialStep((prev) => prev + 1);
-  }, [finishTutorial, tutorialStep]);
+  }, [finishTutorial, tutorialStep, homeTutorialSteps.length]);
 
   const tutorialPosition = useMemo(() => {
     const h = Dimensions.get('window').height;
-    const currentTarget = HOME_TUTORIAL_STEPS[tutorialStep]?.target;
+    const currentTarget = homeTutorialSteps[tutorialStep]?.target;
     if (currentTarget === 'verse') {
       return {
         cardStyle: { top: 280, left: 20 },
@@ -2152,7 +2156,7 @@ export default function HomeScreen() {
       cardStyle: { top: Math.max(320, h * 0.52), left: 20 },
       showArrowDown: true,
     };
-  }, [tutorialStep]);
+  }, [tutorialStep, homeTutorialSteps]);
 
   useFocusEffect(
     useCallback(() => {
@@ -2190,16 +2194,16 @@ export default function HomeScreen() {
         <View style={styles.stickyHeaderWrap}>
           <View style={styles.header}>
             <View style={styles.headerLeft}>
-              <Text style={styles.greetingPrefix}>Merhaba,</Text>
+              <Text style={styles.greetingPrefix}>{t('greetingHello')}</Text>
               <Text style={styles.greetingName}>
-                {trimmedUserName ? `${trimmedUserName}!` : 'Hoş geldin!'}
+                {trimmedUserName ? `${trimmedUserName}!` : t('welcomeGuest')}
               </Text>
               <View style={styles.headerDateRow}>
                 <Text style={styles.dateText}>{dateStr}</Text>
                 {streak > 0 ? (
                   <View style={styles.streakPill}>
                     <Ionicons name="flame-outline" size={12} color={ACCENT} />
-                    <Text style={styles.streakText}>{streak} günlük seri</Text>
+                    <Text style={styles.streakText}>{streak} {t('todayStreak')}</Text>
                   </View>
                 ) : null}
               </View>
@@ -2234,7 +2238,7 @@ export default function HomeScreen() {
             <View style={styles.offlineBannerBelow}>
               <Ionicons name="wifi-outline" size={16} color={colors.text} />
               <Text style={styles.offlineTextBelow}>
-                Çevrimdışı mod
+                {t('offlineMode')}
               </Text>
             </View>
           ) : null}
@@ -2260,9 +2264,9 @@ export default function HomeScreen() {
               <View style={styles.streakZeroIconWrap}>
                 <Ionicons name="flame" size={18} color={ACCENT} />
               </View>
-              <Text style={styles.streakZeroTitle}>Bugün başla!</Text>
+              <Text style={styles.streakZeroTitle}>{t('streakStartTitle')}</Text>
             </View>
-            <Text style={styles.streakZeroDesc}>Her gün okumak ruhsal büyümenin temelidir</Text>
+            <Text style={styles.streakZeroDesc}>{t('streakStartDesc')}</Text>
             <TouchableOpacity
               style={styles.streakZeroBtn}
               onPress={() =>
@@ -2273,7 +2277,7 @@ export default function HomeScreen() {
               }
               activeOpacity={0.86}
             >
-              <Text style={styles.streakZeroBtnText}>İlk Bölümü Oku →</Text>
+              <Text style={styles.streakZeroBtnText}>{t('readFirstChapter')}</Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -2325,7 +2329,7 @@ export default function HomeScreen() {
                 <View style={styles.verseLabelRow}>
                   <View style={styles.verseLabelLeft}>
                     <View style={styles.verseLabelDot} />
-                    <Text style={styles.verseLabel}>GÜNÜN AYETİ</Text>
+                    <Text style={styles.verseLabel}>{t('verseOfDayCaps')}</Text>
                   </View>
                   <Text style={styles.verseDateLabel}>
                     {new Date().toLocaleDateString('tr-TR', {
@@ -2355,7 +2359,7 @@ export default function HomeScreen() {
                         color={favoritedVerse ? '#E57373' : 'rgba(255,255,255,0.85)'}
                       />
                     </Animated.View>
-                    <Text style={styles.verseActionText}>Favori</Text>
+                    <Text style={styles.verseActionText}>{t('favorite')}</Text>
                   </TouchableOpacity>
 
                   <View style={styles.actionDivider} />
@@ -2391,7 +2395,7 @@ export default function HomeScreen() {
                 <View style={styles.verseLabelRow}>
                   <View style={styles.verseLabelLeft}>
                     <View style={styles.verseLabelDot} />
-                    <Text style={styles.verseLabel}>GÜNÜN AYETİ</Text>
+                    <Text style={styles.verseLabel}>{t('verseOfDayCaps')}</Text>
                   </View>
                   <Text style={[styles.verseDateLabel, styles.verseDateLabelFallback]}>
                     {new Date().toLocaleDateString('tr-TR', {
@@ -2421,7 +2425,7 @@ export default function HomeScreen() {
                         color={favoritedVerse ? '#E57373' : 'rgba(255,255,255,0.85)'}
                       />
                     </Animated.View>
-                    <Text style={styles.verseActionText}>Favori</Text>
+                    <Text style={styles.verseActionText}>{t('favorite')}</Text>
                   </TouchableOpacity>
 
                   <View style={styles.actionDivider} />
@@ -2474,11 +2478,11 @@ export default function HomeScreen() {
             onPress={() => setShowTrackPicker(true)}
             activeOpacity={0.7}
           >
-            <Text style={styles.musicLabel}>ORTAM MÜZİĞİ</Text>
+            <Text style={styles.musicLabel}>{t('ambientMusicCaps')}</Text>
             <Text style={styles.musicTrackName}>
               {isPlaying && currentTrack && currentTrack.id !== 'silence'
                 ? currentTrack.name
-                : 'Gözlerini kapa, ses seç...'}
+                : t('chooseSoundPlaceholder')}
             </Text>
             {isPlaying && currentTrack?.id !== 'silence' && (
               <View style={styles.musicWaveRow}>
@@ -2533,8 +2537,8 @@ export default function HomeScreen() {
         >
           <View style={styles.planHeader}>
             <View>
-              <Text style={styles.planLabel}>OKUMA PLANI</Text>
-              <Text style={styles.planTitle}>Yeni Ahit 30 Günde</Text>
+              <Text style={styles.planLabel}>{t('readingPlanCaps')}</Text>
+              <Text style={styles.planTitle}>{t('ntPlan30Days')}</Text>
             </View>
             <View
               style={[
@@ -2578,13 +2582,13 @@ export default function HomeScreen() {
             <View style={styles.planTodayWrap}>
               <Ionicons name="book-outline" size={12} color={ACCENT} />
               <Text style={styles.planToday} numberOfLines={1}>
-                Bugün: {todayPlanChapter}
+                {t('todayColon')} {todayPlanChapter}
               </Text>
             </View>
             <Text style={styles.planRemaining}>
               {planRemainingDays > 0
-                ? `${planRemainingDays} gün kaldı`
-                : '✓ Tamamlandı'}
+                ? t('daysLeftCount', { n: planRemainingDays })
+                : t('planCompletedMark')}
             </Text>
           </View>
         </TouchableOpacity>
@@ -2596,10 +2600,10 @@ export default function HomeScreen() {
         >
           <View style={styles.reflectionBody}>
             <View style={styles.reflectionTop}>
-              <Text style={styles.reflectionLabel}>GÜNLÜK YANSIMA</Text>
+              <Text style={styles.reflectionLabel}>{t('dailyReflectionCaps')}</Text>
               <View style={styles.reflectionTimeBadge}>
                 <Ionicons name="timer-outline" size={12} color={ACCENT} />
-                <Text style={styles.reflectionTimeText}>3 dk</Text>
+                <Text style={styles.reflectionTimeText}>{t('reflectionMinutes')}</Text>
               </View>
             </View>
 
@@ -2619,15 +2623,15 @@ export default function HomeScreen() {
             <View style={styles.reflectionFooter}>
               <View style={styles.reflectionPrayerHint}>
                 <Ionicons name="hand-left-outline" size={11} color={colors.textMuted} />
-                <Text style={styles.reflectionPrayerText}>Dua dahil</Text>
+                <Text style={styles.reflectionPrayerText}>{t('prayerIncluded')}</Text>
               </View>
-              {!reflectionDoneToday ? <Text style={styles.reflectionCta}>Yansımayı Aç →</Text> : null}
+              {!reflectionDoneToday ? <Text style={styles.reflectionCta}>{t('openReflectionCta')}</Text> : null}
             </View>
           </View>
           {reflectionDoneToday ? (
             <View style={styles.reflectionDoneOverlay} pointerEvents="none">
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={styles.reflectionDoneText}>Bugün tamamlandı</Text>
+              <Text style={styles.reflectionDoneText}>{t('reflectionDoneTodayText')}</Text>
             </View>
           ) : null}
         </TouchableOpacity>
@@ -2668,22 +2672,22 @@ export default function HomeScreen() {
                       "{lastMoodPreview.summary}"
                     </Text>
                     <Text style={styles.moodRecapMeta}>
-                      {formatMoodRecency(lastMoodAt)} · 3 ayet önerildi
+                      {formatMoodRecency(lastMoodAt, t)} · {t('versesSuggestedCount', { n: 3 })}
                     </Text>
                     <TouchableOpacity
                       onPress={() => router.push('/mood')}
                       activeOpacity={0.8}
                       style={styles.moodRecapLinkWrap}
                     >
-                      <Text style={styles.moodRecapLink}>Tekrar Sor →</Text>
+                      <Text style={styles.moodRecapLink}>{t('askAgainCta')}</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
                   <>
-                    <Text style={styles.moodEmptyTitle}>Bugün nasılsın?</Text>
-                    <Text style={styles.moodEmptySubtitle}>Ruh haline göre ayet al</Text>
+                    <Text style={styles.moodEmptyTitle}>{t('moodQuestionTitle')}</Text>
+                    <Text style={styles.moodEmptySubtitle}>{t('moodQuestionDesc')}</Text>
                     <View style={styles.moodCtaBtn}>
-                      <Text style={styles.moodCtaBtnText}>Nasılsın? →</Text>
+                      <Text style={styles.moodCtaBtnText}>{t('moodCtaShort')}</Text>
                     </View>
                   </>
                 )}
@@ -2703,8 +2707,8 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.churchTextWrap}>
-            <Text style={styles.churchTitle}>Kilise Grubu</Text>
-            <Text style={styles.churchDesc}>Topluluğunla birlikte oku</Text>
+            <Text style={styles.churchTitle}>{t('churchGroup')}</Text>
+            <Text style={styles.churchDesc}>{t('churchDescHome')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={ACCENT} />
         </TouchableOpacity>
@@ -2722,7 +2726,7 @@ export default function HomeScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               activeOpacity={0.75}
             >
-              <Text style={styles.recentSeeAll}>Tümünü Gör →</Text>
+              <Text style={styles.recentSeeAll}>{t('seeAllCta')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -2756,9 +2760,9 @@ export default function HomeScreen() {
                 <Text style={styles.recentLastSub}>
                   {(() => {
                     const totalChapters = getBookChapterCount(lastRead.book);
-                    if (totalChapters == null) return `${lastRead.chapter}. bölümdesin`;
+                    if (totalChapters == null) return t('chapterOnlyLine', { chapter: lastRead.chapter });
                     const remaining = Math.max(0, totalChapters - lastRead.chapter);
-                    return `${lastRead.chapter}. bölümdesin · ${remaining} bölüm kaldı`;
+                    return t('chaptersRemainingLine', { chapter: lastRead.chapter, remaining });
                   })()}
                 </Text>
                 <View style={styles.recentProgressTrack}>
@@ -2795,8 +2799,8 @@ export default function HomeScreen() {
                 <Ionicons name="book-outline" size={20} color={ACCENT} />
               </View>
               <View style={styles.recentLastMid}>
-                <Text style={styles.recentLastTitle}>Okumaya Başla</Text>
-                <Text style={styles.recentLastSub}>Matta 1'den başla</Text>
+                <Text style={styles.recentLastTitle}>{t('startReadingTitle')}</Text>
+                <Text style={styles.recentLastSub}>{t('startFromMatt1')}</Text>
               </View>
               <Ionicons name="arrow-forward" size={18} color={ACCENT} />
             </TouchableOpacity>
@@ -2830,7 +2834,7 @@ export default function HomeScreen() {
                     const order = ['read', 'think', 'pray'] as const;
                     const currentIdx = order.indexOf(reflectionStep);
                     const label =
-                      step === 'read' ? 'Oku' : step === 'think' ? 'Düşün' : 'Dua Et';
+                      step === 'read' ? t('read') : step === 'think' ? t('thinkStepLabel') : t('prayNow');
                     return (
                       <View
                         key={step}
@@ -2877,14 +2881,14 @@ export default function HomeScreen() {
                           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }}
                       >
-                        <Text style={styles.refNextBtnText}>Düşünme Sorusuna Geç →</Text>
+                        <Text style={styles.refNextBtnText}>{t('thinkQuestionGoCta')}</Text>
                       </TouchableOpacity>
                     </>
                   )}
 
                   {reflectionStep === 'think' && (
                     <>
-                      <Text style={styles.refModalTitle}>Bugün Kendine Sor</Text>
+                      <Text style={styles.refModalTitle}>{t('selfQuestionTitle')}</Text>
 
                       <View style={styles.refBigQuestion}>
                         <Ionicons
@@ -2897,10 +2901,10 @@ export default function HomeScreen() {
                       </View>
 
                       <View style={styles.refNoteWrap}>
-                        <Text style={styles.refNoteLabel}>Düşüncelerini yaz (isteğe bağlı)</Text>
+                        <Text style={styles.refNoteLabel}>{t('thoughtsOptionalLabel')}</Text>
                         <TextInput
                           style={styles.refNoteInput}
-                          placeholder="Bugün aklıma gelenler..."
+                          placeholder={t('thoughtsPlaceholder')}
                           placeholderTextColor={colors.textMuted}
                           multiline
                           numberOfLines={4}
@@ -2929,14 +2933,14 @@ export default function HomeScreen() {
                           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         }}
                       >
-                        <Text style={styles.refNextBtnText}>Duaya Geç →</Text>
+                        <Text style={styles.refNextBtnText}>{t('goToPrayerCta')}</Text>
                       </TouchableOpacity>
                     </>
                   )}
 
                   {reflectionStep === 'pray' && (
                     <>
-                      <Text style={styles.refModalTitle}>Dua</Text>
+                      <Text style={styles.refModalTitle}>{t('prayer')}</Text>
 
                       <View style={styles.refPrayerBox}>
                         <Ionicons
@@ -2964,12 +2968,11 @@ export default function HomeScreen() {
                         }}
                       >
                         <Ionicons name="checkmark" size={16} color={colors.background} />
-                        <Text style={styles.refDoneBtnText}>Bugünü Tamamladım</Text>
+                        <Text style={styles.refDoneBtnText}>{t('finishTodayCta')}</Text>
                       </TouchableOpacity>
 
                       <Text style={styles.refStreakNote}>
-                        Bu özelliği düzenli kullananlar imanlarında daha derin bir büyüme yaşadıklarını
-                        belirtiyor.
+                        {t('reflectionStreakNote')}
                       </Text>
                     </>
                   )}
@@ -2999,7 +3002,7 @@ export default function HomeScreen() {
                 <View style={styles.tooltipInner}>
                   <View style={styles.tooltipHeader}>
                     <View style={styles.tooltipIconWrap}>
-                      <Svg width={15} height={15} viewBox="0 0 40 40" fill="none">
+                      <Svg width={12} height={12} viewBox="0 0 40 40" fill="none">
                         <Line x1="13" y1="11" x2="27" y2="11" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" />
                         <Path d="M27 11C27 11 13 11 13 20C13 29 27 29 27 29" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" fill="none" />
                         <Line x1="13" y1="29" x2="27" y2="29" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" />
@@ -3076,7 +3079,7 @@ export default function HomeScreen() {
               <TextInput
                 ref={searchInputRef}
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Ayet veya kelime ara..."
+                placeholder={t('searchPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={searchText}
                 onChangeText={handleSearch}
@@ -3104,21 +3107,21 @@ export default function HomeScreen() {
               }}
               style={styles.searchCancelBtn}
             >
-              <Text style={styles.searchCancelText}>İptal</Text>
+              <Text style={styles.searchCancelText}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>
 
           {searchText.length < 2 ? (
             <View style={styles.searchEmpty}>
               <Ionicons name="search-outline" size={40} color="rgba(196,149,80,0.25)" />
-              <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>Ayet Ara</Text>
-              <Text style={[styles.searchEmptyDesc, { color: colors.textMuted }]}>Kelime veya ifade yazın</Text>
+              <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{t('searchTitleShort')}</Text>
+              <Text style={[styles.searchEmptyDesc, { color: colors.textMuted }]}>{t('searchTypeHint')}</Text>
             </View>
           ) : searchResults.length === 0 ? (
             <View style={styles.searchEmpty}>
-              <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>Sonuç bulunamadı</Text>
+              <Text style={[styles.searchEmptyTitle, { color: colors.text }]}>{t('noResults')}</Text>
               <Text style={[styles.searchEmptyDesc, { color: colors.textMuted }]}>
-                {`\u201C${searchText}\u201D için eşleşme yok`}
+                {t('searchNoMatchFor', { query: searchText })}
               </Text>
             </View>
           ) : (
@@ -3128,7 +3131,7 @@ export default function HomeScreen() {
               contentContainerStyle={{ paddingBottom: 40 }}
               keyboardShouldPersistTaps="handled"
               ListHeaderComponent={
-                <Text style={styles.searchResultCount}>{searchResults.length} sonuç bulundu</Text>
+                <Text style={styles.searchResultCount}>{searchResults.length} {t('resultsFound')}</Text>
               }
               renderItem={({ item }) => {
                 const query = searchText.toLowerCase();
@@ -3192,12 +3195,12 @@ export default function HomeScreen() {
                 ]}
               />
             ) : null}
-            <Text style={styles.tutorialText}>{HOME_TUTORIAL_STEPS[tutorialStep]?.message}</Text>
+            <Text style={styles.tutorialText}>{homeTutorialSteps[tutorialStep]?.message}</Text>
             <Text style={styles.tutorialStepText}>
-              {tutorialStep + 1}/{HOME_TUTORIAL_STEPS.length}
+              {tutorialStep + 1}/{homeTutorialSteps.length}
             </Text>
             <TouchableOpacity style={styles.tutorialButton} onPress={nextTutorialStep} activeOpacity={0.86}>
-              <Text style={styles.tutorialButtonText}>Anladım →</Text>
+              <Text style={styles.tutorialButtonText}>{t('gotItCta')}</Text>
             </TouchableOpacity>
             {tutorialPosition.showArrowDown ? <View style={styles.tutorialArrow} /> : null}
           </View>

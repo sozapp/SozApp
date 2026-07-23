@@ -1,4 +1,5 @@
 import { supabase } from '@/constants/supabase';
+import { useTranslation } from '@/context/LanguageContext';
 import { useCallback, useEffect, useState } from 'react';
 
 export type ChatMessage = {
@@ -31,6 +32,7 @@ function fromRow(r: MessageRow): ChatMessage {
 }
 
 export function useChatThread(friendId: string) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [myId, setMyId] = useState<string | null>(null);
@@ -89,13 +91,13 @@ export function useChatThread(friendId: string) {
   const sendMessage = useCallback(
     async (text: string): Promise<{ ok: boolean; error?: string }> => {
       const trimmed = text.trim();
-      if (!trimmed) return { ok: false, error: 'Boş mesaj gönderilemez.' };
-      if (!supabase) return { ok: false, error: 'Sunucuya bağlanılamıyor.' };
+      if (!trimmed) return { ok: false, error: t('emptyMessageError') };
+      if (!supabase) return { ok: false, error: t('serverConnectionError') };
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) return { ok: false, error: 'Önce giriş yapmalısınız.' };
+        if (!user) return { ok: false, error: t('mustSignInFirst') };
         const { data, error } = await supabase
           .from('messages')
           .insert({ sender_id: user.id, recipient_id: friendId, text: trimmed })
@@ -105,10 +107,10 @@ export function useChatThread(friendId: string) {
         setMessages((prev) => [...prev, fromRow(data as MessageRow)]);
         return { ok: true };
       } catch (e) {
-        return { ok: false, error: e instanceof Error ? e.message : 'Bir hata oluştu.' };
+        return { ok: false, error: e instanceof Error ? e.message : t('genericErrorOccurred') };
       }
     },
-    [friendId]
+    [friendId, t]
   );
 
   useEffect(() => {
