@@ -42,12 +42,14 @@ import { getDailyStats } from '@/constants/stats-storage';
 import type { PlanProgress } from '@/constants/storage';
 import { deleteAccount, supabase } from '@/constants/supabase';
 import AmbientMusicModal from '@/components/AmbientMusicModal';
+import { AnimatedCounter } from '@/components/AnimatedCounter';
 import { FontSizeModal } from '@/components/FontSizeModal';
 import { LineSpacingModal, type LineSpacingId } from '@/components/LineSpacingModal';
 import { ThemePickerModal } from '@/components/ThemePickerModal';
 import { fonts as themeFonts } from '@/constants/theme';
 import { parseFavoritesRaw } from '@/hooks/useFavorites';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
+import { AMBIENT_TRACK_I18N_KEYS } from '@/hooks/useAmbientMusic';
 import { useDenomination } from '@/hooks/useDenomination';
 import { usePremium } from '@/hooks/usePremium';
 import { useTheme, type ThemeColors, type ThemeType } from '@/hooks/useTheme';
@@ -57,8 +59,13 @@ import type { User } from '@supabase/supabase-js';
 import { useBadges } from '@/hooks/useBadges';
 import { getBadgeProgress, type Badge } from '@/constants/badges';
 import { exportBackup, importBackup } from '@/constants/backup';
+import {
+  isAppLockEnabled,
+  setAppLockEnabled,
+} from '@/constants/app-lock';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
+import * as LocalAuthentication from 'expo-local-authentication';
 import {
   requestNotificationPermission,
   scheduleDailyVerseNotification,
@@ -91,33 +98,12 @@ const DANGER = 'rgba(220,80,60,0.7)';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const STAT_CARD_WIDTH = (SCREEN_WIDTH - 52) / 2;
 
-const themeNames: Record<ThemeType, string> = {
-  day: 'Gündüz',
-  night: 'Gece',
-  sepia: 'Sepia',
-  black: 'Siyah',
-};
-
 const STORAGE_PROFILE_IMAGE = '@soz/profileImage';
 const STORAGE_USER_NAME = '@soz/userName';
 const STORAGE_FONT_SIZE = '@soz/fontSize';
 const STORAGE_SPEECH_RATE = '@soz/speechRate';
 const STORAGE_NOTIFICATIONS = '@soz/notifications';
 const STORAGE_LINE_SPACING = '@soz/lineSpacing';
-
-const FONT_SIZE_LABELS: Record<number, string> = {
-  14: 'Küçük',
-  16: 'Rahat',
-  18: 'Normal',
-  20: 'Büyük',
-  22: 'En büyük',
-};
-
-const SPACING_LABELS: Record<LineSpacingId, string> = {
-  normal: 'Normal',
-  wide: 'Geniş',
-  wider: 'Çok Geniş',
-};
 
 function parseLineSpacingProfile(raw: string | null): LineSpacingId {
   if (raw === 'normal' || raw === 'wide' || raw === 'wider') return raw;
@@ -736,7 +722,7 @@ export default function ProfileScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [userName, setUserName] = useState('Misafir Kullanıcı');
+  const [userName, setUserName] = useState(t('guestUserLabel'));
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [totalVerses, setTotalVerses] = useState(0);
@@ -746,6 +732,7 @@ export default function ProfileScreen() {
   const [fontSize, setFontSize] = useState(18);
   const [dailyReminder, setDailyReminder] = useState(false);
   const [streakNotif, setStreakNotif] = useState(true);
+  const [appLockEnabled, setAppLockEnabledState] = useState(false);
   const [reminderTime, setReminderTime] = useState('08:00');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [speechSpeed, setSpeechSpeed] = useState('Normal');
@@ -773,6 +760,37 @@ export default function ProfileScreen() {
 
   const styles = useMemo(() => makeStyles(colors, fonts, insets.bottom), [colors, fonts, insets.bottom]);
 
+  const themeNames: Record<ThemeType, string> = useMemo(
+    () => ({
+      system: t('themeSystem'),
+      day: t('themeDay'),
+      night: t('themeNight'),
+      sepia: t('themeSepia'),
+      black: t('themeBlack'),
+    }),
+    [t]
+  );
+
+  const fontSizeLabels: Record<number, string> = useMemo(
+    () => ({
+      14: t('fontSizeSmall'),
+      16: t('fontSizeComfortable'),
+      18: t('fontSizeNormal'),
+      20: t('fontSizeLarge'),
+      22: t('fontSizeLargest'),
+    }),
+    [t]
+  );
+
+  const spacingLabels: Record<LineSpacingId, string> = useMemo(
+    () => ({
+      normal: t('spacingNormal'),
+      wide: t('spacingWide'),
+      wider: t('spacingWider'),
+    }),
+    [t]
+  );
+
   useFocusEffect(
     useCallback(() => {
       loadFromStorage();
@@ -788,7 +806,7 @@ export default function ProfileScreen() {
     () => denominations.find((d) => d.id === denomination),
     [denomination]
   );
-  const denomName = denomMeta?.name ?? 'Diğer';
+  const denomName = denomMeta?.name ?? t('otherDenomLabel');
 
   const loadAll = useCallback(async () => {
     let avatarFromServer = false;
@@ -799,9 +817,9 @@ export default function ProfileScreen() {
         setUserEmail(null);
         try {
           const name = await AsyncStorage.getItem(STORAGE_USER_NAME);
-          setUserName(name?.trim() || 'Misafir Kullanıcı');
+          setUserName(name?.trim() || t('guestUserLabel'));
         } catch {
-          setUserName('Misafir Kullanıcı');
+          setUserName(t('guestUserLabel'));
         }
         setFriendCount(0);
       } else {
@@ -821,7 +839,7 @@ export default function ProfileScreen() {
               (prof?.display_name as string)?.trim() ||
               (u.user_metadata?.display_name as string)?.trim() ||
               u.email?.split('@')[0] ||
-              'Kullanıcı';
+              t('genericUserLabel');
             setUserName(name);
             if (prof?.avatar_url) {
               avatarFromServer = true;
@@ -829,7 +847,7 @@ export default function ProfileScreen() {
               await AsyncStorage.setItem(STORAGE_PROFILE_IMAGE, prof.avatar_url as string).catch(() => {});
             }
           } catch {
-            setUserName(u.email?.split('@')[0] ?? 'Kullanıcı');
+            setUserName(u.email?.split('@')[0] ?? t('genericUserLabel'));
           }
           try {
             const { data, error } = await supabase
@@ -845,9 +863,9 @@ export default function ProfileScreen() {
         } else {
           try {
             const name = await AsyncStorage.getItem(STORAGE_USER_NAME);
-            setUserName(name?.trim() || 'Misafir Kullanıcı');
+            setUserName(name?.trim() || t('guestUserLabel'));
           } catch {
-            setUserName('Misafir Kullanıcı');
+            setUserName(t('guestUserLabel'));
           }
           setFriendCount(0);
         }
@@ -934,6 +952,12 @@ export default function ProfileScreen() {
       }
 
       try {
+        setAppLockEnabledState(await isAppLockEnabled());
+      } catch {
+        setAppLockEnabledState(false);
+      }
+
+      try {
         const ls = await AsyncStorage.getItem(STORAGE_LINE_SPACING);
         setLineSpacing(parseLineSpacingProfile(ls));
       } catch {
@@ -978,7 +1002,7 @@ export default function ProfileScreen() {
     } catch {
       /* ignore */
     }
-  }, [checkBadges]);
+  }, [checkBadges, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1049,7 +1073,7 @@ export default function ProfileScreen() {
         await AsyncStorage.setItem(STORAGE_PROFILE_IMAGE, bustedUrl).catch(() => {});
       } catch (e) {
         console.log('Avatar upload error:', e);
-        showAlert('Yüklenemedi', 'Fotoğraf sunucuya yüklenemedi, bu cihazda görünmeye devam edecek.');
+        showAlert(t('photoUploadFailedTitle'), t('photoUploadFailedMsg'));
       }
     } catch {
       /* ignore */
@@ -1079,15 +1103,15 @@ export default function ProfileScreen() {
 
   const handleAvatarPress = useCallback(() => {
     if (profileImage) {
-      showAlert('Profil Fotoğrafı', undefined, [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Fotoğrafı Kaldır', style: 'destructive', onPress: removeProfileImage },
-        { text: 'Yeni Fotoğraf Seç', onPress: pickImage },
+      showAlert(t('avatarTitle'), undefined, [
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('removePhotoOption'), style: 'destructive', onPress: removeProfileImage },
+        { text: t('chooseNewPhotoOption'), onPress: pickImage },
       ]);
     } else {
       pickImage();
     }
-  }, [profileImage, showAlert, removeProfileImage, pickImage]);
+  }, [profileImage, showAlert, removeProfileImage, pickImage, t]);
 
   const openEditProfile = useCallback(() => {
     setEditNameDraft(userName);
@@ -1116,11 +1140,11 @@ export default function ProfileScreen() {
       setUserName(trimmed);
       setEditModalVisible(false);
     } catch {
-      showAlert('Söz', 'Kaydedilemedi.');
+      showAlert('Söz', t('couldNotSaveTitle'));
     } finally {
       setSavingProfile(false);
     }
-  }, [editNameDraft, user]);
+  }, [editNameDraft, user, showAlert, t]);
 
   const handleFontSize = useCallback(async (size: number) => {
     setFontSize(size);
@@ -1184,6 +1208,36 @@ export default function ProfileScreen() {
     }
   }, []);
 
+  const toggleAppLock = useCallback(
+    async (value: boolean) => {
+      try {
+        if (value) {
+          const compatible = await LocalAuthentication.hasHardwareAsync();
+          const enrolled = await LocalAuthentication.isEnrolledAsync();
+          if (!compatible || !enrolled) {
+            showAlert(t('error'), t('appLockUnavailable'));
+            return;
+          }
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: t('appLockTitle'),
+            cancelLabel: t('cancel'),
+            disableDeviceFallback: false,
+          });
+          if (!result.success) return;
+          await setAppLockEnabled(true);
+          setAppLockEnabledState(true);
+        } else {
+          await setAppLockEnabled(false);
+          setAppLockEnabledState(false);
+        }
+        Haptics.selectionAsync();
+      } catch {
+        showAlert(t('error'), t('appLockUnavailable'));
+      }
+    },
+    [showAlert, t]
+  );
+
   const clearAllData = useCallback(async () => {
     try {
       await AsyncStorage.multiRemove([
@@ -1199,25 +1253,25 @@ export default function ProfileScreen() {
   }, [router]);
 
   const handleReset = useCallback(() => {
-    showAlert('Tüm Veriyi Sıfırla', 'Notların, favorilerin ve ilerlemen silinecek. Bu işlem geri alınamaz.', [
-      { text: 'İptal', style: 'cancel' },
-      { text: 'Sıfırla', style: 'destructive', onPress: clearAllData },
+    showAlert(t('resetAllDataTitle'), t('resetAllDataMsg'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('resetActionLabel'), style: 'destructive', onPress: clearAllData },
     ]);
-  }, [clearAllData, showAlert]);
+  }, [clearAllData, showAlert, t]);
 
   const handleDeleteAccount = useCallback(() => {
     showAlert(
-      'Hesabı Sil',
-      'Hesabın ve sunucudaki tüm verilerin (notlar, favoriler, ilerleme, kilise grubu üyeliği) kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      t('deleteAccountTitle'),
+      t('deleteAccountMsg'),
       [
-        { text: 'İptal', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Hesabımı Sil',
+          text: t('deleteMyAccountCta'),
           style: 'destructive',
           onPress: async () => {
             const result = await deleteAccount();
             if (!result.ok) {
-              showAlert('Silinemedi', result.error ?? 'Bir hata oluştu, tekrar dene.');
+              showAlert(t('couldNotDeleteTitle'), result.error ?? t('genericErrorRetryMsg'));
               return;
             }
             try {
@@ -1230,14 +1284,14 @@ export default function ProfileScreen() {
         },
       ]
     );
-  }, [clearAllData, showAlert]);
+  }, [clearAllData, showAlert, t]);
 
   const shareProgress = useCallback(() => {
     Share.share({
-      message: `Söz uygulamasında ${streak} günlük serim var! 📖 sozapp.com`,
-      title: 'Söz — Türkçe İncil',
+      message: t('shareProgressMsg', { streak: String(streak) }),
+      title: t('shareProgressTitle'),
     }).catch(() => {});
-  }, [streak]);
+  }, [streak, t]);
 
   const initials = useMemo(() => {
     const n = userName.trim() || userEmail?.split('@')[0] || '?';
@@ -1313,7 +1367,7 @@ export default function ProfileScreen() {
 
           <Pressable style={styles.editBtn} onPress={openEditProfile}>
             <Ionicons name="pencil-outline" size={14} color={ACCENT} />
-            <Text style={styles.editBtnText}>Düzenle</Text>
+            <Text style={styles.editBtnText}>{t('editShort')}</Text>
           </Pressable>
         </View>
 
@@ -1322,30 +1376,30 @@ export default function ProfileScreen() {
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Ionicons name="book-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <Text style={styles.statValue}>{totalVerses}</Text>
-              <Text style={styles.statLabel}>Okunan Ayet</Text>
+              <AnimatedCounter value={totalVerses} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('readVerseLabel')}</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="star-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <Text style={styles.statValue}>{streak}</Text>
-              <Text style={styles.statLabel}>En Uzun Seri</Text>
+              <AnimatedCounter value={streak} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('longestStreak')}</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="heart-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <Text style={styles.statValue}>{favCount}</Text>
-              <Text style={styles.statLabel}>Favori Ayet</Text>
+              <AnimatedCounter value={favCount} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('favoriteVerseLabel')}</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="moon-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <Text style={styles.statValue}>{focusMinutes}</Text>
-              <Text style={styles.statLabel}>Odak Modu</Text>
+              <AnimatedCounter value={focusMinutes} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('focusMode')}</Text>
             </View>
           </View>
 
           <View style={styles.ntCard}>
             <View style={styles.ntRow}>
-              <Text style={styles.ntTitle}>Yeni Ahit</Text>
-              <Text style={styles.ntSub}>{planChaptersRead} / {ntTotal} bölüm</Text>
+              <Text style={styles.ntTitle}>{t('newTestamentProgress')}</Text>
+              <Text style={styles.ntSub}>{t('chaptersCountLabel', { count: `${planChaptersRead} / ${ntTotal}` })}</Text>
             </View>
             <View style={styles.progressTrack}>
               <Animated.View
@@ -1361,7 +1415,7 @@ export default function ProfileScreen() {
               />
             </View>
             <Text style={styles.ntHint}>
-              {remainingChapters} bölüm kaldı · ~{estimatedDays} gün
+              {t('chaptersLeftDaysLine', { remaining: String(remainingChapters), days: String(estimatedDays) })}
             </Text>
           </View>
         </View>
@@ -1463,7 +1517,7 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.rowRight}>
                 <Text style={styles.rowValue}>
-                  {FONT_SIZE_LABELS[fontSize] ?? `${fontSize}px`}
+                  {fontSizeLabels[fontSize] ?? `${fontSize}px`}
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </View>
@@ -1476,7 +1530,7 @@ export default function ProfileScreen() {
                 <Text style={styles.rowTitle}>{t('lineSpacing')}</Text>
               </View>
               <View style={styles.rowRight}>
-                <Text style={styles.rowValue}>{SPACING_LABELS[lineSpacing]}</Text>
+                <Text style={styles.rowValue}>{spacingLabels[lineSpacing]}</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </View>
             </Pressable>
@@ -1485,13 +1539,13 @@ export default function ProfileScreen() {
                 <Ionicons name="musical-notes-outline" size={18} color={ACCENT} />
               </View>
               <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>Ortam Müziği</Text>
+                <Text style={styles.rowTitle}>{t('ambientMusic')}</Text>
               </View>
               <View style={styles.rowRight}>
                 <Text style={styles.rowValue} numberOfLines={1}>
                   {ambientPlaying && ambientTrack?.id !== 'silence'
-                    ? ambientTrack?.name ?? '—'
-                    : 'Kapalı'}
+                    ? (ambientTrack?.id ? t(AMBIENT_TRACK_I18N_KEYS[ambientTrack.id]?.name ?? 'soundSilence') : '—')
+                    : t('offLabel')}
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </View>
@@ -1530,7 +1584,7 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.rowBody}>
                 <Text style={styles.rowTitle}>{t('churchGroupSetting')}</Text>
-                <Text style={styles.rowSub}>{churchGroupName ?? 'Yok'}</Text>
+                <Text style={styles.rowSub}>{churchGroupName ?? t('noneLabel')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
@@ -1539,8 +1593,8 @@ export default function ProfileScreen() {
                 <Ionicons name="time-outline" size={18} color={ACCENT} />
               </View>
               <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>Okuma Geçmişi</Text>
-                <Text style={styles.rowSub}>Tüm okunanlar</Text>
+                <Text style={styles.rowTitle}>{t('readingHistoryTitle')}</Text>
+                <Text style={styles.rowSub}>{t('allReadItemsSub')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
@@ -1588,7 +1642,7 @@ export default function ProfileScreen() {
               </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingTitle}>{t('streakNotif')}</Text>
-                <Text style={styles.settingSubtitle}>Seriyi korumak için hatırlat</Text>
+                <Text style={styles.settingSubtitle}>{t('streakReminderDesc')}</Text>
               </View>
               <Switch
                 value={streakNotif}
@@ -1604,7 +1658,7 @@ export default function ProfileScreen() {
 
           {/* Kart 4 — Hesap */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>HESAP</Text>
+            <Text style={styles.cardTitle}>{t('account').toUpperCase()}</Text>
             {userEmail ? (
               <>
                 <Pressable style={styles.row} onPress={() => router.push('/change-email')}>
@@ -1621,7 +1675,7 @@ export default function ProfileScreen() {
                     <Ionicons name="key-outline" size={18} color={ACCENT} />
                   </View>
                   <View style={styles.rowBody}>
-                    <Text style={styles.rowTitle}>Şifremi Değiştir</Text>
+                    <Text style={styles.rowTitle}>{t('changePasswordCta')}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
@@ -1677,15 +1731,33 @@ export default function ProfileScreen() {
 
           {/* Kart 5 — Veri */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>VERİ</Text>
+            <Text style={styles.cardTitle}>{t('dataSectionTitle').toUpperCase()}</Text>
+            <View style={styles.settingRow}>
+              <View style={styles.settingIconWrap}>
+                <Ionicons name="lock-closed-outline" size={18} color={ACCENT} />
+              </View>
+              <View style={styles.settingContent}>
+                <Text style={styles.settingTitle}>{t('appLockTitle')}</Text>
+                <Text style={styles.settingSubtitle}>{t('appLockDesc')}</Text>
+              </View>
+              <Switch
+                value={appLockEnabled}
+                onValueChange={(v) => void toggleAppLock(v)}
+                trackColor={{
+                  false: colors.border,
+                  true: 'rgba(196,149,80,0.4)',
+                }}
+                thumbColor={appLockEnabled ? ACCENT : colors.surface}
+              />
+            </View>
             <TouchableOpacity
-              style={styles.row}
+              style={[styles.row, styles.settingRowBorder]}
               activeOpacity={0.8}
               onPress={async () => {
                 try {
                   await exportBackup();
                 } catch {
-                  showAlert('Hata', 'Yedek oluşturulamadı.');
+                  showAlert(t('error'), t('backupCreateFailedMsg'));
                 }
               }}
             >
@@ -1693,8 +1765,8 @@ export default function ProfileScreen() {
                 <Ionicons name="cloud-upload-outline" size={18} color={ACCENT} />
               </View>
               <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>Yedeği Dışa Aktar</Text>
-                <Text style={styles.rowSub}>Notlar, favoriler ve ilerleme</Text>
+                <Text style={styles.rowTitle}>{t('exportBackupTitle')}</Text>
+                <Text style={styles.rowSub}>{t('exportBackupDesc')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
@@ -1708,11 +1780,11 @@ export default function ProfileScreen() {
                   });
                   if (!result.canceled && result.assets[0]) {
                     await importBackup(result.assets[0].uri);
-                    showAlert('Başarılı', 'Veriler geri yüklendi!');
+                    showAlert(t('success'), t('backupRestoredMsg'));
                     await loadAll();
                   }
                 } catch (e: any) {
-                  showAlert('Hata', e?.message ?? 'Geri yükleme başarısız.');
+                  showAlert(t('error'), e?.message ?? t('backupRestoreFailedMsg'));
                 }
               }}
             >
@@ -1720,7 +1792,7 @@ export default function ProfileScreen() {
                 <Ionicons name="cloud-download-outline" size={18} color={ACCENT} />
               </View>
               <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>Yedeği İçe Aktar</Text>
+                <Text style={styles.rowTitle}>{t('importBackupTitle')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
@@ -1729,7 +1801,7 @@ export default function ProfileScreen() {
                 <Ionicons name="trash-outline" size={18} color={DANGER} />
               </View>
               <View style={styles.rowBody}>
-                <Text style={styles.dangerText}>Veriyi Sıfırla</Text>
+                <Text style={styles.dangerText}>{t('resetDataLabel')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
@@ -1739,7 +1811,7 @@ export default function ProfileScreen() {
                   <Ionicons name="person-remove-outline" size={18} color={DANGER} />
                 </View>
                 <View style={styles.rowBody}>
-                  <Text style={styles.dangerText}>Hesabı Sil</Text>
+                  <Text style={styles.dangerText}>{t('deleteAccountTitle')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
@@ -1748,7 +1820,7 @@ export default function ProfileScreen() {
 
           {/* Kart 6 — Destek & Hakkında */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>DESTEK & HAKKINDA</Text>
+            <Text style={styles.cardTitle}>{t('supportAboutTitle').toUpperCase()}</Text>
             <Pressable style={styles.row} onPress={() => router.push('/donate')}>
               <View style={styles.rowIcon}>
                 <Ionicons name="heart-outline" size={18} color={ACCENT} />
@@ -1762,7 +1834,7 @@ export default function ProfileScreen() {
             <Pressable
               style={styles.row}
               onPress={() =>
-                Share.share({ message: 'Söz İncil uygulamasını dene: sozapp.com' }).catch(() => {})
+                Share.share({ message: t('inviteFriendShareMsg') }).catch(() => {})
               }
             >
               <View style={styles.rowIcon}>
@@ -1835,7 +1907,7 @@ export default function ProfileScreen() {
         <View style={styles.footer}>
           <Pressable style={styles.shareBtn} onPress={shareProgress}>
             <Ionicons name="share-outline" size={18} color={ACCENT} />
-            <Text style={styles.shareBtnText}>İlerlemeni Paylaş</Text>
+            <Text style={styles.shareBtnText}>{t('shareYourProgressCta')}</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -1845,7 +1917,7 @@ export default function ProfileScreen() {
         <Pressable style={styles.overlay} onPress={() => setLangModalVisible(false)}>
           <Pressable style={styles.langSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.langDragHandle} />
-            <Text style={styles.langSheetTitle}>Dil Sec</Text>
+            <Text style={styles.langSheetTitle}>{t('selectLanguageTitle')}</Text>
             <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
               {LANGUAGES.map((item) => (
                 <TouchableOpacity
@@ -1897,14 +1969,14 @@ export default function ProfileScreen() {
       </Modal>
       {langToastVisible ? (
         <View pointerEvents="none" style={styles.langToast}>
-          <Text style={styles.langToastText}>Dil degistirildi ✓</Text>
+          <Text style={styles.langToastText}>{t('languageChangedToast')}</Text>
         </View>
       ) : null}
 
       <Modal visible={denomModalVisible} transparent animationType="fade">
         <Pressable style={styles.overlay} onPress={() => setDenomModalVisible(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>Mezhep</Text>
+            <Text style={styles.sheetTitle}>{t('denomination')}</Text>
             <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
               {denominations.map((d) => (
                 <Pressable
@@ -1933,16 +2005,16 @@ export default function ProfileScreen() {
       <Modal visible={editModalVisible} transparent animationType="slide">
         <Pressable style={styles.overlay} onPress={() => setEditModalVisible(false)}>
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>Profili Düzenle</Text>
-            <Text style={[styles.inputLabel, { color: colors.textMuted }]}>İsim</Text>
+            <Text style={styles.sheetTitle}>{t('editProfile')}</Text>
+            <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('nameLabel')}</Text>
             <TextInput
               style={[styles.input, { color: colors.text }]}
               value={editNameDraft}
               onChangeText={setEditNameDraft}
-              placeholder="Adınız"
+              placeholder={t('yourNamePlaceholder')}
               placeholderTextColor={colors.textMuted}
             />
-            <Text style={[styles.inputLabel, { color: colors.textMuted, marginTop: 12 }]}>E-posta</Text>
+            <Text style={[styles.inputLabel, { color: colors.textMuted, marginTop: 12 }]}>{t('emailLabel')}</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
               value={userEmail ?? '—'}
@@ -1953,10 +2025,10 @@ export default function ProfileScreen() {
               onPress={saveEditProfile}
               disabled={savingProfile}
             >
-              <Text style={styles.saveBtnText}>{savingProfile ? 'Kaydediliyor…' : 'Kaydet'}</Text>
+              <Text style={styles.saveBtnText}>{savingProfile ? t('savingEllipsis') : t('save')}</Text>
             </Pressable>
             <Pressable style={styles.cancelBtn} onPress={() => setEditModalVisible(false)}>
-              <Text style={[styles.rowValue, { color: colors.textMuted }]}>İptal</Text>
+              <Text style={[styles.rowValue, { color: colors.textMuted }]}>{t('cancel')}</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -1991,7 +2063,7 @@ export default function ProfileScreen() {
             </TouchableWithoutFeedback>
             <View style={styles.timePickerSheet}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.reminderSheetCaption}>HATIRLATMA SAATİ</Text>
+            <Text style={styles.reminderSheetCaption}>{t('reminderTime').toUpperCase()}</Text>
             {['06:00', '07:00', '08:00', '09:00', '10:00', '20:00', '21:00', '22:00'].map((time) => (
               <TouchableOpacity
                 key={time}

@@ -258,7 +258,13 @@ export default function ShareCardScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.header, { borderBottomColor: colors.dark.surface, paddingTop: insets.top > 0 ? 8 : 14 }]}>
-        <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
+        <Pressable
+          onPress={() => safeBack()}
+          style={styles.backBtn}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Geri git"
+        >
           <Ionicons name="arrow-back" size={24} color={colors.dark.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: colors.dark.text }]}>Paylaşım kartı</Text>
@@ -322,6 +328,8 @@ export default function ShareCardScreen() {
                   }
                   setThemeIndex(i);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel={locked ? `${t.name} (Premium)` : t.name}
               >
                 {t.kind === 'gradient' && t.grad ? (
                   <LinearGradient colors={[...t.grad]} style={styles.themeCircle} />

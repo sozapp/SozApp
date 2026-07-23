@@ -29,10 +29,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import Svg, { Line, Path, Circle } from 'react-native-svg';
 import { useNetwork } from '@/context/NetworkContext';
+import { useRegisterTabScrollToTop } from '@/context/ScrollToTopContext';
 import { bookList, oldTestamentBooks } from '@/constants/bible-index';
 import { newTestament } from '@/constants/new-testament';
 import { loadLastRead, type LastReadPayload } from '@/constants/read-history';
 import { devotionals, getTodaysDevotional } from '@/constants/devotionals';
+import { resolveBookIdForShare } from '@/constants/share-verse';
 import { fonts as appFonts } from '@/constants/theme';
 import { useTheme, type ThemeColors } from '@/hooks/useTheme';
 import { useTranslation } from '@/context/LanguageContext';
@@ -40,8 +42,10 @@ import type { TranslationKey } from '@/constants/i18n';
 import AmbientMusicModal from '@/components/AmbientMusicModal';
 import ShareVerseModal from '@/components/ShareVerseModal';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
+import { AMBIENT_TRACK_I18N_KEYS } from '@/hooks/useAmbientMusic';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
+import { useNotificationsCenter } from '@/hooks/useNotificationsCenter';
 
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
@@ -308,6 +312,23 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       backgroundColor: card,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    notifBadge: {
+      position: 'absolute',
+      top: 2,
+      right: 2,
+      minWidth: 16,
+      height: 16,
+      borderRadius: 8,
+      paddingHorizontal: 3,
+      backgroundColor: '#E57373',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    notifBadgeText: {
+      fontSize: 9,
+      color: '#fff',
+      fontFamily: appFonts.medium,
     },
     profileInitialCircle: {
       width: 22,
@@ -1607,6 +1628,7 @@ export default function HomeScreen() {
   const isHomeFocused = useIsFocused();
   const { colors, fonts } = useTheme();
   const { t, language } = useTranslation();
+  const homeScrollRef = useRegisterTabScrollToTop<ScrollView>('index');
   const [userName, setUserName] = useState('');
   const [streak, setStreak] = useState(0);
   const [streakCardDismissed, setStreakCardDismissed] = useState(false);
@@ -1621,13 +1643,20 @@ export default function HomeScreen() {
   const [reflectionDoneToday, setReflectionDoneToday] = useState(false);
   const [lastRead, setLastRead] = useState<LastReadPayload | null>(null);
   const [shareModalVisible, setShareModalVisible] = useState(false);
-  const [shareVerse, setShareVerse] = useState({ text: '', ref: '' });
+  const [shareVerse, setShareVerse] = useState<{
+    text: string;
+    ref: string;
+    bookId?: string | null;
+    chapter?: number;
+    verse?: number;
+  }>({ text: '', ref: '' });
   const [lastMood, setLastMood] = useState<string | null>(null);
   const [lastMoodAt, setLastMoodAt] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [showTrackPicker, setShowTrackPicker] = useState(false);
   const [isHomeLoading, setIsHomeLoading] = useState(true);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
+  const { totalCount: notificationsCount } = useNotificationsCenter();
   const {
     isPlaying,
     currentTrack,
@@ -2174,6 +2203,7 @@ export default function HomeScreen() {
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
       <View style={{ flex: 1 }}>
       <ScrollView
+        ref={homeScrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -2216,13 +2246,36 @@ export default function HomeScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 }}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('search')}
               >
                 <Ionicons name="search-outline" size={20} color={colors.text} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.ikonBtn}
+                onPress={() => {
+                  router.push('/notifications');
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('notifications')}
+              >
+                <Ionicons name="notifications-outline" size={20} color={colors.text} />
+                {notificationsCount > 0 ? (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {notificationsCount > 9 ? '9+' : notificationsCount}
+                    </Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.ikonBtn}
                 onPress={() => router.push('/(tabs)/profile')}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('profile')}
               >
                 {trimmedUserName ? (
                   <View style={styles.profileInitialCircle}>
@@ -2257,6 +2310,8 @@ export default function HomeScreen() {
               onPress={dismissStreakCard}
               hitSlop={10}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t('close')}
             >
               <Ionicons name="close" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -2351,7 +2406,12 @@ export default function HomeScreen() {
                 <View style={styles.verseDivider} />
 
                 <View style={styles.verseActions}>
-                  <TouchableOpacity style={styles.verseActionBtn} onPress={handleFavorite}>
+                  <TouchableOpacity
+                    style={styles.verseActionBtn}
+                    onPress={handleFavorite}
+                    accessibilityRole="button"
+                    accessibilityLabel={favoritedVerse ? t('removeFavorite') : t('addFavorite')}
+                  >
                     <Animated.View style={{ transform: [{ scale: heartAnim }] }}>
                       <Ionicons
                         name={favoritedVerse ? 'heart' : 'heart-outline'}
@@ -2370,10 +2430,15 @@ export default function HomeScreen() {
                       setShareVerse({
                         text: dailyVerse.text,
                         ref: `${dailyVerse.book} ${dailyVerse.chapter}:${dailyVerse.verse}`,
+                        bookId: resolveBookIdForShare(dailyVerse.book),
+                        chapter: dailyVerse.chapter,
+                        verse: dailyVerse.verse,
                       });
                       setShareModalVisible(true);
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('share')}
                   >
                     <Ionicons name="share-outline" size={15} color="rgba(255,255,255,0.85)" />
                     <Text style={styles.verseActionText}>{t('share')}</Text>
@@ -2381,7 +2446,12 @@ export default function HomeScreen() {
 
                   <View style={styles.actionDivider} />
 
-                  <TouchableOpacity style={styles.verseActionBtn} onPress={goToDailyVerseRead}>
+                  <TouchableOpacity
+                    style={styles.verseActionBtn}
+                    onPress={goToDailyVerseRead}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('read')}
+                  >
                     <Ionicons name="book-outline" size={15} color="rgba(255,255,255,0.85)" />
                     <Text style={styles.verseActionText}>{t('read')}</Text>
                   </TouchableOpacity>
@@ -2417,7 +2487,12 @@ export default function HomeScreen() {
                 <View style={styles.verseDivider} />
 
                 <View style={styles.verseActions}>
-                  <TouchableOpacity style={styles.verseActionBtn} onPress={handleFavorite}>
+                  <TouchableOpacity
+                    style={styles.verseActionBtn}
+                    onPress={handleFavorite}
+                    accessibilityRole="button"
+                    accessibilityLabel={favoritedVerse ? t('removeFavorite') : t('addFavorite')}
+                  >
                     <Animated.View style={{ transform: [{ scale: heartAnim }] }}>
                       <Ionicons
                         name={favoritedVerse ? 'heart' : 'heart-outline'}
@@ -2436,10 +2511,15 @@ export default function HomeScreen() {
                       setShareVerse({
                         text: dailyVerse.text,
                         ref: `${dailyVerse.book} ${dailyVerse.chapter}:${dailyVerse.verse}`,
+                        bookId: resolveBookIdForShare(dailyVerse.book),
+                        chapter: dailyVerse.chapter,
+                        verse: dailyVerse.verse,
                       });
                       setShareModalVisible(true);
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('share')}
                   >
                     <Ionicons name="share-outline" size={15} color="rgba(255,255,255,0.85)" />
                     <Text style={styles.verseActionText}>{t('share')}</Text>
@@ -2447,7 +2527,12 @@ export default function HomeScreen() {
 
                   <View style={styles.actionDivider} />
 
-                  <TouchableOpacity style={styles.verseActionBtn} onPress={goToDailyVerseRead}>
+                  <TouchableOpacity
+                    style={styles.verseActionBtn}
+                    onPress={goToDailyVerseRead}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('read')}
+                  >
                     <Ionicons name="book-outline" size={15} color="rgba(255,255,255,0.85)" />
                     <Text style={styles.verseActionText}>{t('read')}</Text>
                   </TouchableOpacity>
@@ -2481,7 +2566,7 @@ export default function HomeScreen() {
             <Text style={styles.musicLabel}>{t('ambientMusicCaps')}</Text>
             <Text style={styles.musicTrackName}>
               {isPlaying && currentTrack && currentTrack.id !== 'silence'
-                ? currentTrack.name
+                ? t(AMBIENT_TRACK_I18N_KEYS[currentTrack.id]?.name ?? 'soundSilence')
                 : t('chooseSoundPlaceholder')}
             </Text>
             {isPlaying && currentTrack?.id !== 'silence' && (
@@ -3032,6 +3117,8 @@ export default function HomeScreen() {
               onPress={handleFabPress}
               activeOpacity={1}
               style={styles.fabBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('askSoz')}
             >
               <Svg width={22} height={22} viewBox="0 0 40 40" fill="none">
                 <Line x1="13" y1="11" x2="27" y2="11" stroke={colors.background} strokeWidth="2.5" strokeLinecap="round" />
@@ -3057,6 +3144,15 @@ export default function HomeScreen() {
         onClose={closeShareModal}
         verseText={shareVerse.text}
         verseRef={shareVerse.ref}
+        deepLinkParams={
+          shareVerse.bookId
+            ? {
+                bookId: shareVerse.bookId,
+                chapter: shareVerse.chapter ?? 1,
+                verse: shareVerse.verse ?? 1,
+              }
+            : null
+        }
       />
 
       <AmbientMusicModal visible={showTrackPicker} onClose={() => setShowTrackPicker(false)} />

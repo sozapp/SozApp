@@ -233,13 +233,25 @@ export default function ChurchCalendarScreen() {
         )}
 
         <View style={[styles.monthNav, { backgroundColor: surface }]}>
-          <Pressable onPress={goPrevMonth} style={styles.monthNavBtn} hitSlop={12}>
+          <Pressable
+            onPress={goPrevMonth}
+            style={styles.monthNavBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Önceki ay"
+          >
             <Ionicons name="chevron-back" size={24} color={ACCENT} />
           </Pressable>
           <Text style={[styles.monthNavTitle, { color: text }]}>
             {MONTHS_TR[viewMonthIndex]} {viewYear}
           </Text>
-          <Pressable onPress={goNextMonth} style={styles.monthNavBtn} hitSlop={12}>
+          <Pressable
+            onPress={goNextMonth}
+            style={styles.monthNavBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Sonraki ay"
+          >
             <Ionicons name="chevron-forward" size={24} color={ACCENT} />
           </Pressable>
         </View>

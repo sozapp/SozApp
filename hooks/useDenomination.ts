@@ -31,8 +31,8 @@ export function useDenomination() {
       if (d && VALID.includes(d as Denomination)) {
         setDenomination(d as Denomination);
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[Denomination] loadFromStorage failed:', e);
     }
   }, []);
 
@@ -47,15 +47,16 @@ export function useDenomination() {
         [USER_CHURCH_KEY, d],
         [STORAGE_KEY_LEGACY, d],
       ]);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[Denomination] changeDenomination failed:', e);
     }
   }, []);
 
   const getTodayEvents = useCallback((): CalendarEvent[] => {
     try {
       return getTodayCalendarEvents(denomination);
-    } catch {
+    } catch (e) {
+      console.warn('[Denomination] getTodayEvents failed:', e);
       return [];
     }
   }, [denomination]);
@@ -74,7 +75,8 @@ export function useDenomination() {
           }
           return eventMatchesDenomination(event, denomination);
         });
-      } catch {
+      } catch (e) {
+        console.warn('[Denomination] getMonthEvents failed:', e);
         return [];
       }
     },
@@ -92,7 +94,8 @@ export function useDenomination() {
             event.date === dateStr &&
             eventMatchesDenomination(event, denomination)
         );
-      } catch {
+      } catch (e) {
+        console.warn('[Denomination] getEventsForDate failed:', e);
         return [];
       }
     },

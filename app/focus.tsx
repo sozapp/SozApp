@@ -3,6 +3,7 @@ import { bookList, getVerseTextByVerseId } from '@/constants/bible-index';
 import { getVerseForDay, getWidgetVersePayload, type DailyVerse } from '@/constants/daily-verse';
 import { pickRandomExploreVerse, type ExploreRandomVerse } from '@/constants/explore-random-verses';
 import { loadReadHistory } from '@/constants/read-history';
+import { buildShareMessage, deepLinkParamsFromVerseId } from '@/constants/share-verse';
 import { colors, fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
@@ -562,6 +563,8 @@ export default function FocusScreen() {
                 style={styles.closeBtnActive}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('close')}
               >
                 <Ionicons name="close" size={22} color={theme.textMuted} />
               </TouchableOpacity>
@@ -599,6 +602,8 @@ export default function FocusScreen() {
           <Pressable
             style={styles.pauseBtn}
             onPress={() => setIsRunning((r) => !r)}
+            accessibilityRole="button"
+            accessibilityLabel={isRunning ? t('pauseFocus') : t('resumeFocus')}
           >
             <Ionicons name={isRunning ? 'pause' : 'play'} size={28} color={ACCENT} />
           </Pressable>
@@ -632,7 +637,11 @@ export default function FocusScreen() {
                   style={styles.verseActionBtn}
                   onPress={() =>
                     Share.share({
-                      message: `${verse.text}\n— ${verse.ref}`,
+                      message: buildShareMessage(
+                        verse.text,
+                        verse.ref,
+                        verse.verseId ? deepLinkParamsFromVerseId(verse.verseId) : null
+                      ),
                       title: 'Söz',
                     }).catch(() => {})
                   }
@@ -791,6 +800,8 @@ export default function FocusScreen() {
           style={styles.configBackBtn}
           onPress={() => safeBack()}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={t('back')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.textMuted} />
         </TouchableOpacity>

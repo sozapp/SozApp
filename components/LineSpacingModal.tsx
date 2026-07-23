@@ -1,8 +1,9 @@
 import { fonts } from '@/constants/theme';
+import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Modal,
@@ -24,16 +25,11 @@ export type LineSpacingModalProps = {
 
 const SHEET_MAX = 420;
 
-const spacingOptions: Array<{
-  id: LineSpacingId;
-  name: string;
-  lineHeight: number;
-  description: string;
-}> = [
-  { id: 'normal', name: 'Normal', lineHeight: 1.6, description: 'Standart okuma' },
-  { id: 'wide', name: 'Geniş', lineHeight: 2.0, description: 'Rahat okuma' },
-  { id: 'wider', name: 'Çok Geniş', lineHeight: 2.5, description: 'Notlar için ideal' },
-];
+const SPACING_LINE_HEIGHTS: Record<LineSpacingId, number> = {
+  normal: 1.6,
+  wide: 2.0,
+  wider: 2.5,
+};
 
 export function LineSpacingModal({
   visible,
@@ -42,8 +38,23 @@ export function LineSpacingModal({
   onSelect,
 }: LineSpacingModalProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const slideAnim = useRef(new Animated.Value(SHEET_MAX)).current;
   const closingRef = useRef(false);
+
+  const spacingOptions: Array<{
+    id: LineSpacingId;
+    name: string;
+    lineHeight: number;
+    description: string;
+  }> = useMemo(
+    () => [
+      { id: 'normal', name: t('spacingNormal'), lineHeight: SPACING_LINE_HEIGHTS.normal, description: t('spacingDescNormal') },
+      { id: 'wide', name: t('spacingWide'), lineHeight: SPACING_LINE_HEIGHTS.wide, description: t('spacingDescWide') },
+      { id: 'wider', name: t('spacingWider'), lineHeight: SPACING_LINE_HEIGHTS.wider, description: t('spacingDescWider') },
+    ],
+    [t]
+  );
 
   const runClose = useCallback(() => {
     if (closingRef.current) return;
@@ -119,7 +130,7 @@ export function LineSpacingModal({
           {...panResponder.panHandlers}
         >
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.title, { color: '#C4956A' }]}>SATIR ARALIĞI</Text>
+          <Text style={[styles.title, { color: '#C4956A' }]}>{t('lineSpacing').toUpperCase()}</Text>
           {spacingOptions.map((option) => {
             const selected = currentSpacing === option.id;
             return (
@@ -167,7 +178,7 @@ export function LineSpacingModal({
                       fontFamily: fonts.italic,
                     }}
                   >
-                    {'Çünkü Tanrı dünyayı\no kadar çok sevdi\nki biricik Oğlu\'nu verdi.'}
+                    {t('spacingSampleVerse')}
                   </Text>
                 </View>
               </Pressable>

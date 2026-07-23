@@ -163,7 +163,13 @@ export default function PaywallScreen() {
             <Text style={styles.headTitle}>Premium&apos;a Geç</Text>
             <Text style={styles.headSubtitle}>Tüm özelliklerin kilidini aç</Text>
           </View>
-          <Pressable onPress={() => safeBack()} style={styles.closeBtn} hitSlop={14}>
+          <Pressable
+            onPress={() => safeBack()}
+            style={styles.closeBtn}
+            hitSlop={14}
+            accessibilityRole="button"
+            accessibilityLabel="Kapat"
+          >
             <Ionicons name="close" size={28} color={TEXT} />
           </Pressable>
         </View>

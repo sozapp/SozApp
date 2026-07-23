@@ -15,9 +15,10 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/hooks/useTheme';
-import { fonts } from '@/constants/theme';
 import { SozLogo } from '@/components/SozLogo';
+import { buildShareMessage, type VerseDeepLinkParams } from '@/constants/share-verse';
+import { fonts } from '@/constants/theme';
+import { useTheme } from '@/hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_SIZE = Math.min(SCREEN_WIDTH - 64, 280);
@@ -49,6 +50,8 @@ export interface ShareVerseModalProps {
   onClose: () => void;
   verseText: string;
   verseRef: string;
+  /** Uygulama yüklüyse soz://read?... deep link için */
+  deepLinkParams?: VerseDeepLinkParams | null;
 }
 
 export default function ShareVerseModal({
@@ -56,6 +59,7 @@ export default function ShareVerseModal({
   onClose,
   verseText,
   verseRef,
+  deepLinkParams,
 }: ShareVerseModalProps) {
   const { colors } = useTheme();
   const [selectedTheme, setSelectedTheme] = useState<ShareThemeItem>(SHARE_THEMES[0]);
@@ -92,7 +96,9 @@ export default function ShareVerseModal({
         });
       } else {
         await Share.share({
-          message: `«${verseText}»\n— ${verseRef}\n\nsozapp.com`,
+          message: buildShareMessage(verseText, verseRef, deepLinkParams, {
+            brandLine: 'sozapp.com',
+          }),
         });
       }
       onClose();
@@ -105,7 +111,7 @@ export default function ShareVerseModal({
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await Share.share({
-        message: `«${verseText}»\n— ${verseRef}\n\nSöz Uygulaması • sozapp.com`,
+        message: buildShareMessage(verseText, verseRef, deepLinkParams),
       });
       onClose();
     } catch (_) {}

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { TranslationKey } from '@/constants/i18n';
 import { Audio } from 'expo-av';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -94,6 +95,18 @@ export const AMBIENT_TRACKS: AmbientTrack[] = [
   },
 ];
 
+/** track.id -> constants/i18n.ts key eşlemesi (görüntülenen ad/açıklama için). */
+export const AMBIENT_TRACK_I18N_KEYS: Record<string, { name: TranslationKey; desc: TranslationKey }> = {
+  silence: { name: 'soundSilence', desc: 'soundSilenceDesc' },
+  rain: { name: 'soundRain', desc: 'soundRainDesc' },
+  wind: { name: 'soundWind', desc: 'soundWindDesc' },
+  fire: { name: 'soundFire', desc: 'soundFireDesc' },
+  stream: { name: 'soundStream', desc: 'soundStreamDesc' },
+  birds: { name: 'soundBirds', desc: 'soundBirdsDesc' },
+  piano: { name: 'soundPiano', desc: 'soundPianoDesc' },
+  strings: { name: 'soundStrings', desc: 'soundStringsDesc' },
+};
+
 function toPublicTrack(t: AmbientTrack | undefined): AmbientCurrentTrack | null {
   if (!t) return null;
   return { id: t.id, name: t.name, icon: t.icon };
@@ -119,8 +132,8 @@ export function useAmbientMusicInternal() {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[AmbientMusic] stopAndUnload failed:', e);
     }
   }, []);
 
@@ -183,8 +196,8 @@ export function useAmbientMusicInternal() {
         await soundRef.current.playAsync();
         setIsPlaying(true);
       }
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[AmbientMusic] togglePlay failed:', e);
     }
   }, [isPlaying]);
 
@@ -228,8 +241,8 @@ export function useAmbientMusicInternal() {
         await soundRef.current.setVolumeAsync(next);
       }
       await AsyncStorage.setItem(STORAGE_VOLUME, String(next));
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[AmbientMusic] setVolume failed:', e);
     }
   }, []);
 
@@ -237,8 +250,8 @@ export function useAmbientMusicInternal() {
     setAmbientAutoPlayState(enabled);
     try {
       await AsyncStorage.setItem(STORAGE_AUTO_PLAY, enabled ? 'true' : 'false');
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[AmbientMusic] setAmbientAutoPlay failed:', e);
     }
   }, []);
 
@@ -248,8 +261,8 @@ export function useAmbientMusicInternal() {
     setActiveTrackId('silence');
     try {
       await AsyncStorage.setItem(STORAGE_TRACK, 'silence');
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[AmbientMusic] stopMusic failed:', e);
     }
   }, [stopAndUnload]);
 
@@ -305,8 +318,8 @@ export function useAmbientMusicInternal() {
             setIsPlaying(false);
           }
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.warn('[AmbientMusic] init from storage failed:', e);
       }
     })();
 

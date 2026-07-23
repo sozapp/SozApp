@@ -5,6 +5,7 @@ import {
   markDayComplete,
   savePlanProgress,
 } from '@/constants/storage';
+import { BOOK_SHORT_TO_ID, getPlanCurrentDay } from '@/constants/continueReading';
 import { logFriendActivity } from '@/constants/friend-activity';
 import { supabase } from '@/constants/supabase';
 import { colors, fonts, borderRadius } from '@/constants/theme';
@@ -28,28 +29,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PlanProgress } from '@/constants/storage';
 import type { ReadingPlan } from '@/constants/plans';
 
-function getCurrentDay(progress: PlanProgress | null, totalDays: number): number {
-  if (progress == null) return 1;
-  const start = new Date(progress.startDate).getTime();
-  const now = Date.now();
-  const dayIndex = Math.floor((now - start) / 86400000);
-  return Math.min(totalDays, Math.max(1, dayIndex + 1));
-}
-
 function todayString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
 const ACCENT = '#C4956A';
-
-// plans.ts'teki bookShort (Türkçe kısaltma) -> read.tsx'in beklediği bookId.
-// Çoğu zaten küçük harfle eşleşiyor, Yuhanna ("Yuh") tek istisna ("joh").
-const BOOK_SHORT_TO_ID: Record<string, string> = {
-  Mat: 'mat',
-  Mar: 'mar',
-  Luk: 'luk',
-  Yuh: 'joh',
-};
 
 export default function PlansScreen() {
   const { theme } = useTheme();
@@ -85,7 +69,7 @@ export default function PlansScreen() {
     async (plan: ReadingPlan) => {
       let progress = progressByPlanId[plan.id] ?? null;
       const wasNewPlan = progress == null;
-      const currentDay = getCurrentDay(progress, plan.totalDays);
+      const currentDay = getPlanCurrentDay(progress, plan.totalDays);
       const hadDay = progress?.completedDays?.includes(currentDay) ?? false;
 
       if (progress == null) {
@@ -203,7 +187,7 @@ export default function PlansScreen() {
           const progress = progressByPlanId[plan.id] ?? null;
           const completedCount = progress?.completedDays?.length ?? 0;
           const percent = plan.totalDays > 0 ? (completedCount / plan.totalDays) * 100 : 0;
-          const currentDay = getCurrentDay(progress, plan.totalDays);
+          const currentDay = getPlanCurrentDay(progress, plan.totalDays);
           const dayInfo = plan.days.find((d) => d.day === currentDay);
           const streak = progress?.streak ?? 0;
           const planUnlocked = isPremium || plan.id === FREE_PLAN_ID;

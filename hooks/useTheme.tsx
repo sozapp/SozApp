@@ -5,13 +5,18 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from 'react';
+import { useColorScheme } from 'react-native';
 
 const STORAGE_KEY = '@soz/readingTheme';
 
-export type ThemeType = 'day' | 'night' | 'sepia' | 'black';
+/** Elle seçilebilen paletler (sepia/black özel kalır). */
+export type ThemePaletteId = 'day' | 'night' | 'sepia' | 'black';
+/** Kullanıcı tercihi — `system` cihazın açık/koyu modunu izler. */
+export type ThemeType = ThemePaletteId | 'system';
 
 /** Marka vurgusu için dosya başında `const ACCENT = '#C4956A'` kullanın — theme’de yok. */
 export type ThemeColors = {
@@ -29,7 +34,7 @@ export type ThemeColors = {
   borderStrong: string;
 };
 
-export const themes: Record<ThemeType, ThemeColors> = {
+export const themes: Record<ThemePaletteId, ThemeColors> = {
   day: {
     background: '#F5F0E8',
     surface: '#EDE8DF',
@@ -81,19 +86,40 @@ export const themes: Record<ThemeType, ThemeColors> = {
 };
 
 export const themeNames: Record<ThemeType, string> = {
+  system: 'Otomatik (Sistem)',
   day: 'Gündüz',
   night: 'Gece',
   sepia: 'Sepia',
   black: 'Siyah',
 };
 
+const THEME_TYPES: readonly ThemeType[] = ['system', 'day', 'night', 'sepia', 'black'];
+
+function isThemeType(value: string): value is ThemeType {
+  return (THEME_TYPES as readonly string[]).includes(value);
+}
+
+function resolvePalette(
+  preference: ThemeType,
+  systemScheme: string | null | undefined
+): ThemePaletteId {
+  if (preference === 'system') {
+    return systemScheme === 'dark' ? 'night' : 'day';
+  }
+  return preference;
+}
+
 type ThemeContextValue = {
   colors: ThemeColors;
   fonts: typeof appFonts;
+  /** Kullanıcının seçtiği tercih (`system` dahil). */
   activeTheme: ThemeType;
+  /** Uygulanan palet — `system` iken day/night. */
+  resolvedTheme: ThemePaletteId;
   changeTheme: (theme: ThemeType) => Promise<void>;
   loadFromStorage: () => Promise<void>;
   theme: ThemeColors;
+  /** @deprecated resolvedTheme kullanın; geriye dönük alias. */
   themeName: ThemeType;
 };
 
@@ -104,12 +130,13 @@ type ThemeProviderProps = {
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [activeTheme, setActiveTheme] = useState<ThemeType>('night');
+  const systemScheme = useColorScheme();
+  const [activeTheme, setActiveTheme] = useState<ThemeType>('system');
 
   const loadFromStorage = useCallback(async () => {
     try {
       const t = await AsyncStorage.getItem(STORAGE_KEY);
-      if (t && (t === 'day' || t === 'night' || t === 'sepia' || t === 'black')) {
+      if (t && isThemeType(t)) {
         setActiveTheme(t);
       }
     } catch {
@@ -130,23 +157,28 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, []);
 
-  const colors = themes[activeTheme];
-
-  return (
-    <ThemeContext.Provider
-      value={{
-        colors,
-        fonts: appFonts,
-        activeTheme,
-        changeTheme,
-        loadFromStorage,
-        theme: colors,
-        themeName: activeTheme,
-      }}
-    >
-      {children}
-    </ThemeContext.Provider>
+  const resolvedTheme = useMemo(
+    () => resolvePalette(activeTheme, systemScheme),
+    [activeTheme, systemScheme]
   );
+
+  const colors = themes[resolvedTheme];
+
+  const value = useMemo<ThemeContextValue>(
+    () => ({
+      colors,
+      fonts: appFonts,
+      activeTheme,
+      resolvedTheme,
+      changeTheme,
+      loadFromStorage,
+      theme: colors,
+      themeName: activeTheme,
+    }),
+    [colors, activeTheme, resolvedTheme, changeTheme, loadFromStorage]
+  );
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme(): ThemeContextValue {

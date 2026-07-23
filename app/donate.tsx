@@ -47,6 +47,8 @@ export default function DonateScreen() {
           onPress={() => safeBack()}
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Geri git"
         >
           <Ionicons name="arrow-back" size={22} color={colors.textMuted} />
         </TouchableOpacity>

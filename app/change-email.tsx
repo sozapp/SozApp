@@ -89,7 +89,13 @@ export default function ChangeEmailScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top']}>
       <View style={styles.safeInner} {...swipeBack}>
         <View style={styles.header}>
-          <Pressable style={styles.headerLeft} onPress={() => safeBack()} hitSlop={12}>
+          <Pressable
+            style={styles.headerLeft}
+            onPress={() => safeBack()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Geri git"
+          >
             <Ionicons name="chevron-back" size={24} color={text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: text }]}>E-postamı Değiştir</Text>
@@ -122,6 +128,8 @@ export default function ChangeEmailScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
+              textContentType="emailAddress"
+              autoComplete="email"
               editable={!loading}
             />
 

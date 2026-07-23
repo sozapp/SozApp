@@ -1,7 +1,8 @@
 import { fonts } from '@/constants/theme';
+import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Modal,
@@ -21,13 +22,6 @@ export type FontSizeModalProps = {
 };
 
 const DEFAULT_SIZES = [14, 16, 18, 20, 22] as const;
-const LABELS: Record<number, string> = {
-  14: 'Küçük',
-  16: 'Rahat',
-  18: 'Normal',
-  20: 'Büyük',
-  22: 'En büyük',
-};
 
 const SHEET_MAX = 380;
 
@@ -39,8 +33,20 @@ export function FontSizeModal({
   sizes = DEFAULT_SIZES,
 }: FontSizeModalProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const slideAnim = useRef(new Animated.Value(SHEET_MAX)).current;
   const closingRef = useRef(false);
+
+  const labels: Record<number, string> = useMemo(
+    () => ({
+      14: t('fontSizeSmall'),
+      16: t('fontSizeComfortable'),
+      18: t('fontSizeNormal'),
+      20: t('fontSizeLarge'),
+      22: t('fontSizeLargest'),
+    }),
+    [t]
+  );
 
   const runClose = useCallback(() => {
     if (closingRef.current) return;
@@ -116,7 +122,7 @@ export function FontSizeModal({
           {...panResponder.panHandlers}
         >
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.title, { color: '#C4956A' }]}>YAZI BOYUTU</Text>
+          <Text style={[styles.title, { color: '#C4956A' }]}>{t('fontSize').toUpperCase()}</Text>
           <View style={styles.row}>
             {sizes.map((size) => {
               const selected = currentSize === size;
@@ -156,7 +162,7 @@ export function FontSizeModal({
                       { color: selected ? '#C4956A' : colors.textMuted },
                     ]}
                   >
-                    {LABELS[size] ?? `${size}px`}
+                    {labels[size] ?? `${size}px`}
                   </Text>
                 </Pressable>
               );

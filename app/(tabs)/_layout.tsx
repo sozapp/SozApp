@@ -1,8 +1,14 @@
 import { fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
 import { useTabPulse } from '@/context/TabPulseContext';
+import {
+  ScrollToTopProvider,
+  useScrollToTopRegistry,
+  type TabScrollKey,
+} from '@/context/ScrollToTopContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useWidgetUpdate } from '@/hooks/useWidgetUpdate';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
@@ -44,12 +50,21 @@ const getTabIndex = (path: string): number => {
   return 0;
 };
 
+function tabKeyForIndex(index: number): TabScrollKey | null {
+  const name = TAB_NAMES[index];
+  if (name === 'index' || name === 'read' || name === 'explore' || name === 'notes' || name === 'profile') {
+    return name;
+  }
+  return null;
+}
+
 // ─── BouncingTabBarButton ─────────────────────────────────────────────────────
 const BouncingTabBarButton = forwardRef<View, BottomTabBarButtonProps>(
   function BouncingTabBarButton(
     { children, onPress, style, accessibilityState, accessibilityLabel, testID, href },
     ref
   ) {
+    const reduceMotion = useReduceMotion();
     const scale = useRef(new Animated.Value(1)).current;
     return (
       <Pressable
@@ -60,10 +75,12 @@ const BouncingTabBarButton = forwardRef<View, BottomTabBarButtonProps>(
         testID={testID}
         {...(href != null ? ({ href } as { href: string }) : {})}
         onPress={(e) => {
-          Animated.sequence([
-            Animated.timing(scale, { toValue: 1.3, duration: 100, useNativeDriver: false }),
-            Animated.spring(scale, { toValue: 1, useNativeDriver: false, friction: 5, tension: 200 }),
-          ]).start();
+          if (!reduceMotion) {
+            Animated.sequence([
+              Animated.timing(scale, { toValue: 1.3, duration: 100, useNativeDriver: false }),
+              Animated.spring(scale, { toValue: 1, useNativeDriver: false, friction: 5, tension: 200 }),
+            ]).start();
+          }
           onPress?.(e);
         }}
         style={style}
@@ -129,11 +146,22 @@ function TabLabel({ children, color }: { children: string; color: string }) {
 
 // ─── Main layout ─────────────────────────────────────────────────────────────
 export default function TabsLayout() {
+  return (
+    <ScrollToTopProvider>
+      <TabsLayoutInner />
+    </ScrollToTopProvider>
+  );
+}
+
+function TabsLayoutInner() {
   const { theme } = useTheme();
   const { t } = useTranslation();
+  const { scrollToTop } = useScrollToTopRegistry();
   useWidgetUpdate();
 
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   // Swipe navigasyon devre dışı bırakılacak ekranlar
   const swipeDisabled = pathname.includes('read');
@@ -146,6 +174,18 @@ export default function TabsLayout() {
     currentTabIndexRef.current = currentTabIndex;
     swipeDisabledRef.current = swipeDisabled;
   }, [currentTabIndex, swipeDisabled]);
+
+  /** Zaten aktif tab'a tekrar basınca scroll-to-top (navigasyonu engellemeden). */
+  const tabPressListeners = useCallback(
+    (tabIndex: number) => ({
+      tabPress: () => {
+        if (getTabIndex(pathnameRef.current) !== tabIndex) return;
+        const key = tabKeyForIndex(tabIndex);
+        if (key) scrollToTop(key);
+      },
+    }),
+    [scrollToTop]
+  );
 
   // ─── Animasyon değerleri ─────────────────────────────────────────────────
   const tabIndicatorX = useRef(new Animated.Value(currentTabIndex * (SCREEN_WIDTH / 5))).current;
@@ -335,8 +375,10 @@ export default function TabsLayout() {
         >
           <Tabs.Screen
             name="index"
+            listeners={tabPressListeners(0)}
             options={{
               title: t('tabHome'),
+              tabBarAccessibilityLabel: t('tabHome'),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="home-outline" size={size} color={color} />
               ),
@@ -344,8 +386,10 @@ export default function TabsLayout() {
           />
           <Tabs.Screen
             name="read"
+            listeners={tabPressListeners(1)}
             options={{
               title: t('tabRead'),
+              tabBarAccessibilityLabel: t('tabRead'),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="book-outline" size={size} color={color} />
               ),
@@ -353,8 +397,10 @@ export default function TabsLayout() {
           />
           <Tabs.Screen
             name="explore"
+            listeners={tabPressListeners(2)}
             options={{
               title: t('tabExplore'),
+              tabBarAccessibilityLabel: t('tabExplore'),
               tabBarIcon: ({ color, focused }) => (
                 <Ionicons
                   name={focused ? 'compass' : 'compass-outline'}
@@ -366,8 +412,10 @@ export default function TabsLayout() {
           />
           <Tabs.Screen
             name="notes"
+            listeners={tabPressListeners(3)}
             options={{
               title: t('tabNotes'),
+              tabBarAccessibilityLabel: t('tabNotes'),
               tabBarIcon: ({ color, size }) => (
                 <NotesTabIcon color={color} size={size} />
               ),
@@ -375,8 +423,10 @@ export default function TabsLayout() {
           />
           <Tabs.Screen
             name="profile"
+            listeners={tabPressListeners(4)}
             options={{
               title: t('tabProfile'),
+              tabBarAccessibilityLabel: t('tabProfile'),
               tabBarIcon: ({ color, size }) => (
                 <Ionicons name="person-outline" size={size} color={color} />
               ),

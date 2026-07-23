@@ -1,24 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useTheme } from '@/hooks/useTheme';
-import { useSafeBack } from '@/hooks/useSafeBack';
 import { markGameCompletedToday } from '@/constants/game-storage';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
-import { GameLeaderboardModal } from '@/components/GameLeaderboardModal';
+import { GameShell } from '@/components/games/GameShell';
 
 const ACCENT = '#C4956A';
 const SUCCESS = '#4CAF50';
@@ -137,8 +125,6 @@ function pickQuestions(): VerseQuestion[] {
 }
 
 export default function MissingWord() {
-  const router = useRouter();
-  const safeBack = useSafeBack();
   const { colors, fonts } = useTheme();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -148,10 +134,8 @@ export default function MissingWord() {
   const [streak, setStreak] = useState(0);
   const [questions, setQuestions] = useState<VerseQuestion[]>(() => pickQuestions());
   const [locked, setLocked] = useState(false);
-  const [leaderboardVisible, setLeaderboardVisible] = useState(false);
   const { submitScore } = useLeaderboard(GAME_ID);
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
   const fillWordAnim = useRef(new Animated.Value(0)).current;
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -163,7 +147,6 @@ export default function MissingWord() {
 
   const totalQuestions = questions.length;
   const current = questions[currentIndex];
-  const progress = totalQuestions > 0 ? (currentIndex + 1) / totalQuestions : 0;
 
   useFocusEffect(
     useCallback(() => {
@@ -186,15 +169,6 @@ export default function MissingWord() {
   useEffect(() => {
     fillWordAnim.setValue(0);
   }, [currentIndex, fillWordAnim]);
-
-  useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: progress,
-      duration: 350,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [progress, progressAnim]);
 
   const saveStreak = async (nextStreak: number) => {
     try {
@@ -250,7 +224,6 @@ export default function MissingWord() {
     setScore(0);
     setGameOver(false);
     setLocked(false);
-    progressAnim.setValue(0);
     fillWordAnim.setValue(0);
   };
 
@@ -265,191 +238,102 @@ export default function MissingWord() {
   const parts = current.template.split('_____');
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={() => safeBack()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={[styles.title, { color: colors.text, fontFamily: fonts.regular }]}>Eksik Kelime</Text>
-        <View style={[styles.streakBadge, { backgroundColor: `${ACCENT}20` }]}>
-          <Ionicons name="flame-outline" size={14} color={ACCENT} />
-          <Text style={[styles.streakText, { color: ACCENT, fontFamily: fonts.regular }]}>{streak}</Text>
-        </View>
+    <GameShell
+      gameId={GAME_ID}
+      title="Eksik Kelime"
+      leaderboardTitle="Eksik Kelime — Liderlik"
+      streak={streak}
+      currentIndex={currentIndex}
+      totalQuestions={totalQuestions}
+      gameOver={gameOver}
+      score={score}
+      resultMeta={resultMeta}
+      resultExtra={
+        <Text style={[styles.dailyHint, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+          Yarın tekrar gel, günlük seriyi koru.
+        </Text>
+      }
+      replayButtonLayout={styles.replayLayout}
+      onReplay={onReplay}
+    >
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <Text style={[styles.questionMeta, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+          Soru {currentIndex + 1}/{totalQuestions}
+        </Text>
+
+        <Text style={[styles.verse, { color: colors.text, fontFamily: fonts.italic ?? fonts.regular }]}>
+          {parts[0]}
+          {selectedAnswer === current.answer ? (
+            <Animated.Text
+              style={[
+                styles.fillWord,
+                {
+                  color: SUCCESS,
+                  opacity: fillWordAnim,
+                  transform: [
+                    {
+                      translateY: fillWordAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [6, 0],
+                      }),
+                    },
+                  ],
+                  fontFamily: fonts.regular,
+                },
+              ]}
+            >
+              {current.answer}
+            </Animated.Text>
+          ) : (
+            <Text style={[styles.blankWord, { borderBottomColor: ACCENT, color: colors.textSecondary }]}>
+              _____
+            </Text>
+          )}
+          {parts[1]}
+        </Text>
+
+        <Text style={[styles.reference, { color: ACCENT, fontFamily: fonts.regular }]}>
+          {current.reference}
+        </Text>
       </View>
 
-      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-        <Animated.View
-          style={[
-            styles.progressFill,
-            {
-              width: progressAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
-            },
-          ]}
-        />
+      <View style={styles.optionsGrid}>
+        {current.options.map((option) => {
+          const isSelected = selectedAnswer === option;
+          const isCorrect = option === current.answer;
+          const selectedWrong = Boolean(selectedAnswer && isSelected && !isCorrect);
+          const revealCorrect = Boolean(selectedAnswer && isCorrect);
+
+          let borderColor = colors.border;
+          let backgroundColor = colors.card;
+          if (selectedWrong) {
+            borderColor = DANGER;
+            backgroundColor = `${DANGER}20`;
+          } else if (revealCorrect) {
+            borderColor = SUCCESS;
+            backgroundColor = `${SUCCESS}20`;
+          }
+
+          return (
+            <TouchableOpacity
+              key={option}
+              style={[styles.optionBtn, { borderColor, backgroundColor }]}
+              onPress={() => onSelect(option)}
+              activeOpacity={0.88}
+              disabled={locked}
+            >
+              <Text style={[styles.optionText, { color: colors.text, fontFamily: fonts.regular }]}>
+                {option}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
-
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {!gameOver ? (
-          <>
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <Text style={[styles.questionMeta, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
-                Soru {currentIndex + 1}/{totalQuestions}
-              </Text>
-
-              <Text style={[styles.verse, { color: colors.text, fontFamily: fonts.italic ?? fonts.regular }]}>
-                {parts[0]}
-                {selectedAnswer === current.answer ? (
-                  <Animated.Text
-                    style={[
-                      styles.fillWord,
-                      {
-                        color: SUCCESS,
-                        opacity: fillWordAnim,
-                        transform: [
-                          {
-                            translateY: fillWordAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [6, 0],
-                            }),
-                          },
-                        ],
-                        fontFamily: fonts.regular,
-                      },
-                    ]}
-                  >
-                    {current.answer}
-                  </Animated.Text>
-                ) : (
-                  <Text style={[styles.blankWord, { borderBottomColor: ACCENT, color: colors.textSecondary }]}>
-                    _____
-                  </Text>
-                )}
-                {parts[1]}
-              </Text>
-
-              <Text style={[styles.reference, { color: ACCENT, fontFamily: fonts.regular }]}>
-                {current.reference}
-              </Text>
-            </View>
-
-            <View style={styles.optionsGrid}>
-              {current.options.map((option) => {
-                const isSelected = selectedAnswer === option;
-                const isCorrect = option === current.answer;
-                const selectedWrong = Boolean(selectedAnswer && isSelected && !isCorrect);
-                const revealCorrect = Boolean(selectedAnswer && isCorrect);
-
-                let borderColor = colors.border;
-                let backgroundColor = colors.card;
-                if (selectedWrong) {
-                  borderColor = DANGER;
-                  backgroundColor = `${DANGER}20`;
-                } else if (revealCorrect) {
-                  borderColor = SUCCESS;
-                  backgroundColor = `${SUCCESS}20`;
-                }
-
-                return (
-                  <TouchableOpacity
-                    key={option}
-                    style={[styles.optionBtn, { borderColor, backgroundColor }]}
-                    onPress={() => onSelect(option)}
-                    activeOpacity={0.88}
-                    disabled={locked}
-                  >
-                    <Text style={[styles.optionText, { color: colors.text, fontFamily: fonts.regular }]}>
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </>
-        ) : (
-          <View style={[styles.resultCard, { backgroundColor: colors.card }]}>
-            <Ionicons name={resultMeta.icon} size={48} color={resultMeta.color} />
-            <Text style={[styles.resultTitle, { color: resultMeta.color, fontFamily: fonts.regular }]}>
-              {resultMeta.text}
-            </Text>
-            <Text style={[styles.resultScore, { color: colors.text, fontFamily: fonts.regular }]}>
-              Puan: {score} / {totalQuestions}
-            </Text>
-            <Text style={[styles.dailyHint, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
-              Yarın tekrar gel, günlük seriyi koru.
-            </Text>
-            <TouchableOpacity style={styles.primaryBtn} onPress={onReplay} activeOpacity={0.9}>
-              <Text style={[styles.primaryBtnText, { fontFamily: fonts.regular }]}>Tekrar Oyna</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-              onPress={() => setLeaderboardVisible(true)}
-              activeOpacity={0.9}
-            >
-              <Ionicons name="trophy-outline" size={16} color={colors.text} />
-              <Text style={[styles.secondaryBtnText, { color: colors.text, fontFamily: fonts.regular }]}>
-                Liderlik Tablosu
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-              onPress={() => router.push('/(tabs)' as never)}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.text, fontFamily: fonts.regular }]}>
-                Ana Sayfaya Dön
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-      <GameLeaderboardModal
-        visible={leaderboardVisible}
-        onClose={() => setLeaderboardVisible(false)}
-        gameId={GAME_ID}
-        title="Eksik Kelime — Liderlik"
-      />
-    </SafeAreaView>
+    </GameShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  iconBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18 },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 48,
-    justifyContent: 'center',
-  },
-  streakText: { fontSize: 12 },
-  progressTrack: {
-    marginHorizontal: 16,
-    marginTop: 6,
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: ACCENT,
-  },
-  content: { paddingBottom: 28 },
   card: {
     borderRadius: 20,
     padding: 24,
@@ -496,34 +380,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
   },
-  resultCard: {
-    borderRadius: 20,
-    padding: 24,
-    margin: 16,
-    alignItems: 'center',
-    gap: 12,
-  },
-  resultTitle: { fontSize: 24, textAlign: 'center' },
-  resultScore: { fontSize: 18 },
   dailyHint: { fontSize: 13, textAlign: 'center' },
-  primaryBtn: {
-    width: '100%',
-    marginTop: 6,
-    backgroundColor: ACCENT,
-    borderRadius: 14,
-    padding: 16,
-    alignItems: 'center',
-  },
-  primaryBtnText: { color: '#FFF8EE', fontSize: 15 },
-  secondaryBtn: {
-    width: '100%',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  secondaryBtnText: { fontSize: 15 },
+  replayLayout: { width: '100%', marginTop: 6 },
 });

@@ -658,6 +658,8 @@ export default function AskScreen() {
           onPress={() => safeBack()}
           style={styles.headerLeft}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('back')}
         >
           <Ionicons name="arrow-back" size={22} color={muted} />
         </TouchableOpacity>
@@ -668,6 +670,8 @@ export default function AskScreen() {
           onPress={() => setShowHistory(true)}
           style={styles.headerRight}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('history')}
         >
           <Ionicons name="time-outline" size={22} color={muted} />
         </TouchableOpacity>
@@ -896,6 +900,8 @@ export default function AskScreen() {
               style={[styles.micBtn, { backgroundColor: surface }]}
               disabled={loading || !canAsk || isOffline || isTranscribing}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('voiceInput')}
             >
               {isTranscribing ? (
                 <ActivityIndicator size="small" color={muted} />
@@ -925,6 +931,8 @@ export default function AskScreen() {
               ]}
               onPress={() => sendMessage(input)}
               disabled={loading || !input.trim() || !canAsk || isOffline}
+              accessibilityRole="button"
+              accessibilityLabel={t('send')}
             >
               <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
                 <Path

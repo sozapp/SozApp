@@ -1,6 +1,7 @@
 import { EmptyState } from '@/components/EmptyState';
 import { SozAlert } from '@/components/SozAlert';
 import { useNetwork } from '@/context/NetworkContext';
+import { colorForUserId } from '@/constants/avatar-colors';
 import { newTestament } from '@/constants/new-testament';
 import { supabase } from '@/constants/supabase';
 import { colors, fonts, borderRadius } from '@/constants/theme';
@@ -159,6 +160,8 @@ export default function ChurchScreen() {
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
           style={styles.backBtn}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={t('back')}
         >
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
@@ -317,8 +320,8 @@ export default function ChurchScreen() {
             </View>
             {prayers.map((p) => (
               <View key={p.id} style={styles.prayerItem}>
-                <View style={[styles.prayerAvatar, { backgroundColor: 'rgba(196,149,80,0.2)' }]}>
-                  <Text style={[styles.prayerInitials, { color: ACCENT }]}>
+                <View style={[styles.prayerAvatar, { backgroundColor: colorForUserId(p.userId) }]}>
+                  <Text style={[styles.prayerInitials, { color: colors.white }]}>
                     {initialsFromName(p.displayName)}
                   </Text>
                 </View>
@@ -338,8 +341,8 @@ export default function ChurchScreen() {
             <Text style={[styles.progressTitle, { color: theme.text }]}>{t('memberProgressTitle')}</Text>
             {members.map((m) => (
               <View key={m.userId} style={styles.memberRow}>
-                <View style={[styles.memberAvatar, { backgroundColor: 'rgba(196,149,80,0.2)' }]}>
-                  <Text style={[styles.memberInitials, { color: ACCENT }]}>
+                <View style={[styles.memberAvatar, { backgroundColor: colorForUserId(m.userId) }]}>
+                  <Text style={[styles.memberInitials, { color: colors.white }]}>
                     {initialsFromName(m.displayName)}
                   </Text>
                 </View>

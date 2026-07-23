@@ -1,24 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  Easing,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Animated, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { useTheme } from '@/hooks/useTheme';
-import { useSafeBack } from '@/hooks/useSafeBack';
 import { markGameCompletedToday } from '@/constants/game-storage';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
-import { GameLeaderboardModal } from '@/components/GameLeaderboardModal';
+import { GameShell } from '@/components/games/GameShell';
 
 const ACCENT = '#C4956A';
 const SUCCESS = '#4CAF50';
@@ -63,8 +51,6 @@ function pickQuestions(): Question[] {
 }
 
 export default function WhoSaid() {
-  const router = useRouter();
-  const safeBack = useSafeBack();
   const { colors, fonts } = useTheme();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -74,16 +60,13 @@ export default function WhoSaid() {
   const [streak, setStreak] = useState(0);
   const [questions, setQuestions] = useState<Question[]>(() => pickQuestions());
   const [locked, setLocked] = useState(false);
-  const [leaderboardVisible, setLeaderboardVisible] = useState(false);
   const { submitScore } = useLeaderboard(GAME_ID);
 
-  const progressAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const totalQuestions = questions.length;
   const currentQuestion = questions[currentIndex];
-  const progress = totalQuestions > 0 ? (currentIndex + 1) / totalQuestions : 0;
 
   useEffect(() => {
     void (async () => {
@@ -96,15 +79,6 @@ export default function WhoSaid() {
       }
     })();
   }, []);
-
-  useEffect(() => {
-    Animated.timing(progressAnim, {
-      toValue: progress,
-      duration: 350,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [progress, progressAnim]);
 
   const runWrongAnimation = () => {
     shakeAnim.setValue(0);
@@ -168,7 +142,6 @@ export default function WhoSaid() {
     setScore(0);
     setGameOver(false);
     setLocked(false);
-    progressAnim.setValue(0);
   };
 
   const resultMeta = useMemo(() => {
@@ -180,179 +153,90 @@ export default function WhoSaid() {
   if (!currentQuestion) return null;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={() => safeBack()} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={[styles.title, { color: colors.text, fontFamily: fonts.regular }]}>Kim Söyledi?</Text>
-        <View style={[styles.streakBadge, { backgroundColor: `${ACCENT}20` }]}>
-          <Ionicons name="flame-outline" size={14} color={ACCENT} />
-          <Text style={[styles.streakText, { color: ACCENT, fontFamily: fonts.regular }]}>{streak}</Text>
-        </View>
-      </View>
+    <GameShell
+      gameId={GAME_ID}
+      title="Kim Söyledi?"
+      leaderboardTitle="Kim Söyledi? — Liderlik"
+      streak={streak}
+      currentIndex={currentIndex}
+      totalQuestions={totalQuestions}
+      gameOver={gameOver}
+      score={score}
+      resultMeta={resultMeta}
+      replayButtonLayout={styles.nextBtnLayout}
+      onReplay={onReplay}
+    >
+      <Animated.View style={[styles.card, { backgroundColor: colors.card, transform: [{ scale: pulseAnim }] }]}>
+        <Text style={[styles.questionMeta, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+          Soru {currentIndex + 1}/{totalQuestions}
+        </Text>
+        <Text style={[styles.verse, { color: colors.text, fontFamily: fonts.italic ?? fonts.regular }]}>
+          "{currentQuestion.verse}"
+        </Text>
+        <Text style={[styles.reference, { color: ACCENT, fontFamily: fonts.italic ?? fonts.regular }]}>
+          {currentQuestion.reference}
+        </Text>
+      </Animated.View>
 
-      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-        <Animated.View
-          style={[
-            styles.progressFill,
+      <Animated.View
+        style={{
+          transform: [
             {
-              width: progressAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
+              translateX: shakeAnim.interpolate({
+                inputRange: [-1, 1],
+                outputRange: [-8, 8],
               }),
             },
-          ]}
-        />
-      </View>
+          ],
+        }}
+      >
+        {currentQuestion.options.map((option) => {
+          const isSelected = selectedAnswer === option;
+          const isCorrect = option === currentQuestion.correct;
+          const selectedWrong = Boolean(selectedAnswer && isSelected && !isCorrect);
+          const showCorrect = Boolean(selectedAnswer && isCorrect);
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {!gameOver ? (
-          <>
-            <Animated.View style={[styles.card, { backgroundColor: colors.card, transform: [{ scale: pulseAnim }] }]}>
-              <Text style={[styles.questionMeta, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
-                Soru {currentIndex + 1}/{totalQuestions}
-              </Text>
-              <Text style={[styles.verse, { color: colors.text, fontFamily: fonts.italic ?? fonts.regular }]}>
-                "{currentQuestion.verse}"
-              </Text>
-              <Text style={[styles.reference, { color: ACCENT, fontFamily: fonts.italic ?? fonts.regular }]}>
-                {currentQuestion.reference}
-              </Text>
-            </Animated.View>
+          let borderColor = colors.border;
+          let backgroundColor = colors.card;
+          if (showCorrect && isSelected) {
+            borderColor = SUCCESS;
+            backgroundColor = `${SUCCESS}20`;
+          } else if (selectedWrong) {
+            borderColor = DANGER;
+            backgroundColor = `${DANGER}20`;
+          } else if (showCorrect) {
+            borderColor = SUCCESS;
+            backgroundColor = `${SUCCESS}15`;
+          }
 
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    translateX: shakeAnim.interpolate({
-                      inputRange: [-1, 1],
-                      outputRange: [-8, 8],
-                    }),
-                  },
-                ],
-              }}
-            >
-              {currentQuestion.options.map((option) => {
-                const isSelected = selectedAnswer === option;
-                const isCorrect = option === currentQuestion.correct;
-                const selectedWrong = Boolean(selectedAnswer && isSelected && !isCorrect);
-                const showCorrect = Boolean(selectedAnswer && isCorrect);
-
-                let borderColor = colors.border;
-                let backgroundColor = colors.card;
-                if (showCorrect && isSelected) {
-                  borderColor = SUCCESS;
-                  backgroundColor = `${SUCCESS}20`;
-                } else if (selectedWrong) {
-                  borderColor = DANGER;
-                  backgroundColor = `${DANGER}20`;
-                } else if (showCorrect) {
-                  borderColor = SUCCESS;
-                  backgroundColor = `${SUCCESS}15`;
-                }
-
-                return (
-                  <TouchableOpacity
-                    key={option}
-                    style={[styles.optionBtn, { borderColor, backgroundColor }]}
-                    onPress={() => onSelect(option)}
-                    activeOpacity={0.88}
-                    disabled={locked}
-                  >
-                    <Text style={[styles.optionText, { color: colors.text, fontFamily: fonts.regular }]}>{option}</Text>
-                    {selectedWrong ? <Ionicons name="close-circle" size={20} color={DANGER} /> : null}
-                    {showCorrect ? <Ionicons name="checkmark-circle" size={20} color={SUCCESS} /> : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </Animated.View>
-
-            {selectedAnswer ? (
-              <TouchableOpacity style={styles.nextBtn} onPress={() => void onNext()} activeOpacity={0.9}>
-                <Text style={[styles.nextBtnText, { fontFamily: fonts.regular }]}>
-                  {currentIndex === totalQuestions - 1 ? 'Sonucu Gör →' : 'Sonraki Soru →'}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-          </>
-        ) : (
-          <View style={[styles.resultCard, { backgroundColor: colors.card }]}>
-            <Ionicons name={resultMeta.icon} size={48} color={resultMeta.color} />
-            <Text style={[styles.resultTitle, { color: resultMeta.color, fontFamily: fonts.regular }]}>{resultMeta.text}</Text>
-            <Text style={[styles.resultScore, { color: colors.text, fontFamily: fonts.regular }]}>
-              Puan: {score} / {totalQuestions}
-            </Text>
-            <TouchableOpacity style={styles.nextBtn} onPress={onReplay} activeOpacity={0.9}>
-              <Text style={[styles.nextBtnText, { fontFamily: fonts.regular }]}>Tekrar Oyna</Text>
-            </TouchableOpacity>
+          return (
             <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-              onPress={() => setLeaderboardVisible(true)}
-              activeOpacity={0.9}
+              key={option}
+              style={[styles.optionBtn, { borderColor, backgroundColor }]}
+              onPress={() => onSelect(option)}
+              activeOpacity={0.88}
+              disabled={locked}
             >
-              <Ionicons name="trophy-outline" size={16} color={colors.text} />
-              <Text style={[styles.secondaryBtnText, { color: colors.text, fontFamily: fonts.regular }]}>
-                Liderlik Tablosu
-              </Text>
+              <Text style={[styles.optionText, { color: colors.text, fontFamily: fonts.regular }]}>{option}</Text>
+              {selectedWrong ? <Ionicons name="close-circle" size={20} color={DANGER} /> : null}
+              {showCorrect ? <Ionicons name="checkmark-circle" size={20} color={SUCCESS} /> : null}
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-              onPress={() => router.push('/(tabs)' as never)}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.text, fontFamily: fonts.regular }]}>
-                Ana Sayfaya Dön
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-      <GameLeaderboardModal
-        visible={leaderboardVisible}
-        onClose={() => setLeaderboardVisible(false)}
-        gameId={GAME_ID}
-        title="Kim Söyledi? — Liderlik"
-      />
-    </SafeAreaView>
+          );
+        })}
+      </Animated.View>
+
+      {selectedAnswer ? (
+        <TouchableOpacity style={styles.nextBtn} onPress={() => void onNext()} activeOpacity={0.9}>
+          <Text style={[styles.nextBtnText, { fontFamily: fonts.regular }]}>
+            {currentIndex === totalQuestions - 1 ? 'Sonucu Gör →' : 'Sonraki Soru →'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </GameShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  iconBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18 },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 48,
-    justifyContent: 'center',
-  },
-  streakText: { fontSize: 12 },
-  progressTrack: {
-    marginHorizontal: 16,
-    marginTop: 6,
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: ACCENT,
-  },
-  content: { paddingBottom: 28 },
   card: {
     borderRadius: 20,
     padding: 24,
@@ -387,24 +271,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nextBtnText: { color: '#FFF8EE', fontSize: 15 },
-  resultCard: {
-    borderRadius: 20,
-    padding: 24,
-    margin: 16,
-    alignItems: 'center',
-    gap: 12,
-  },
-  resultTitle: { fontSize: 24, textAlign: 'center' },
-  resultScore: { fontSize: 18 },
-  secondaryBtn: {
-    width: '100%',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  secondaryBtnText: { fontSize: 15 },
+  nextBtnLayout: { marginHorizontal: 16, marginTop: 10 },
 });

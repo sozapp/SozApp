@@ -176,7 +176,13 @@ export default function SearchScreen() {
         keyboardVerticalOffset={0}
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
+          <TouchableOpacity
+            onPress={() => safeBack()}
+            style={styles.backBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('back')}
+          >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <View
@@ -210,6 +216,8 @@ export default function SearchScreen() {
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={styles.clearBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t('clearSearch')}
               >
                 <Ionicons name="close-circle" size={18} color={colors.textMuted} />
               </TouchableOpacity>
@@ -280,6 +288,8 @@ export default function SearchScreen() {
                     removeFromHistory(item);
                   }}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('removeFromHistory')}
                 >
                   <Ionicons name="close" size={14} color={colors.textMuted} />
                 </TouchableOpacity>

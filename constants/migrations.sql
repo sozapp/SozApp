@@ -574,10 +574,19 @@ CREATE TABLE IF NOT EXISTS messages (
   read_at TIMESTAMPTZ
 );
 
+-- Client TextInput maxLength={2000} ile aynı sınır — API'yi doğrudan çağıran
+-- istemciler de bu uzunluğu aşamasın. Mevcut kurulumlar için ALTER aşağıda.
+ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_text_length_check;
+ALTER TABLE messages ADD CONSTRAINT messages_text_length_check
+  CHECK (char_length(text) <= 2000);
+
 CREATE INDEX IF NOT EXISTS idx_messages_conversation
   ON messages(sender_id, recipient_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_rev
   ON messages(recipient_id, sender_id, created_at DESC);
+-- Rate-limit trigger'ının son 10 sn sayımı için.
+CREATE INDEX IF NOT EXISTS idx_messages_sender_created
+  ON messages(sender_id, created_at DESC);
 
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
@@ -605,6 +614,38 @@ CREATE POLICY "messages_insert" ON messages FOR INSERT
 CREATE POLICY "messages_update" ON messages FOR UPDATE
   USING (auth.uid() = recipient_id)
   WITH CHECK (auth.uid() = recipient_id);
+
+-- DB-seviye spam koruması: aynı kullanıcı 10 saniyede en fazla 20 mesaj
+-- gönderebilir. Client cooldown (400ms) yumuşak UX korumasıdır; bu trigger
+-- API'yi doğrudan çağıran kötüye kullanımı engeller.
+CREATE OR REPLACE FUNCTION public.check_message_rate_limit()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  recent_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO recent_count
+  FROM messages
+  WHERE sender_id = NEW.sender_id
+    AND created_at > NOW() - INTERVAL '10 seconds';
+
+  IF recent_count >= 20 THEN
+    RAISE EXCEPTION 'message_rate_limit: max 20 messages per 10 seconds'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS messages_rate_limit ON messages;
+CREATE TRIGGER messages_rate_limit
+  BEFORE INSERT ON messages
+  FOR EACH ROW
+  EXECUTE FUNCTION public.check_message_rate_limit();
 
 -- Postgres Changes ile anlık teslimat için tabloyu realtime yayınına ekle.
 ALTER PUBLICATION supabase_realtime ADD TABLE messages;

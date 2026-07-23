@@ -101,7 +101,7 @@ function categoryBadgeLabel(
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
 
 export default function MapScreen() {
-  const { theme, themeName } = useTheme();
+  const { theme, resolvedTheme } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ focusId?: string | string[] }>();
@@ -119,7 +119,7 @@ export default function MapScreen() {
   const surface = theme.surface ?? '#1A1612';
   const text = theme.text ?? '#E8E0D0';
   const muted = theme.textMuted ?? 'rgba(232,224,208,0.5)';
-  const isDarkMap = themeName === 'dark' || themeName === 'midnight';
+  const isDarkMap = resolvedTheme === 'night' || resolvedTheme === 'black';
 
   useFocusEffect(
     useCallback(() => {
@@ -395,6 +395,8 @@ export default function MapScreen() {
             style={[styles.ctrlBtn, { backgroundColor: surface, borderColor: ACCENT }]}
             onPress={fitTurkey}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('showFullMap')}
           >
             <Ionicons name="map-outline" size={20} color={ACCENT} />
           </Pressable>
@@ -402,6 +404,8 @@ export default function MapScreen() {
             style={[styles.ctrlBtn, { backgroundColor: surface, borderColor: ACCENT }]}
             onPress={goToUserLocation}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('myLocation')}
           >
             <Ionicons name="location-outline" size={20} color={ACCENT} />
           </Pressable>

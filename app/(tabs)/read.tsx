@@ -25,6 +25,7 @@ import { newTestament } from '@/constants/new-testament';
 import { FREE_LIMITS } from '@/constants/premium';
 import { logFriendActivity } from '@/constants/friend-activity';
 import { addToReadHistory, saveLastRead } from '@/constants/read-history';
+import { buildShareMessage } from '@/constants/share-verse';
 import { supabase } from '@/constants/supabase';
 import { recordVerseViews } from '@/constants/stats-storage';
 import { colors, fonts } from '@/constants/theme';
@@ -44,7 +45,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   Dimensions,
@@ -61,7 +62,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { FontSizeModal } from '@/components/FontSizeModal';
@@ -75,6 +80,54 @@ import { Toast } from '@/components/Toast';
 type VerseItem = { number: number; text: string };
 
 const ACCENT = '#C4956A';
+
+/**
+ * Tek dokunma (ses ikonu) ile çift dokunmayı (favori) Exclusive ile ayırır.
+ * Uzun basma Pressable'da kalır — Exclusive(tap, longPress) uzun basmayı geciktirdiği için.
+ */
+function VerseGesturePressable({
+  style,
+  onSingleTap,
+  onDoubleTap,
+  onLongPress,
+  children,
+}: {
+  style?: StyleProp<ViewStyle>;
+  onSingleTap: () => void;
+  onDoubleTap: () => void;
+  onLongPress: () => void;
+  children: ReactNode;
+}) {
+  const onSingleTapRef = useRef(onSingleTap);
+  const onDoubleTapRef = useRef(onDoubleTap);
+  onSingleTapRef.current = onSingleTap;
+  onDoubleTapRef.current = onDoubleTap;
+
+  const composed = useMemo(() => {
+    const fireSingle = () => onSingleTapRef.current();
+    const fireDouble = () => onDoubleTapRef.current();
+
+    const doubleTap = Gesture.Tap()
+      .numberOfTaps(2)
+      .onEnd((_e, success) => {
+        if (success) runOnJS(fireDouble)();
+      });
+
+    const singleTap = Gesture.Tap().onEnd((_e, success) => {
+      if (success) runOnJS(fireSingle)();
+    });
+
+    return Gesture.Exclusive(doubleTap, singleTap);
+  }, []);
+
+  return (
+    <GestureDetector gesture={composed}>
+      <Pressable style={style} onLongPress={onLongPress} delayLongPress={400}>
+        {children}
+      </Pressable>
+    </GestureDetector>
+  );
+}
 const MIN_FONT_SIZE = 14;
 const MAX_FONT_SIZE = 22;
 const STORAGE_LINE_SPACING = '@soz/lineSpacing';
@@ -211,7 +264,13 @@ export default function ReadScreen() {
   const [tappedVerseId, setTappedVerseId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [showShareOptions, setShowShareOptions] = useState(false);
-  const [shareVerse, setShareVerse] = useState({ text: '', ref: '' });
+  const [shareVerse, setShareVerse] = useState<{
+    text: string;
+    ref: string;
+    bookId?: string;
+    chapter?: number;
+    verse?: number;
+  }>({ text: '', ref: '' });
   const [showShareCard, setShowShareCard] = useState(false);
   const [highlights, setHighlights] = useState<Highlights>({});
   const [notes, setNotes] = useState<Notes>({});
@@ -243,8 +302,11 @@ export default function ReadScreen() {
     bookId?: string;
     chapter?: string;
     highlightVerse?: string;
+    verse?: string;
   }>();
-  const highlightRaw = Array.isArray(params.highlightVerse) ? params.highlightVerse[0] : params.highlightVerse;
+  const highlightRaw =
+    (Array.isArray(params.highlightVerse) ? params.highlightVerse[0] : params.highlightVerse) ??
+    (Array.isArray(params.verse) ? params.verse[0] : params.verse);
   const highlightVerseParam = highlightRaw != null ? parseInt(String(highlightRaw), 10) : null;
   const highlightVerseNum = Number.isNaN(highlightVerseParam) ? null : highlightVerseParam;
 
@@ -268,6 +330,9 @@ export default function ReadScreen() {
   const flatListRef = useRef<FlatList<VerseItem>>(null);
   const readPositionSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartScale = useRef(new Animated.Value(1)).current;
+  const doubleTapHeartScale = useRef(new Animated.Value(0)).current;
+  const doubleTapHeartOpacity = useRef(new Animated.Value(0)).current;
+  const [doubleTapHeartVisible, setDoubleTapHeartVisible] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [visibleVerseIndex, setVisibleVerseIndex] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -640,6 +705,81 @@ export default function ReadScreen() {
     ]).start();
   }, [heartScale]);
 
+  /** Instagram tarzı ortada büyüyüp kaybolan kalp (~600ms). */
+  const playDoubleTapHeart = useCallback(() => {
+    setDoubleTapHeartVisible(true);
+    doubleTapHeartScale.setValue(0);
+    doubleTapHeartOpacity.setValue(1);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.spring(doubleTapHeartScale, {
+          toValue: 1.2,
+          friction: 4,
+          tension: 140,
+          useNativeDriver: true,
+        }),
+        Animated.timing(doubleTapHeartScale, {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.sequence([
+        Animated.delay(320),
+        Animated.timing(doubleTapHeartOpacity, {
+          toValue: 0,
+          duration: 220,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start(({ finished }) => {
+      if (finished) setDoubleTapHeartVisible(false);
+    });
+  }, [doubleTapHeartScale, doubleTapHeartOpacity]);
+
+  const handleVerseDoubleTapFavorite = useCallback(
+    async (verseId: string, verseText: string) => {
+      setTappedVerseId(null);
+      const wasFav = isFavorite(verseId);
+      playDoubleTapHeart();
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await toggleFavorite(verseId, verseText);
+      if (!wasFav) {
+        animateFavorite();
+        pulseNotesTab();
+        try {
+          if (supabase) {
+            const {
+              data: { user },
+            } = await supabase.auth.getUser();
+            await logFriendActivity(supabase, user, isOnline, {
+              type: 'verse_favorite',
+              verse_id: verseId,
+              book: chapter.book,
+              chapter: chapter.chapterNumber,
+            });
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      syncFavorites();
+    },
+    [
+      isFavorite,
+      playDoubleTapHeart,
+      toggleFavorite,
+      animateFavorite,
+      pulseNotesTab,
+      isOnline,
+      chapter.book,
+      chapter.chapterNumber,
+      syncFavorites,
+    ]
+  );
+
   useEffect(() => {
     if (loading) return;
     setReadProgress(0);
@@ -884,7 +1024,7 @@ export default function ReadScreen() {
       bookIndex < newTestament.length - 1;
     const nextBook = movingToNextBook ? newTestament[bookIndex + 1] : null;
     const prevChapterNameForBanner = isPsalmMode
-      ? `${chapter.chapterNumber}. Mezmur`
+      ? tx('psalmName', { n: chapter.chapterNumber })
       : `${chapter.book} ${chapter.chapterNumber}`;
     addToReadHistory({
       bookId: currentBook.id,
@@ -908,7 +1048,7 @@ export default function ReadScreen() {
     showTopBannerTemporary(prevChapterNameForBanner);
     if (movingToNextBook && nextBook) {
       haptics.success();
-      setToastMessage(`${nextBook.name}'a geçildi`);
+      setToastMessage(tx('switchedToBookMsg', { name: nextBook.name }));
       setToastVisible(true);
     }
   }, [
@@ -921,6 +1061,7 @@ export default function ReadScreen() {
     goToNextChapter,
     flashOpacity,
     showTopBannerTemporary,
+    tx,
   ]);
 
   const triggerPrevChapter = useCallback(() => {
@@ -969,7 +1110,7 @@ export default function ReadScreen() {
       const nextIdx = selectedPsalmIndex + 1;
       if (nextIdx < psalmNumbers.length) {
         const n = psalmNumbers[nextIdx];
-        return `${n}. Mezmur →`;
+        return `${tx('psalmName', { n })} →`;
       }
       return null;
     }
@@ -979,7 +1120,7 @@ export default function ReadScreen() {
       return `${chapter.book} ${nextCh.chapter} →`;
     }
     if (bookIndex < newTestament.length - 1) {
-      return `${newTestament[bookIndex + 1].name}'a geç →`;
+      return `${tx('goToBookName', { name: newTestament[bookIndex + 1].name })} →`;
     }
     return null;
   })();
@@ -989,18 +1130,18 @@ export default function ReadScreen() {
     if (isPsalmMode) {
       if (selectedPsalmIndex > 0) {
         const n = psalmNumbers[selectedPsalmIndex - 1];
-        return `← ${n}. Mezmur'a dön`;
+        return `← ${tx('backToPsalmName', { n })}`;
       }
       return null;
     }
     if (chapterIndexInBook > 0) {
       const ntBook = currentBook;
       const prevCh = ntBook?.chapters?.[chapterIndexInBook - 1];
-      return `← ${chapter.book} ${prevCh.chapter}'e dön`;
+      return `← ${tx('backToChapterName', { book: chapter.book, chapter: prevCh.chapter })}`;
     }
     if (bookIndex > 0) {
       const prevBook = newTestament[bookIndex - 1];
-      return `← ${prevBook.name}'a dön`;
+      return `← ${tx('backToBookName', { name: prevBook.name })}`;
     }
     return null;
   })();
@@ -1245,10 +1386,19 @@ export default function ReadScreen() {
     if (!selectedVerse) return;
     const text = selectedVerse.text;
     const refStr = `${listChapter.book} ${listChapter.chapterNumber}:${selectedVerse.number}`;
+    const bookId = currentBook.id;
+    const chapterNum = listChapter.chapterNumber;
+    const verseNum = selectedVerse.number;
     setSelectedVerse(null);
     closeModal();
     setTimeout(() => {
-      setShareVerse({ text, ref: refStr });
+      setShareVerse({
+        text,
+        ref: refStr,
+        bookId,
+        chapter: chapterNum,
+        verse: verseNum,
+      });
       setShowShareOptions(true);
       haptics.light();
     }, 300);
@@ -1257,7 +1407,11 @@ export default function ReadScreen() {
   const handleShareHighlight = () => {
     if (!selectedVerse || !selectedVerseId) return;
     const refStr = getVerseRefFromVerseId(selectedVerseId);
-    const message = `«${selectedVerse.text}»\n\n— ${refStr}\n\nSöz Uygulaması`;
+    const message = buildShareMessage(selectedVerse.text, refStr, {
+      bookId: currentBook.id,
+      chapter: listChapter.chapterNumber,
+      verse: selectedVerse.number,
+    });
     Share.share({ message });
     setTimeout(() => closeModal(), 300);
   };
@@ -1495,7 +1649,7 @@ export default function ReadScreen() {
           <Animated.View style={[styles.topBanner, { opacity: topBannerOpacity }]}>
             <Ionicons name="chevron-up" size={14} color={colors.textMuted} />
             <Text style={styles.topBannerText}>
-              ← {bannerPrevChapterName} — başa dön
+              ← {tx('backToTopName', { name: bannerPrevChapterName ?? '' })}
             </Text>
           </Animated.View>
         ) : null}
@@ -1568,11 +1722,25 @@ export default function ReadScreen() {
     const isAbsoluteEnd = isLastChapter && atLastBook;
 
     let nextLabel = '';
-    if (nextChapterLabel != null) {
-      nextLabel = nextChapterLabel.replace(/\s*→\s*$/, '').replace(/'a geç$/, '');
-    } else if (!atLastBook) {
+    if (!isLastChapter) {
+      if (isPsalmMode) {
+        const nextIdx = selectedPsalmIndex + 1;
+        if (nextIdx < psalmNumbers.length) {
+          nextLabel = tx('psalmName', { n: psalmNumbers[nextIdx] });
+        }
+      } else {
+        const ntBook = currentBook;
+        if (chapterIndexInBook < (ntBook?.chapters?.length ?? 0) - 1) {
+          const nextCh = ntBook?.chapters?.[chapterIndexInBook + 1];
+          nextLabel = `${chapter.book} ${nextCh.chapter}`;
+        } else if (bookIndex < newTestament.length - 1) {
+          nextLabel = newTestament[bookIndex + 1].name;
+        }
+      }
+    }
+    if (nextLabel === '' && !atLastBook) {
       const nextBook = newTestament[bookIndex + 1];
-      nextLabel = nextBook ? `${nextBook.name} — 1. Bölüm` : '';
+      nextLabel = nextBook ? tx('nextBookFirstChapter', { name: nextBook.name }) : '';
     }
 
     return (
@@ -1620,7 +1788,10 @@ export default function ReadScreen() {
     isLastChapter,
     isPsalmMode,
     bookIndex,
-    nextChapterLabel,
+    selectedPsalmIndex,
+    psalmNumbers,
+    currentBook,
+    chapterIndexInBook,
     swipeHintAnim,
     theme.text,
     theme.textMuted,
@@ -1640,7 +1811,7 @@ export default function ReadScreen() {
     const secondLangText = secondLangChapter?.verses?.find((v) => v.verse === item.number)?.text ?? null;
 
     const rowContent = (
-      <Pressable
+      <VerseGesturePressable
         style={[
           styles.verseRow,
           highlightEntry != null && {
@@ -1658,9 +1829,9 @@ export default function ReadScreen() {
           isSelected && highlightEntry == null && !isHighlightedFromParams && styles.verseRowSelected,
           isSpeakingThis && styles.verseRowSpeaking,
         ]}
-        onPress={() => setTappedVerseId((prev) => (prev === verseId ? null : verseId))}
+        onSingleTap={() => setTappedVerseId((prev) => (prev === verseId ? null : verseId))}
+        onDoubleTap={() => void handleVerseDoubleTapFavorite(verseId, item.text)}
         onLongPress={() => handleLongPress(item)}
-        delayLongPress={400}
       >
         <View style={styles.verseNumberRow}>
           {isSpeakingThis && (
@@ -1676,6 +1847,8 @@ export default function ReadScreen() {
                 speak(item.text, verseId);
               }}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={tx('listen')}
             >
               <Ionicons name="volume-medium-outline" size={16} color={ACCENT} />
             </Pressable>
@@ -1739,7 +1912,7 @@ export default function ReadScreen() {
           </View>
         )}
         {favorite && <Text style={styles.verseFavoriteIcon}>♥</Text>}
-      </Pressable>
+      </VerseGesturePressable>
     );
 
     if (isHighlightedFromParams) {
@@ -1771,7 +1944,7 @@ export default function ReadScreen() {
     const isHighlightedFromParams = highlightedVerse === item.number;
 
     const rowContent = (
-      <Pressable
+      <VerseGesturePressable
         style={[
           styles.verseRow,
           styles.compareVerse,
@@ -1790,9 +1963,9 @@ export default function ReadScreen() {
           isSelected && highlightEntry == null && !isHighlightedFromParams && styles.verseRowSelected,
           isSpeakingThis && styles.verseRowSpeaking,
         ]}
-        onPress={() => setTappedVerseId((prev) => (prev === verseId ? null : verseId))}
+        onSingleTap={() => setTappedVerseId((prev) => (prev === verseId ? null : verseId))}
+        onDoubleTap={() => void handleVerseDoubleTapFavorite(verseId, item.text)}
         onLongPress={() => handleLongPress(item)}
-        delayLongPress={400}
       >
         <View style={styles.verseNumberRow}>
           {isSpeakingThis && (
@@ -1808,6 +1981,8 @@ export default function ReadScreen() {
                 speak(item.text, verseId);
               }}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={tx('listen')}
             >
               <Ionicons name="volume-medium-outline" size={16} color={ACCENT} />
             </Pressable>
@@ -1841,7 +2016,7 @@ export default function ReadScreen() {
           </View>
         )}
         {favorite && <Text style={styles.verseFavoriteIcon}>♥</Text>}
-      </Pressable>
+      </VerseGesturePressable>
     );
 
     if (isHighlightedFromParams) {
@@ -1886,6 +2061,20 @@ export default function ReadScreen() {
         ]}
         pointerEvents="none"
       />
+      {doubleTapHeartVisible ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.doubleTapHeartOverlay,
+            {
+              opacity: doubleTapHeartOpacity,
+              transform: [{ scale: doubleTapHeartScale }],
+            },
+          ]}
+        >
+          <Ionicons name="heart" size={96} color="#E57373" />
+        </Animated.View>
+      ) : null}
       <View style={[styles.headerWrap, { backgroundColor: theme.background }]}>
         <View style={styles.headerRow}>
           <Pressable
@@ -1893,6 +2082,8 @@ export default function ReadScreen() {
             disabled={isFirstChapter || isPageTurning}
             style={[styles.chapterNavBtn, (isFirstChapter || isPageTurning) && styles.chapterNavBtnDisabled]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={tx('prevChapter')}
           >
             <Ionicons name="chevron-back" size={24} color={CHAPTER_NAV_COLOR} />
           </Pressable>
@@ -1905,12 +2096,14 @@ export default function ReadScreen() {
             </Text>
             <View style={styles.headerChapterRow}>
               <Text style={styles.headerChapterLabel}>
-                {isPsalmMode ? `${chapter.chapterNumber}. Mezmur` : `${chapterIndexInBook + 1}. Bölüm`}
+                {isPsalmMode
+                  ? tx('psalmName', { n: chapter.chapterNumber })
+                  : tx('chapterOrdinalLabel', { n: chapterIndexInBook + 1 })}
               </Text>
               <Text style={styles.headerChevron}>▾</Text>
             </View>
             <Text style={[styles.headerVerseCount, { color: theme.textMuted }]}>
-              {visibleVerseIndex} / {listChapter.verses.length} ayet
+              {visibleVerseIndex} / {listChapter.verses.length} {tx('verse')}
             </Text>
           </Pressable>
           <Pressable
@@ -1918,6 +2111,8 @@ export default function ReadScreen() {
             disabled={isLastChapter || isPageTurning}
             style={[styles.chapterNavBtn, (isLastChapter || isPageTurning) && styles.chapterNavBtnDisabled]}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={tx('nextChapter')}
           >
             <Ionicons name="chevron-forward" size={24} color={CHAPTER_NAV_COLOR} />
           </Pressable>
@@ -2082,6 +2277,8 @@ export default function ReadScreen() {
               ]}
               onPress={() => setShowMusicModal(true)}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={tx('ambientMusic')}
             >
               {ambientTrack?.id !== 'silence' && ambientPlaying ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 1 }}>
@@ -2148,7 +2345,7 @@ export default function ReadScreen() {
         </Animated.View>
         {compareMode && !isPsalmMode && bibleVersion !== 'WEB' && bibleVersion !== 'KJV' && (
           <View style={[styles.langSelectorRow, { backgroundColor: theme.surface, borderTopColor: 'rgba(196,149,80,0.15)' }]}>
-            <Text style={[styles.langSelectorLabel, { color: theme.textMuted }]}>Karşılaştır:</Text>
+            <Text style={[styles.langSelectorLabel, { color: theme.textMuted }]}>{tx('compareColonLabel')}</Text>
             <View style={styles.langSelectorBtns}>
               {(['en', 'de', 'ar'] as const).map((lang) => (
                 <TouchableOpacity
@@ -2294,7 +2491,7 @@ export default function ReadScreen() {
                   <View style={styles.noteInputSection}>
                     <TextInput
                       style={[styles.noteInput, { backgroundColor: theme.background, color: theme.text }]}
-                      placeholder="Notunuzu yazın..."
+                      placeholder={tx('notePlaceholder')}
                       placeholderTextColor={theme.textMuted}
                       value={noteDraft}
                       onChangeText={setNoteDraft}
@@ -2318,7 +2515,7 @@ export default function ReadScreen() {
                   </View>
                 ) : showColorPicker ? (
                   <View style={styles.colorPickerSection}>
-                    <Text style={[styles.colorPickerLabel, { color: theme.textMuted }]}>Renk seçin</Text>
+                    <Text style={[styles.colorPickerLabel, { color: theme.textMuted }]}>{tx('chooseColorLabel')}</Text>
                     <View style={styles.colorPickerRow}>
                       {HIGHLIGHT_COLORS.map((h) => (
                         <Pressable
@@ -2332,6 +2529,8 @@ export default function ReadScreen() {
                             },
                           ]}
                           onPress={() => handleHighlightColor(h.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={h.label}
                         >
                           <Text style={[styles.colorCardLabel, { color: h.border }]}>{h.label}</Text>
                           {selectedHighlight === h.id && (
@@ -2347,6 +2546,8 @@ export default function ReadScreen() {
                   <View style={styles.modalActions}>
                     <Pressable
                       style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={isFavorite(selectedVerseId ?? '') ? tx('removeFromFavorites') : tx('addToFavorites')}
                       onPress={async () => {
                         if (selectedVerseId) {
                           const wasFav = isFavorite(selectedVerseId);
@@ -2397,6 +2598,8 @@ export default function ReadScreen() {
                     <Pressable
                       style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
                       onPress={handleCopyVerse}
+                      accessibilityRole="button"
+                      accessibilityLabel={verseCopied ? tx('copied') : tx('copyVerse')}
                     >
                       <Ionicons
                         name={verseCopied ? 'checkmark-outline' : 'copy-outline'}
@@ -2414,6 +2617,8 @@ export default function ReadScreen() {
                     </Pressable>
                     <Pressable
                       style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={tx('memorize')}
                       onPress={() => {
                         if (selectedVerseId && selectedVerse) {
                           closeModal();
@@ -2434,6 +2639,8 @@ export default function ReadScreen() {
                     <Pressable
                       style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
                       onPress={() => { setShowNoteInput(true); setShowColorPicker(false); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={tx('addNote')}
                     >
                       <Ionicons name="create-outline" size={20} color={theme.text} />
                       <Text style={[styles.modalBtnText, { color: theme.text }]}>{tx('addNote')}</Text>
@@ -2441,6 +2648,8 @@ export default function ReadScreen() {
                     <Pressable
                       style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
                       onPress={() => { setShowColorPicker(true); setShowNoteInput(false); }}
+                      accessibilityRole="button"
+                      accessibilityLabel={tx('highlight')}
                     >
                       <Ionicons name="brush-outline" size={20} color={theme.text} />
                       <Text style={[styles.modalBtnText, { color: theme.text }]}>{tx('highlight')}</Text>
@@ -2449,6 +2658,8 @@ export default function ReadScreen() {
                       <Pressable
                         style={[styles.modalBtn, styles.modalBtnSurface, { backgroundColor: theme.surface }]}
                         onPress={handleShareHighlight}
+                        accessibilityRole="button"
+                        accessibilityLabel={tx('shareHighlight')}
                       >
                         <Ionicons name="share-outline" size={20} color={theme.text} />
                         <Text style={[styles.modalBtnText, { color: theme.text }]}>{tx('shareHighlight')}</Text>
@@ -2457,6 +2668,8 @@ export default function ReadScreen() {
                     <Pressable
                       style={[styles.modalBtn, styles.modalBtnAccent]}
                       onPress={handleShare}
+                      accessibilityRole="button"
+                      accessibilityLabel={tx('share')}
                     >
                       <Ionicons name="share-outline" size={20} color={colors.white} />
                       <Text style={[styles.modalBtnText, { color: colors.white }]}>{tx('share')}</Text>
@@ -2493,13 +2706,13 @@ export default function ReadScreen() {
             onPress={(e) => e.stopPropagation()}
           >
             <Text style={[styles.bookPickerTitle, { color: theme.text }]}>
-              Kitap seç
+              {tx('chooseBookTitle')}
             </Text>
             <FlatList
               data={[
-                { type: 'header' as const, label: 'Yeni Ahit' },
+                { type: 'header' as const, label: tx('newTestamentProgress') },
                 ...bookList.map((item, index) => ({ type: 'book' as const, item, index })),
-                { type: 'header' as const, label: 'Eski Ahit' },
+                { type: 'header' as const, label: tx('oldTestamentLabel') },
                 ...oldTestamentBooks.map((item) => ({ type: 'oldBook' as const, item })),
               ]}
               keyExtractor={(entry) =>
@@ -2533,7 +2746,7 @@ export default function ReadScreen() {
                         {entry.item.name}
                       </Text>
                       <Text style={[styles.bookPickerChapters, { color: theme.textMuted }]}>
-                        {entry.item.chapterCount} mezmur
+                        {tx('psalmsCountLabel', { count: entry.item.chapterCount })}
                       </Text>
                     </Pressable>
                   );
@@ -2557,7 +2770,7 @@ export default function ReadScreen() {
                       {item.name}
                     </Text>
                     <Text style={[styles.bookPickerChapters, { color: theme.textMuted }]}>
-                      {item.chapterCount} bölüm
+                      {tx('chaptersCountLabel', { count: item.chapterCount })}
                     </Text>
                   </Pressable>
                 );
@@ -2627,7 +2840,7 @@ export default function ReadScreen() {
         />
         <View style={[styles.shareSheet, { backgroundColor: theme.surface }]}>
           <View style={[styles.shareHandle, { backgroundColor: theme.border }]} />
-          <Text style={[styles.shareTitle, { color: theme.text }]}>Ayeti Paylaş</Text>
+          <Text style={[styles.shareTitle, { color: theme.text }]}>{tx('shareVerseTitle')}</Text>
           <Text style={styles.shareRef}>{shareVerse.ref}</Text>
           <TouchableOpacity
             style={[styles.shareOption, { borderColor: theme.border }]}
@@ -2635,7 +2848,19 @@ export default function ReadScreen() {
               setShowShareOptions(false);
               haptics.light();
               await Share.share({
-                message: `«${shareVerse.text}»\n— ${shareVerse.ref}\n\nSöz Uygulaması • sozapp.com`,
+                message: buildShareMessage(
+                  shareVerse.text,
+                  shareVerse.ref,
+                  shareVerse.bookId != null &&
+                    shareVerse.chapter != null &&
+                    shareVerse.verse != null
+                    ? {
+                        bookId: shareVerse.bookId,
+                        chapter: shareVerse.chapter,
+                        verse: shareVerse.verse,
+                      }
+                    : null
+                ),
               });
             }}
           >
@@ -2643,9 +2868,9 @@ export default function ReadScreen() {
               <Ionicons name="text-outline" size={20} color="#C4956A" />
             </View>
             <View style={styles.shareOptionText}>
-              <Text style={[styles.shareOptionTitle, { color: theme.text }]}>Metin Olarak Paylaş</Text>
+              <Text style={[styles.shareOptionTitle, { color: theme.text }]}>{tx('shareAsTextTitle')}</Text>
               <Text style={[styles.shareOptionDesc, { color: theme.textMuted }]}>
-                WhatsApp, mesaj, e-posta...
+                {tx('shareAsTextDesc')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
@@ -2661,15 +2886,15 @@ export default function ReadScreen() {
               <Ionicons name="image-outline" size={20} color="#C4956A" />
             </View>
             <View style={styles.shareOptionText}>
-              <Text style={[styles.shareOptionTitle, { color: theme.text }]}>Temalı Kart Olarak Paylaş</Text>
+              <Text style={[styles.shareOptionTitle, { color: theme.text }]}>{tx('shareAsCardTitle')}</Text>
               <Text style={[styles.shareOptionDesc, { color: theme.textMuted }]}>
-                Instagram, hikaye, görsel...
+                {tx('shareAsCardDesc')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareOptions(false)}>
-            <Text style={[styles.shareCancelText, { color: theme.textMuted }]}>İptal</Text>
+            <Text style={[styles.shareCancelText, { color: theme.textMuted }]}>{tx('cancel')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -2679,6 +2904,15 @@ export default function ReadScreen() {
         onClose={() => setShowShareCard(false)}
         verseText={shareVerse.text}
         verseRef={shareVerse.ref}
+        deepLinkParams={
+          shareVerse.bookId != null && shareVerse.chapter != null && shareVerse.verse != null
+            ? {
+                bookId: shareVerse.bookId,
+                chapter: shareVerse.chapter,
+                verse: shareVerse.verse,
+              }
+            : null
+        }
       />
 
       <AmbientMusicModal visible={showMusicModal} onClose={() => setShowMusicModal(false)} />
@@ -2942,6 +3176,12 @@ const styles = StyleSheet.create({
   },
   flashOverlay: {
     zIndex: 9998,
+  },
+  doubleTapHeartOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
   },
   pageContainer: {
     flex: 1,

@@ -134,7 +134,13 @@ export default function VideosScreen() {
     <View style={styles.safe}>
       <SafeAreaView style={styles.safeInner} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
+          <Pressable
+            onPress={() => safeBack()}
+            style={styles.backBtn}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Geri git"
+          >
             <Ionicons name="arrow-back" size={24} color={TEXT} />
           </Pressable>
           <View style={styles.headerCenter}>

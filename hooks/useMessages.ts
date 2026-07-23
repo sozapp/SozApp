@@ -1,6 +1,11 @@
 import { supabase } from '@/constants/supabase';
 import { useTranslation } from '@/context/LanguageContext';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+/** Client-side spam koruması — ardışık basmaları yumuşakça engeller (UX'i bozmaz). */
+const SEND_COOLDOWN_MS = 400;
+/** Client TextInput maxLength ile aynı; DB CHECK constraint'iyle de güvence altında. */
+const MAX_MESSAGE_LENGTH = 2000;
 
 export type ChatMessage = {
   id: string;
@@ -31,11 +36,26 @@ function fromRow(r: MessageRow): ChatMessage {
   };
 }
 
+/** İki peer'ın aynı broadcast kanalına katılması için id'leri sıralı birleştir. */
+function chatChannelName(a: string, b: string): string {
+  return a < b ? `chat:${a}:${b}` : `chat:${b}:${a}`;
+}
+
+/** Typing broadcast — debounce (~500ms); ilk tuşta da hemen gönderilir. */
+const TYPING_DEBOUNCE_MS = 500;
+/** Karşı taraftan sinyal gelmezse yazıyor göstergesini kapat. */
+const TYPING_IDLE_MS = 3000;
+
 export function useChatThread(friendId: string) {
   const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [myId, setMyId] = useState<string | null>(null);
+  const [theirTyping, setTheirTyping] = useState(false);
+  const lastSendAtRef = useRef(0);
+  const channelRef = useRef<ReturnType<NonNullable<typeof supabase>['channel']> | null>(null);
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const theirTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     if (!supabase) {
@@ -92,7 +112,16 @@ export function useChatThread(friendId: string) {
     async (text: string): Promise<{ ok: boolean; error?: string }> => {
       const trimmed = text.trim();
       if (!trimmed) return { ok: false, error: t('emptyMessageError') };
+      if (trimmed.length > MAX_MESSAGE_LENGTH) {
+        return { ok: false, error: t('messageTooLong') };
+      }
+      const now = Date.now();
+      if (now - lastSendAtRef.current < SEND_COOLDOWN_MS) {
+        return { ok: false, error: t('messageSendTooFast') };
+      }
       if (!supabase) return { ok: false, error: t('serverConnectionError') };
+      // Slot'u await'ten önce kilitle — paralel/ardışık çağrıları engelle.
+      lastSendAtRef.current = now;
       try {
         const {
           data: { user },
@@ -119,25 +148,85 @@ export function useChatThread(friendId: string) {
 
   useEffect(() => {
     const client = supabase;
-    if (!client || !myId) return;
+    if (!client || !myId || !friendId) return;
+
+    const clearTheirTypingSoon = () => {
+      if (theirTypingTimeoutRef.current) clearTimeout(theirTypingTimeoutRef.current);
+      theirTypingTimeoutRef.current = setTimeout(() => {
+        setTheirTyping(false);
+        theirTypingTimeoutRef.current = null;
+      }, TYPING_IDLE_MS);
+    };
+
     const channel = client
-      .channel(`chat:${myId}:${friendId}`)
+      .channel(chatChannelName(myId, friendId), {
+        config: { broadcast: { self: false } },
+      })
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${friendId}` },
         (payload) => {
           const row = payload.new as MessageRow;
           if (row.recipient_id !== myId) return;
+          setTheirTyping(false);
+          if (theirTypingTimeoutRef.current) {
+            clearTimeout(theirTypingTimeoutRef.current);
+            theirTypingTimeoutRef.current = null;
+          }
           setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, fromRow(row)]));
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `recipient_id=eq.${friendId}` },
+        (payload) => {
+          const row = payload.new as MessageRow;
+          // Benim gönderdiğim, karşı tarafın okuduğu mesajlar
+          if (row.sender_id !== myId) return;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === row.id ? { ...m, readAt: row.read_at } : m))
+          );
+        }
+      )
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        const userId = (payload as { userId?: string } | null)?.userId;
+        if (!userId || userId === myId) return;
+        setTheirTyping(true);
+        clearTheirTypingSoon();
+      })
       .subscribe();
+
+    channelRef.current = channel;
     return () => {
+      channelRef.current = null;
+      if (typingDebounceRef.current) {
+        clearTimeout(typingDebounceRef.current);
+        typingDebounceRef.current = null;
+      }
+      if (theirTypingTimeoutRef.current) {
+        clearTimeout(theirTypingTimeoutRef.current);
+        theirTypingTimeoutRef.current = null;
+      }
+      setTheirTyping(false);
       void client.removeChannel(channel);
     };
   }, [myId, friendId]);
 
-  return { messages, loading, myId, sendMessage, markRead, reload: load };
+  /** TextInput onChangeText'ten çağır — ~500ms debounce ile typing broadcast gönderir. */
+  const notifyTyping = useCallback(() => {
+    if (!myId || !channelRef.current) return;
+    if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+    typingDebounceRef.current = setTimeout(() => {
+      typingDebounceRef.current = null;
+      void channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: myId },
+      });
+    }, TYPING_DEBOUNCE_MS);
+  }, [myId]);
+
+  return { messages, loading, myId, theirTyping, notifyTyping, sendMessage, markRead, reload: load };
 }
 
 export function useUnreadMessageCounts(friendIds: string[]) {

@@ -22,7 +22,13 @@ export default function DevotionalScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={8}>
+        <Pressable
+          onPress={() => safeBack()}
+          style={styles.backBtn}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('back')}
+        >
           <Ionicons name="chevron-back" size={24} color={ACCENT} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Günlük Yansıma</Text>

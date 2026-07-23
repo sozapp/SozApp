@@ -17,11 +17,16 @@ import { NetworkProvider } from '@/context/NetworkContext';
 import { SpeechProvider } from '@/context/SpeechContext';
 import { TabPulseProvider } from '@/context/TabPulseContext';
 import { ThemeProvider } from '@/hooks/useTheme';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { RootLayoutContent } from '@/components/RootLayoutContent';
 import SozSplashScreen from '@/components/SplashScreen';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
 import { setupNotificationHandler } from '@/constants/notifications';
+import { initSentry } from '@/constants/sentry';
 
+// Crash/error reporting en erken noktada başlamalı — splash screen'i bile
+// gizlemeden önce, ki uygulama açılışında olan crash'ler de yakalanabilsin.
+initSentry();
 SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 
@@ -91,25 +96,27 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#0A0A08' }}>
-      {fontsReady ? (
-        <ThemeProvider>
-          <AmbientMusicProvider>
-            <SpeechProvider>
-              <LanguageProvider>
-                <NetworkProvider>
-                  <TabPulseProvider>
-                    <RootLayoutContent />
-                  </TabPulseProvider>
-                </NetworkProvider>
-              </LanguageProvider>
-            </SpeechProvider>
-          </AmbientMusicProvider>
-        </ThemeProvider>
-      ) : null}
+      <ErrorBoundary>
+        {fontsReady ? (
+          <ThemeProvider>
+            <AmbientMusicProvider>
+              <SpeechProvider>
+                <LanguageProvider>
+                  <NetworkProvider>
+                    <TabPulseProvider>
+                      <RootLayoutContent />
+                    </TabPulseProvider>
+                  </NetworkProvider>
+                </LanguageProvider>
+              </SpeechProvider>
+            </AmbientMusicProvider>
+          </ThemeProvider>
+        ) : null}
 
-      {showSplash && (
-        <SozSplashScreen onFinish={() => setShowSplash(false)} />
-      )}
+        {showSplash && (
+          <SozSplashScreen onFinish={() => setShowSplash(false)} />
+        )}
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

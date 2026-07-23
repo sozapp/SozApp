@@ -217,7 +217,12 @@ export default function ReadingHistoryScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Pressable onPress={() => safeBack()} hitSlop={10}>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Geri git"
+          >
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
           <Text style={styles.title}>Okuma Geçmişi</Text>

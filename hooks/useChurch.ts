@@ -1,4 +1,5 @@
 import { supabase } from '@/constants/supabase';
+import { reportError } from '@/constants/sentry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -101,6 +102,7 @@ export function useChurch() {
       );
     } catch (e) {
       console.warn('[Church] loadMembers failed:', e);
+      reportError('Church.loadMembers', e);
       setMembers([]);
     }
   }, []);
@@ -131,6 +133,7 @@ export function useChurch() {
       );
     } catch (e) {
       console.warn('[Church] loadPrayers failed:', e);
+      reportError('Church.loadPrayers', e);
       setPrayers([]);
     }
   }, []);
@@ -166,6 +169,7 @@ export function useChurch() {
         .limit(1);
       if (error) {
         console.warn('[Church] refresh membership fetch:', error.message);
+        reportError('Church.refresh.membershipFetch', error);
       }
       const membership = membershipRows?.[0] ?? null;
       const groupRow = (
@@ -206,6 +210,7 @@ export function useChurch() {
     } catch (e) {
       // Çevrimdışıyken cache'ten yüklenen değer ekranda kalsın
       console.warn('[Church] refresh failed:', e);
+      reportError('Church.refresh', e);
       return null;
     } finally {
       setLoading(false);
@@ -325,6 +330,7 @@ export function useChurch() {
         }
       } catch (e) {
         console.warn('[Church] leaveGroup failed:', e);
+        reportError('Church.leaveGroup', e);
       }
     }
     setChurchState(null);
@@ -400,6 +406,7 @@ export function useChurch() {
       await loadMembers(church.id, church.planReference);
     } catch (e) {
       console.warn('[Church] toggleMyCompletion failed:', e);
+      reportError('Church.toggleMyCompletion', e);
     }
   }, [church, members, loadMembers]);
 

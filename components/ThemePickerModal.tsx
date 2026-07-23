@@ -1,8 +1,9 @@
 import { fonts } from '@/constants/theme';
-import { useTheme, themes, themeNames, type ThemeType } from '@/hooks/useTheme';
+import { useTranslation } from '@/context/LanguageContext';
+import { useTheme, themes, type ThemePaletteId, type ThemeType } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Animated,
   Modal,
@@ -10,6 +11,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useColorScheme,
   View,
 } from 'react-native';
 
@@ -18,12 +20,34 @@ export type ThemePickerModalProps = {
   onClose: () => void;
 };
 
-const SHEET_MAX = 400;
+const SHEET_MAX = 520;
+const THEME_OPTIONS: ThemeType[] = ['system', 'day', 'night', 'sepia', 'black'];
 
 export function ThemePickerModal({ visible, onClose }: ThemePickerModalProps) {
   const { activeTheme, changeTheme, colors } = useTheme();
+  const systemScheme = useColorScheme();
+  const { t } = useTranslation();
   const slideAnim = useRef(new Animated.Value(SHEET_MAX)).current;
   const closingRef = useRef(false);
+
+  const themeNames: Record<ThemeType, string> = useMemo(
+    () => ({
+      system: t('themeSystem'),
+      day: t('themeDay'),
+      night: t('themeNight'),
+      sepia: t('themeSepia'),
+      black: t('themeBlack'),
+    }),
+    [t]
+  );
+
+  const previewPalette = useCallback(
+    (themeId: ThemeType): ThemePaletteId => {
+      if (themeId === 'system') return systemScheme === 'dark' ? 'night' : 'day';
+      return themeId;
+    },
+    [systemScheme]
+  );
 
   const runClose = useCallback(() => {
     if (closingRef.current) return;
@@ -104,16 +128,16 @@ export function ThemePickerModal({ visible, onClose }: ThemePickerModalProps) {
           {...panResponder.panHandlers}
         >
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.title, { color: '#C4956A' }]}>OKUMA TEMASI</Text>
+          <Text style={[styles.title, { color: '#C4956A' }]}>{t('readingTheme').toUpperCase()}</Text>
           <View style={styles.grid}>
-            {(['day', 'night', 'sepia', 'black'] as ThemeType[]).map((t) => {
-              const thm = themes[t];
-              const isActive = activeTheme === t;
+            {THEME_OPTIONS.map((themeId) => {
+              const thm = themes[previewPalette(themeId)];
+              const isActive = activeTheme === themeId;
               return (
                 <Pressable
-                  key={t}
+                  key={themeId}
                   onPress={() => {
-                    changeTheme(t);
+                    void changeTheme(themeId);
                     try {
                       Haptics.selectionAsync();
                     } catch {
@@ -130,11 +154,11 @@ export function ThemePickerModal({ visible, onClose }: ThemePickerModalProps) {
                     },
                   ]}
                 >
-                  <Text style={styles.cardLabel}>{themeNames[t]}</Text>
+                  <Text style={styles.cardLabel}>{themeNames[themeId]}</Text>
                   <Text style={[styles.cardSample, { color: thm.text }]}>
-                    Başlangıçta Söz vardı.
+                    {t('themeSampleVerse')}
                   </Text>
-                  <Text style={styles.cardRef}>Yuhanna 1:1</Text>
+                  <Text style={styles.cardRef}>{t('themeSampleRef')}</Text>
                   {isActive && (
                     <View style={styles.checkWrap}>
                       <Ionicons name="checkmark" size={12} color="#0A0A08" />

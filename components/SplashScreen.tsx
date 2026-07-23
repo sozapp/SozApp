@@ -1,12 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, Dimensions, StyleSheet } from 'react-native';
+import { View, Text, Animated, Dimensions, StyleSheet, AccessibilityInfo } from 'react-native';
 import Svg, { Line, Path, Circle } from 'react-native-svg';
 import { fonts } from '@/constants/theme';
+import { useReduceMotion } from '@/hooks/useReduceMotion';
 
 const { width, height } = Dimensions.get('window');
 
 export default function SozSplashScreen({ onFinish }: { onFinish: () => void }) {
-  const bgOpacity = useRef(new Animated.Value(1)).current;
+  const reduceMotion = useReduceMotion();
+  const reduceMotionRef = useRef(reduceMotion);
+  reduceMotionRef.current = reduceMotion;
   const logoScale = useRef(new Animated.Value(0.3)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const glowScale = useRef(new Animated.Value(0.5)).current;
@@ -16,101 +19,152 @@ export default function SozSplashScreen({ onFinish }: { onFinish: () => void }) 
   const subtitleOpacity = useRef(new Animated.Value(0)).current;
   const lineWidth = useRef(new Animated.Value(0)).current;
   const exitOpacity = useRef(new Animated.Value(1)).current;
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
 
   useEffect(() => {
     let finished = false;
+    let cancelled = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const finish = () => {
       if (finished) return;
       finished = true;
-      onFinish();
+      onFinishRef.current();
     };
 
-    // Logo spring — 100ms
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.spring(logoScale, {
-          toValue: 1,
-          tension: 60,
-          friction: 7,
-          useNativeDriver: false,
-        }),
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-      ]).start();
-    }, 100);
+    const runReduced = () => {
+      logoScale.setValue(1);
+      logoOpacity.setValue(1);
+      glowScale.setValue(1);
+      glowOpacity.setValue(1);
+      titleOpacity.setValue(1);
+      titleY.setValue(0);
+      subtitleOpacity.setValue(1);
+      lineWidth.setValue(60);
+      timers.push(
+        setTimeout(() => {
+          Animated.timing(exitOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: false,
+          }).start(({ finished: animFinished }) => {
+            if (animFinished) finish();
+          });
+        }, 250)
+      );
+      timers.push(setTimeout(finish, 700));
+    };
 
-    // Glow — 300ms
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(glowOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: false,
-        }),
-        Animated.spring(glowScale, {
-          toValue: 1,
-          tension: 40,
-          friction: 8,
-          useNativeDriver: false,
-        }),
-      ]).start();
-    }, 300);
+    const runFull = () => {
+      // Logo spring — 100ms
+      timers.push(
+        setTimeout(() => {
+          Animated.parallel([
+            Animated.spring(logoScale, {
+              toValue: 1,
+              tension: 60,
+              friction: 7,
+              useNativeDriver: false,
+            }),
+            Animated.timing(logoOpacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: false,
+            }),
+          ]).start();
+        }, 100)
+      );
 
-    // Başlık — 500ms
-    setTimeout(() => {
-      Animated.parallel([
-        Animated.timing(titleOpacity, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: false,
-        }),
-        Animated.timing(titleY, {
-          toValue: 0,
-          duration: 350,
-          useNativeDriver: false,
-        }),
-      ]).start();
-    }, 500);
+      // Glow — 300ms
+      timers.push(
+        setTimeout(() => {
+          Animated.parallel([
+            Animated.timing(glowOpacity, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: false,
+            }),
+            Animated.spring(glowScale, {
+              toValue: 1,
+              tension: 40,
+              friction: 8,
+              useNativeDriver: false,
+            }),
+          ]).start();
+        }, 300)
+      );
 
-    // Çizgi — 750ms (useNativeDriver:false çünkü width non-transform)
-    setTimeout(() => {
-      Animated.timing(lineWidth, {
-        toValue: 60,
-        duration: 400,
-        useNativeDriver: false,
-      }).start();
-    }, 750);
+      // Başlık — 500ms
+      timers.push(
+        setTimeout(() => {
+          Animated.parallel([
+            Animated.timing(titleOpacity, {
+              toValue: 1,
+              duration: 350,
+              useNativeDriver: false,
+            }),
+            Animated.timing(titleY, {
+              toValue: 0,
+              duration: 350,
+              useNativeDriver: false,
+            }),
+          ]).start();
+        }, 500)
+      );
 
-    // Alt yazı — 900ms
-    setTimeout(() => {
-      Animated.timing(subtitleOpacity, {
-        toValue: 1,
-        duration: 350,
-        useNativeDriver: false,
-      }).start();
-    }, 900);
+      // Çizgi — 750ms (useNativeDriver:false çünkü width non-transform)
+      timers.push(
+        setTimeout(() => {
+          Animated.timing(lineWidth, {
+            toValue: 60,
+            duration: 400,
+            useNativeDriver: false,
+          }).start();
+        }, 750)
+      );
 
-    // Çıkış — 1900ms
-    setTimeout(() => {
-      Animated.timing(exitOpacity, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: false,
-      }).start(({ finished: animFinished }) => {
-        if (animFinished) finish();
-      });
-    }, 1900);
+      // Alt yazı — 900ms
+      timers.push(
+        setTimeout(() => {
+          Animated.timing(subtitleOpacity, {
+            toValue: 1,
+            duration: 350,
+            useNativeDriver: false,
+          }).start();
+        }, 900)
+      );
 
-    // Animasyon callback kaçsa bile splash ekranı asla takılı kalmasın
-    const failsafe = setTimeout(finish, 2800);
+      // Çıkış — 1900ms
+      timers.push(
+        setTimeout(() => {
+          Animated.timing(exitOpacity, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: false,
+          }).start(({ finished: animFinished }) => {
+            if (animFinished) finish();
+          });
+        }, 1900)
+      );
+
+      // Animasyon callback kaçsa bile splash ekranı asla takılı kalmasın
+      timers.push(setTimeout(finish, 2800));
+    };
+
+    // OS ayarını bekleyerek başlat — ilk frame'de false default ile full anim başlamasın
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (cancelled) return;
+      if (enabled || reduceMotionRef.current) runReduced();
+      else runFull();
+    });
+
     return () => {
-      clearTimeout(failsafe);
+      cancelled = true;
       finished = true;
+      timers.forEach(clearTimeout);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Mount'ta bir kez: OS Promise + o anki reduceMotion; yeniden başlatma yok
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

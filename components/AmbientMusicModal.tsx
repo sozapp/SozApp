@@ -1,5 +1,6 @@
-import { AMBIENT_TRACKS } from '@/hooks/useAmbientMusic';
+import { AMBIENT_TRACKS, AMBIENT_TRACK_I18N_KEYS } from '@/hooks/useAmbientMusic';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
+import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -130,6 +131,7 @@ export interface AmbientMusicModalProps {
 
 export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModalProps) {
   const { colors, fonts } = useTheme();
+  const { t } = useTranslation();
   const {
     currentTrack,
     isPlaying,
@@ -181,7 +183,9 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
 
   const playingLabel =
     isPlaying && currentTrack && currentTrack.id !== 'silence'
-      ? `♪ ${currentTrack.name} çalıyor`
+      ? t('playingNowTemplate', {
+          name: t(AMBIENT_TRACK_I18N_KEYS[currentTrack.id]?.name ?? 'soundSilence'),
+        })
       : null;
 
   return (
@@ -202,7 +206,7 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
           <View style={styles.header}>
             <View style={styles.headerTextCol}>
               <Text style={[styles.title, { color: colors.text, fontFamily: fonts.regular }]}>
-                Ortam Müziği
+                {t('ambientMusic')}
               </Text>
               {playingLabel ? (
                 <Text
@@ -220,7 +224,7 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
                     { color: colors.textSecondary, fontFamily: fonts.regular },
                   ]}
                 >
-                  Bir ses seç
+                  {t('chooseSoundShort')}
                 </Text>
               )}
               <Text
@@ -229,7 +233,7 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
                   { color: colors.textMuted, fontFamily: fonts.italic },
                 ]}
               >
-                Okurken arka plan sesi
+                {t('ambientMusicSubtitle')}
               </Text>
             </View>
             {currentTrack?.id !== 'silence' && (
@@ -325,7 +329,7 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
                         active && { color: ACCENT },
                       ]}
                     >
-                      {track.name}
+                      {t(AMBIENT_TRACK_I18N_KEYS[track.id]?.name ?? 'soundSilence')}
                     </Text>
                     <Text
                       style={[
@@ -333,7 +337,7 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
                         { color: colors.textMuted, fontFamily: fonts.italic },
                       ]}
                     >
-                      {track.desc}
+                      {t(AMBIENT_TRACK_I18N_KEYS[track.id]?.desc ?? 'soundSilenceDesc')}
                     </Text>
                     <Text
                       style={[
@@ -344,7 +348,7 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
                         },
                       ]}
                     >
-                      {isSilence ? '—' : '∞ Sonsuz'}
+                      {isSilence ? '—' : t('infiniteDurationLabel')}
                     </Text>
                   </TouchableOpacity>
                 );

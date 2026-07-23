@@ -20,6 +20,8 @@ export default {
       requiresFullScreen: false,
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
+        NSFaceIDUsageDescription:
+          'Söz, notlarınızı ve kişisel içeriklerinizi korumak için Face ID kullanır.',
         NSAppTransportSecurity: {
           NSAllowsArbitraryLoads: true,
           NSAllowsLocalNetworking: true,
@@ -37,6 +39,7 @@ export default {
       'expo-font',
       'expo-router',
       'expo-web-browser',
+      'expo-local-authentication',
       [
         'expo-notifications',
         {
@@ -44,12 +47,49 @@ export default {
           color: '#C4956A',
         },
       ],
+      '@sentry/react-native/expo',
       'expo-widgets',
       [
         './widgets/plugin',
         {
           targetName: 'DailyVerseWidget',
           bundleIdentifier: 'com.sozapp.widget',
+        },
+      ],
+      [
+        'expo-quick-actions',
+        {
+          // İlk açılıştan önce bile görünsün (static iOS actions)
+          iosActions: [
+            {
+              id: 'daily-verse',
+              title: 'Günün Ayeti',
+              subtitle: 'Bugünkü ayeti aç',
+              icon: 'symbol:sun.max',
+              params: { href: '/(tabs)' },
+            },
+            {
+              id: 'ask-soz',
+              title: "Söz'e Sor",
+              subtitle: 'İncil hakkında sor',
+              icon: 'symbol:bubble.left.and.bubble.right',
+              params: { href: '/ask' },
+            },
+            {
+              id: 'continue-plan',
+              title: 'Devam Et',
+              subtitle: 'Kaldığın yerden oku',
+              icon: 'bookmark',
+              params: { href: '/continue-plan' },
+            },
+            {
+              id: 'random-verse',
+              title: 'Rastgele Ayet',
+              subtitle: 'Paylaşılacak bir ayet',
+              icon: 'shuffle',
+              params: { href: '/random-verse' },
+            },
+          ],
         },
       ],
     ],

@@ -1048,12 +1048,16 @@ export default function MemorizeScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: 'rgba(196,149,80,0.12)' }]}>
         <TouchableOpacity onPress={() => safeBack()} style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Geri git">
           <Ionicons name="arrow-back" size={22} color={colors.textMuted} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Ezberleme</Text>
         <TouchableOpacity onPress={openAdd} style={styles.addBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Ayet ekle">
           <Ionicons name="add" size={24} color={ACCENT} />
         </TouchableOpacity>
         </View>
@@ -1441,6 +1445,8 @@ export default function MemorizeScreen() {
             onPress={() => { Speech.stop(); setView('list'); }}
             style={styles.backBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Kapat"
           >
             <Ionicons name="close" size={22} color={colors.textMuted} />
           </TouchableOpacity>
@@ -1561,7 +1567,9 @@ export default function MemorizeScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: 'rgba(196,149,80,0.12)' }]}>
         <TouchableOpacity onPress={() => setView('list')} style={styles.backBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel="Kapat">
           <Ionicons name="close" size={22} color={colors.textMuted} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Ayet Ekle</Text>

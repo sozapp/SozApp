@@ -83,7 +83,13 @@ export default function ChangePasswordScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top']}>
       <View style={styles.safeInner} {...swipeBack}>
         <View style={styles.header}>
-          <Pressable style={styles.headerLeft} onPress={() => safeBack()} hitSlop={12}>
+          <Pressable
+            style={styles.headerLeft}
+            onPress={() => safeBack()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Geri git"
+          >
             <Ionicons name="chevron-back" size={24} color={text} />
           </Pressable>
           <Text style={[styles.headerTitle, { color: text }]}>Şifremi Değiştir</Text>
@@ -113,12 +119,16 @@ export default function ChangePasswordScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!passwordVisible}
+                textContentType="newPassword"
+                autoComplete="new-password"
                 editable={!loading}
               />
               <Pressable
                 style={styles.eyeBtn}
                 onPress={() => setPasswordVisible((v) => !v)}
                 hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={passwordVisible ? 'Şifreyi gizle' : 'Şifreyi göster'}
               >
                 <Ionicons
                   name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
@@ -136,6 +146,8 @@ export default function ChangePasswordScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry={!passwordVisible}
+              textContentType="newPassword"
+              autoComplete="new-password"
               editable={!loading}
             />
 

@@ -1,3 +1,4 @@
+import { colorForUserId } from '@/constants/avatar-colors';
 import {
   activityDescription,
   bookNameToReadParams,
@@ -346,7 +347,12 @@ export default function FriendsScreen() {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
         <View style={styles.header}>
-          <Pressable onPress={() => safeBack()} hitSlop={12}>
+          <Pressable
+            onPress={() => safeBack()}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={t('back')}
+          >
             <Ionicons name="chevron-back" size={28} color={theme.text} />
           </Pressable>
           <Text style={[styles.title, { color: theme.text }]}>{t('friends')}</Text>
@@ -368,7 +374,12 @@ export default function FriendsScreen() {
     <>
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => safeBack()} hitSlop={12}>
+        <Pressable
+          onPress={() => safeBack()}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={t('back')}
+        >
           <Ionicons name="chevron-back" size={28} color={theme.text} />
         </Pressable>
         <Text style={[styles.title, { color: theme.text }]}>{t('friends')}</Text>
@@ -377,6 +388,8 @@ export default function FriendsScreen() {
             /* scroll to invite — already visible */
           }}
           hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={t('addFriendCta')}
         >
           <Ionicons name="person-add-outline" size={26} color={ACCENT} />
         </Pressable>
@@ -426,7 +439,7 @@ export default function FriendsScreen() {
             const p = profileMap[fromId];
             return (
               <View key={row.id} style={[styles.requestRow, { backgroundColor: theme.surface }]}>
-                <View style={[styles.avatar, { backgroundColor: ACCENT }]}>
+                <View style={[styles.avatar, { backgroundColor: colorForUserId(fromId) }]}>
                   <Text style={styles.avatarText}>{initials(name, p?.email ?? null)}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
@@ -435,10 +448,20 @@ export default function FriendsScreen() {
                     <Text style={[styles.friendEmail, { color: theme.textMuted }]}>{p.email}</Text>
                   ) : null}
                 </View>
-                <Pressable style={styles.acceptBtn} onPress={() => acceptRequest(row)}>
+                <Pressable
+                  style={styles.acceptBtn}
+                  onPress={() => acceptRequest(row)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('acceptCta')}
+                >
                   <Text style={styles.acceptBtnText}>{t('acceptCta')}</Text>
                 </Pressable>
-                <Pressable style={styles.rejectBtn} onPress={() => rejectRequest(row)}>
+                <Pressable
+                  style={styles.rejectBtn}
+                  onPress={() => rejectRequest(row)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('declineCta')}
+                >
                   <Text style={[styles.rejectBtnText, { color: theme.textMuted }]}>{t('declineCta')}</Text>
                 </Pressable>
               </View>
@@ -462,7 +485,7 @@ export default function FriendsScreen() {
               const unread = unreadCounts[fid] ?? 0;
               return (
                 <View key={row.id} style={[styles.friendRow, { backgroundColor: theme.surface }]}>
-                  <View style={[styles.avatar, { backgroundColor: ACCENT }]}>
+                  <View style={[styles.avatar, { backgroundColor: colorForUserId(fid) }]}>
                     <Text style={styles.avatarText}>{initials(name, p?.email ?? null)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
@@ -476,6 +499,8 @@ export default function FriendsScreen() {
                       router.push({ pathname: '/chat/[friendId]', params: { friendId: fid, friendName: name } })
                     }
                     hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('sendMessageTo')}
                   >
                     <Ionicons name="chatbubble-outline" size={20} color={ACCENT} />
                     {unread > 0 ? (
@@ -522,7 +547,7 @@ export default function FriendsScreen() {
                   style={[styles.actCard, { backgroundColor: theme.surface }]}
                   onPress={() => onActivityPress(a)}
                 >
-                  <View style={[styles.actAvatar, { backgroundColor: ACCENT }]}>
+                  <View style={[styles.actAvatar, { backgroundColor: colorForUserId(a.user_id) }]}>
                     <Text style={styles.actAvatarText}>{initials(name, p?.email ?? null)}</Text>
                   </View>
                   <Text style={[styles.actBody, { color: theme.text }]} numberOfLines={3}>

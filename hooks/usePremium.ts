@@ -1,5 +1,6 @@
 import { supabase } from '@/constants/supabase';
 import { loginRevenueCat } from '@/constants/purchases';
+import { reportError } from '@/constants/sentry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -27,7 +28,9 @@ async function readCache(): Promise<PremiumCache | null> {
     const raw = await AsyncStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as PremiumCache;
-  } catch {
+  } catch (e) {
+    console.warn('[Premium] readCache failed:', e);
+    reportError('Premium.readCache', e);
     return null;
   }
 }
@@ -36,8 +39,9 @@ async function writeCache(isPremium: boolean): Promise<void> {
   try {
     const payload: PremiumCache = { isPremium, verifiedAt: new Date().toISOString() };
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-  } catch {
-    /* ignore */
+  } catch (e) {
+    console.warn('[Premium] writeCache failed:', e);
+    reportError('Premium.writeCache', e);
   }
 }
 
@@ -45,7 +49,9 @@ async function checkRevenueCatPremium(): Promise<boolean | null> {
   try {
     const info = await Purchases.getCustomerInfo();
     return info.entitlements.active.premium !== undefined;
-  } catch {
+  } catch (e) {
+    console.warn('[Premium] checkRevenueCatPremium failed:', e);
+    reportError('Premium.checkRevenueCatPremium', e);
     return null;
   }
 }
@@ -66,7 +72,9 @@ async function checkSupabasePremium(): Promise<boolean | null> {
     if (error || !data) return null;
     const profile = data as { is_premium: boolean | null; premium_expires_at: string | null };
     return isProfilePremium(profile.is_premium, profile.premium_expires_at);
-  } catch {
+  } catch (e) {
+    console.warn('[Premium] checkSupabasePremium failed:', e);
+    reportError('Premium.checkSupabasePremium', e);
     return null;
   }
 }
@@ -94,11 +102,20 @@ export function usePremium() {
         await writeCache(merged);
         setIsPremium(merged);
       } else if (cache) {
+        console.warn(
+          '[Premium] RevenueCat and Supabase both failed to verify, falling back to cache:',
+          cache.isPremium
+        );
         setIsPremium(cache.isPremium);
       } else {
+        console.warn(
+          '[Premium] RevenueCat and Supabase both failed to verify and no cache exists, defaulting to isPremium=false'
+        );
         setIsPremium(false);
       }
-    } catch {
+    } catch (e) {
+      console.warn('[Premium] refreshPremium failed:', e);
+      reportError('Premium.refreshPremium', e);
       const cache = await readCache();
       setIsPremium(cache?.isPremium ?? false);
     } finally {
@@ -136,5 +153,6 @@ export async function syncRevenueCatWithSupabase(): Promise<void> {
     await loginRevenueCat(data.session.user.id);
   } catch (e) {
     console.warn('syncRevenueCatWithSupabase:', e);
+    reportError('Premium.syncRevenueCatWithSupabase', e);
   }
 }

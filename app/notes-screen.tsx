@@ -16,6 +16,7 @@ import {
   STORAGE_PRAYERS,
 } from '@/constants/prayer-journal';
 import { FREE_LIMITS } from '@/constants/premium';
+import { buildShareMessage, deepLinkParamsFromVerseId } from '@/constants/share-verse';
 import { colors as palette, fonts as sheetFonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
 import { useFavorites, type FavoriteItem } from '@/hooks/useFavorites';
@@ -52,6 +53,8 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { UndoToast } from '@/components/UndoToast';
+import { useUndoableDelete } from '@/hooks/useUndoableDelete';
 import { useSafeBack } from '@/hooks/useSafeBack';
 
 const STORAGE_NOTES = '@soz/notes';
@@ -171,6 +174,18 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
   const [highlights, setHighlights] = useState<HighlightsMap>({});
   const [highlightTimestamps, setHighlightTimestamps] = useState<Record<string, string>>({});
   const [prayers, setPrayers] = useState<PrayerEntry[]>([]);
+  const notesRef = useRef(notes);
+  const noteTimestampsRef = useRef(noteTimestamps);
+  const highlightsRef = useRef(highlights);
+  const highlightTimestampsRef = useRef(highlightTimestamps);
+  const prayersRef = useRef(prayers);
+  notesRef.current = notes;
+  noteTimestampsRef.current = noteTimestamps;
+  highlightsRef.current = highlights;
+  highlightTimestampsRef.current = highlightTimestamps;
+  prayersRef.current = prayers;
+
+  const { toast: undoToast, runDelete, undo: undoDelete } = useUndoableDelete();
   const [colorFilter, setColorFilter] = useState<string | null>(null);
   const [highlightSort, setHighlightSort] = useState<HighlightSort>('newest');
   const [noteSort, setNoteSort] = useState<NoteSort>('newest');
@@ -484,35 +499,101 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
     filteredPrayers.length === 0;
 
   const handleDeleteNote = useCallback(
-    async (verseId: string) => {
-      const next = { ...notes };
-      delete next[verseId];
-      setNotes(next);
-      const nextTs = { ...noteTimestamps };
+    (verseId: string) => {
+      const text = notesRef.current[verseId];
+      if (text === undefined) return;
+      const ts = noteTimestampsRef.current[verseId];
+
+      const nextNotes = { ...notesRef.current };
+      delete nextNotes[verseId];
+      const nextTs = { ...noteTimestampsRef.current };
       delete nextTs[verseId];
-      setNoteTimestamps(nextTs);
-      try {
-        await AsyncStorage.setItem(STORAGE_NOTES, JSON.stringify(next));
-        await AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(nextTs));
-      } catch (_) {}
+
+      runDelete({
+        message: t('noteDeleted'),
+        apply: () => {
+          notesRef.current = nextNotes;
+          noteTimestampsRef.current = nextTs;
+          setNotes(nextNotes);
+          setNoteTimestamps(nextTs);
+        },
+        commit: async () => {
+          const n = { ...notesRef.current };
+          delete n[verseId];
+          const tmap = { ...noteTimestampsRef.current };
+          delete tmap[verseId];
+          try {
+            await AsyncStorage.setItem(STORAGE_NOTES, JSON.stringify(n));
+            await AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(tmap));
+          } catch {
+            /* ignore */
+          }
+        },
+        restore: () => {
+          const restoredNotes = { ...notesRef.current, [verseId]: text };
+          const restoredTs =
+            ts !== undefined
+              ? { ...noteTimestampsRef.current, [verseId]: ts }
+              : { ...noteTimestampsRef.current };
+          notesRef.current = restoredNotes;
+          noteTimestampsRef.current = restoredTs;
+          setNotes(restoredNotes);
+          setNoteTimestamps(restoredTs);
+          void AsyncStorage.setItem(STORAGE_NOTES, JSON.stringify(restoredNotes));
+          void AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(restoredTs));
+        },
+      });
     },
-    [notes, noteTimestamps]
+    [runDelete, t]
   );
 
   const handleDeleteHighlight = useCallback(
-    async (verseId: string) => {
-      const next = { ...highlights };
+    (verseId: string) => {
+      const color = highlightsRef.current[verseId];
+      if (color === undefined) return;
+      const ts = highlightTimestampsRef.current[verseId];
+
+      const next = { ...highlightsRef.current };
       delete next[verseId];
-      setHighlights(next);
-      const nextMeta = { ...highlightTimestamps };
+      const nextMeta = { ...highlightTimestampsRef.current };
       delete nextMeta[verseId];
-      setHighlightTimestamps(nextMeta);
-      try {
-        await AsyncStorage.setItem(STORAGE_HIGHLIGHTS, JSON.stringify(next));
-        await AsyncStorage.setItem(STORAGE_HIGHLIGHT_TIMESTAMPS, JSON.stringify(nextMeta));
-      } catch (_) {}
+
+      runDelete({
+        message: t('highlightDeleted'),
+        apply: () => {
+          highlightsRef.current = next;
+          highlightTimestampsRef.current = nextMeta;
+          setHighlights(next);
+          setHighlightTimestamps(nextMeta);
+        },
+        commit: async () => {
+          const h = { ...highlightsRef.current };
+          delete h[verseId];
+          const meta = { ...highlightTimestampsRef.current };
+          delete meta[verseId];
+          try {
+            await AsyncStorage.setItem(STORAGE_HIGHLIGHTS, JSON.stringify(h));
+            await AsyncStorage.setItem(STORAGE_HIGHLIGHT_TIMESTAMPS, JSON.stringify(meta));
+          } catch {
+            /* ignore */
+          }
+        },
+        restore: () => {
+          const restored = { ...highlightsRef.current, [verseId]: color };
+          const restoredMeta =
+            ts !== undefined
+              ? { ...highlightTimestampsRef.current, [verseId]: ts }
+              : { ...highlightTimestampsRef.current };
+          highlightsRef.current = restored;
+          highlightTimestampsRef.current = restoredMeta;
+          setHighlights(restored);
+          setHighlightTimestamps(restoredMeta);
+          void AsyncStorage.setItem(STORAGE_HIGHLIGHTS, JSON.stringify(restored));
+          void AsyncStorage.setItem(STORAGE_HIGHLIGHT_TIMESTAMPS, JSON.stringify(restoredMeta));
+        },
+      });
     },
-    [highlights, highlightTimestamps]
+    [runDelete, t]
   );
 
   const handleSetHighlightColor = useCallback(
@@ -596,16 +677,41 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
   );
 
   const handleDeletePrayer = useCallback(
-    async (id: string) => {
-      const next = prayers.filter((p) => p.id !== id);
-      setPrayers(next);
-      await AsyncStorage.setItem(STORAGE_PRAYERS, JSON.stringify(next));
-      if (editingPrayerId === id) {
-        setPrayerModalVisible(false);
-        setEditingPrayerId(null);
-      }
+    (id: string) => {
+      const snapshot = prayersRef.current.find((p) => p.id === id);
+      if (!snapshot) return;
+
+      runDelete({
+        message: t('prayerDeleted'),
+        apply: () => {
+          const next = prayersRef.current.filter((p) => p.id !== id);
+          prayersRef.current = next;
+          setPrayers(next);
+          if (editingPrayerId === id) {
+            setPrayerModalVisible(false);
+            setEditingPrayerId(null);
+          }
+        },
+        commit: async () => {
+          const next = prayersRef.current.filter((p) => p.id !== id);
+          try {
+            await AsyncStorage.setItem(STORAGE_PRAYERS, JSON.stringify(next));
+          } catch {
+            /* ignore */
+          }
+        },
+        restore: () => {
+          if (prayersRef.current.some((p) => p.id === id)) return;
+          const next = [...prayersRef.current, snapshot].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
+          prayersRef.current = next;
+          setPrayers(next);
+          void AsyncStorage.setItem(STORAGE_PRAYERS, JSON.stringify(next));
+        },
+      });
     },
-    [prayers, editingPrayerId]
+    [runDelete, t, editingPrayerId]
   );
 
   const renderRightActions = useCallback(
@@ -707,7 +813,13 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
           {asTab ? (
             <View style={styles.backBtn} />
           ) : (
-            <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
+            <Pressable
+              onPress={() => safeBack()}
+              style={styles.backBtn}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={t('back')}
+            >
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </Pressable>
           )}
@@ -716,7 +828,13 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
           </Text>
           <View style={styles.headerRight}>
             {activeTab === 'prayers' ? (
-              <Pressable onPress={openAddPrayer} style={styles.headerIconBtn} hitSlop={10}>
+              <Pressable
+                onPress={openAddPrayer}
+                style={styles.headerIconBtn}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('addPrayer')}
+              >
                 <Ionicons name="add-outline" size={24} color={colors.text} />
               </Pressable>
             ) : (
@@ -724,6 +842,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                 onPress={() => setSearchVisible(true)}
                 style={styles.headerIconBtn}
                 hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('search')}
               >
                 <Ionicons name="search-outline" size={24} color={colors.text} />
               </Pressable>
@@ -742,7 +862,13 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
               onChangeText={setSearchQuery}
               returnKeyType="search"
             />
-            <Pressable onPress={closeSearch} style={styles.searchCloseBtn} hitSlop={8}>
+            <Pressable
+              onPress={closeSearch}
+              style={styles.searchCloseBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('close')}
+            >
               <Ionicons name="close" size={22} color={colors.textMuted} />
             </Pressable>
           </View>
@@ -794,7 +920,13 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
 
         {activeTab === 'notes' && noteEntries.length > 0 && (
           <View style={styles.toolbarRow}>
-            <Pressable onPress={() => setShowFilterModal(true)} style={styles.sortBtn} hitSlop={10}>
+            <Pressable
+              onPress={() => setShowFilterModal(true)}
+              style={styles.sortBtn}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('sortOptions')}
+            >
               <Ionicons name="options-outline" size={22} color={ACCENT} />
             </Pressable>
           </View>
@@ -956,7 +1088,11 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                   const verseText = getVerseTextByVerseId(verseId);
                   const palette = getHighlightPaletteEntry(storedColor);
                   const leftColor = highlightLeftColor(storedColor);
-                  const shareMsg = `«${verseText ?? ''}»\n\n— ${refStr}\n\nSöz Uygulaması`;
+                  const shareMsg = buildShareMessage(
+                    verseText ?? '',
+                    refStr,
+                    deepLinkParamsFromVerseId(verseId)
+                  );
                   return (
                     <View
                       key={verseId}
@@ -1014,6 +1150,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                             onPress={() => Share.share({ message: shareMsg })}
                             style={styles.cardIconBtn}
                             hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('share')}
                           >
                             <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
                           </Pressable>
@@ -1021,6 +1159,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                             onPress={() => void handleDeleteHighlight(verseId)}
                             style={styles.cardIconBtn}
                             hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('delete')}
                           >
                             <Ionicons name="trash-outline" size={18} color="#E57373" />
                           </Pressable>
@@ -1083,6 +1223,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                             void handleRemoveFavorite(fav.id);
                           }}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('removeFavorite')}
                         >
                           <Ionicons name="heart" size={16} color="#C4956A" />
                         </TouchableOpacity>
@@ -1236,8 +1378,7 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
               setShowShareOptions(false);
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               await Share.share({
-                message:
-                  `«${shareVerse.text}»\n— ${shareVerse.ref}\n\nSöz Uygulaması • sozapp.com`,
+                message: buildShareMessage(shareVerse.text, shareVerse.ref),
               });
             }}
           >
@@ -1303,6 +1444,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
               <TouchableOpacity
                 onPress={() => setShowFilterModal(false)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('close')}
               >
                 <Ionicons name="close" size={20} color={colors.textMuted} />
               </TouchableOpacity>
@@ -1363,6 +1506,12 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
         </View>
       </Modal>
       <SozAlert {...alertConfig} onDismiss={hideAlert} />
+      <UndoToast
+        visible={!!undoToast}
+        message={undoToast?.message ?? ''}
+        undoLabel={t('undo')}
+        onUndo={undoDelete}
+      />
     </SafeAreaView>
   );
 }
@@ -1389,9 +1538,15 @@ function NoteCard({
   onEditNote: (verseId: string) => void;
   renderRightActions: (onDelete: () => void) => React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const refStr = getVerseRefFromVerseId(verseId);
   const verseText = getVerseTextByVerseId(verseId);
-  const shareMsg = `«${verseText ?? ''}»\n\n— ${refStr}\n\nNot: ${noteText}\n\nSöz Uygulaması`;
+  const shareMsg = buildShareMessage(
+    verseText ?? '',
+    refStr,
+    deepLinkParamsFromVerseId(verseId),
+    { note: noteText, brandLine: 'Söz Uygulaması' }
+  );
   const refFont = fonts.italic ?? fonts.regular;
   const bodyFont = fonts.italic ?? fonts.regular;
   const tag = noteTag?.trim();
@@ -1434,13 +1589,27 @@ function NoteCard({
             onPress={() => Share.share({ message: shareMsg })}
             style={styles.noteCardActionHit}
             hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('share')}
           >
             <Ionicons name="share-outline" size={18} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={() => onEditNote(verseId)} style={styles.noteCardActionHit} hitSlop={8}>
+          <Pressable
+            onPress={() => onEditNote(verseId)}
+            style={styles.noteCardActionHit}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('editNote')}
+          >
             <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
           </Pressable>
-          <Pressable onPress={() => onDelete(verseId)} style={styles.noteCardActionHit} hitSlop={8}>
+          <Pressable
+            onPress={() => onDelete(verseId)}
+            style={styles.noteCardActionHit}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('delete')}
+          >
             <Ionicons name="trash-outline" size={18} color="#E57373" />
           </Pressable>
         </View>
@@ -1464,10 +1633,12 @@ function PrayerCard({
   onDelete: (id: string) => void;
   onAnsweredAnimationDone: () => void;
 }) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     if (prayer.answered && justAnsweredId === prayer.id) {
-      const t = setTimeout(() => onAnsweredAnimationDone(), 1200);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => onAnsweredAnimationDone(), 1200);
+      return () => clearTimeout(timer);
     }
   }, [prayer.answered, justAnsweredId, prayer.id, onAnsweredAnimationDone]);
 
@@ -1519,7 +1690,13 @@ function PrayerCard({
               <Text style={[styles.prayerStatusText, { color: theme.textMuted }]}>Devam ediyor</Text>
             </Pressable>
           )}
-          <Pressable onPress={() => onDelete(prayer.id)} style={styles.cardIconBtn} hitSlop={8}>
+          <Pressable
+            onPress={() => onDelete(prayer.id)}
+            style={styles.cardIconBtn}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('delete')}
+          >
             <Ionicons name="trash-outline" size={20} color={theme.textMuted} />
           </Pressable>
         </View>

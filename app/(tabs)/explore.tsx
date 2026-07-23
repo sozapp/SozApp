@@ -39,6 +39,9 @@ import { SozAlert } from '@/components/SozAlert'
 import { useSozAlert } from '@/hooks/useSozAlert'
 import { useDenomination } from '@/hooks/useDenomination'
 import { useTheme, type ThemeColors } from '../../hooks/useTheme'
+import { useTranslation } from '@/context/LanguageContext'
+import { useRegisterTabScrollToTop } from '@/context/ScrollToTopContext'
+import type { TranslationKey } from '@/constants/i18n'
 
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
@@ -50,56 +53,48 @@ const VERSE_SEARCH_DEBOUNCE_MS = 300;
 const VERSE_SEARCH_MIN_CHARS = 3;
 const VERSE_SEARCH_MAX_RESULTS = 8;
 
-const ALL_ITEMS = [
-  { title: 'Harita', route: '/map', icon: 'map-outline' },
-  { title: 'Okuma Planları', route: '/plans', icon: 'calendar-outline' },
-  { title: 'Kilise Grubu', route: '/church', icon: 'people-outline' },
-  { title: 'Odak Modu', route: '/focus', icon: 'moon-outline' },
-  { title: "Söz'e Sor", route: '/ask', icon: 'chatbubble-outline' },
-  { title: 'İstatistikler', route: '/stats', icon: 'bar-chart-outline' },
-  { title: 'Videolar', route: '/videos', icon: 'play-circle-outline' },
-  { title: 'Çok Dilli', route: '/(tabs)/read', icon: 'language-outline' },
-  { title: 'Kim Söyledi?', route: '/games/who-said', icon: 'help-circle-outline' },
-  { title: 'Doğru mu Yanlış mı?', route: '/games/true-false', icon: 'shuffle-outline' },
-  { title: 'Eksik Kelime', route: '/games/missing-word', icon: 'pencil-outline' },
-] as const;
+type Tx = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
-const GAMES = [
-  {
-    id: 'who-said',
-    route: '/games/who-said',
-    title: 'Kim Söyledi?',
-    desc: 'Ayeti söyleyen kişiyi bul',
-    cardIcon: 'chatbubble-outline' as keyof typeof Ionicons.glyphMap,
-    badgeKind: 'daily' as const,
-  },
-  {
-    id: 'true-false',
-    route: '/games/true-false',
-    title: 'Doğru mu Yanlış mı?',
-    desc: 'Sağa veya sola kaydır',
-    cardIcon: 'checkmark-circle-outline' as keyof typeof Ionicons.glyphMap,
-    badgeKind: 'daily' as const,
-  },
-  {
-    id: 'missing-word',
-    route: '/games/missing-word',
-    title: 'Eksik Kelime',
-    desc: 'Ayeti tamamla',
-    cardIcon: 'text-outline' as keyof typeof Ionicons.glyphMap,
-    badgeKind: 'new' as const,
-  },
-] as const;
+function getGames(t: Tx) {
+  return [
+    {
+      id: 'who-said',
+      route: '/games/who-said',
+      title: t('whoSaid'),
+      desc: t('whoSaidDesc'),
+      cardIcon: 'chatbubble-outline' as keyof typeof Ionicons.glyphMap,
+      badgeKind: 'daily' as const,
+    },
+    {
+      id: 'true-false',
+      route: '/games/true-false',
+      title: t('trueFalse'),
+      desc: t('trueFalseDesc'),
+      cardIcon: 'checkmark-circle-outline' as keyof typeof Ionicons.glyphMap,
+      badgeKind: 'daily' as const,
+    },
+    {
+      id: 'missing-word',
+      route: '/games/missing-word',
+      title: t('missingWord'),
+      desc: t('missingWordDesc'),
+      cardIcon: 'text-outline' as keyof typeof Ionicons.glyphMap,
+      badgeKind: 'new' as const,
+    },
+  ] as const;
+}
 
-const TOOLS_GRID = [
-  { key: 'plans', icon: 'calendar-outline', title: 'Okuma Planları', desc: '30 günde NT', route: '/plans' },
-  { key: 'ask', icon: 'chatbubble-ellipses-outline', title: "Söz'e Sor", desc: 'AI İncil rehberi', route: '/ask' },
-  { key: 'memorize', icon: 'school-outline', title: 'Ezberleme', desc: 'Ayet ezberle', route: '/memorize' },
-  { key: 'church', icon: 'people-outline', title: 'Kilise Grubu', desc: 'Birlikte oku', route: '/church' },
-  { key: 'multilang', icon: 'language-outline', title: 'Çok Dilli', desc: '7 dil desteği', route: '/(tabs)/read' },
-  { key: 'stats', icon: 'bar-chart-outline', title: 'İstatistikler', desc: 'İlerlemeni gör', route: '/stats' },
-  { key: 'videos', icon: 'play-circle-outline', title: 'Videolar', desc: 'Bible Project özetleri', route: '/videos' },
-] as const;
+function getToolsGrid(t: Tx) {
+  return [
+    { key: 'plans', icon: 'calendar-outline', title: t('readingPlansTitle'), desc: t('readingPlans30DaysDesc'), route: '/plans' },
+    { key: 'ask', icon: 'chatbubble-ellipses-outline', title: t('askSoz'), desc: t('askSozToolDesc'), route: '/ask' },
+    { key: 'memorize', icon: 'school-outline', title: t('memorizeTitle'), desc: t('memorizeToolDesc'), route: '/memorize' },
+    { key: 'church', icon: 'people-outline', title: t('churchGroup'), desc: t('churchGroupToolDesc'), route: '/church' },
+    { key: 'multilang', icon: 'language-outline', title: t('multiLangTitle'), desc: t('multiLangToolDesc'), route: '/(tabs)/read' },
+    { key: 'stats', icon: 'bar-chart-outline', title: t('statistics'), desc: t('statisticsToolDesc'), route: '/stats' },
+    { key: 'videos', icon: 'play-circle-outline', title: t('videosTitle'), desc: t('videosToolDesc'), route: '/videos' },
+  ] as const;
+}
 
 const toolColors = {
   plans: '#C4956A',
@@ -111,18 +106,22 @@ const toolColors = {
   videos: '#B88A6A',
 } as const;
 
-const QUICK_ACCESS = [
-  { icon: 'moon-outline', label: 'Odak', route: '/focus', color: '#6BA3BE' },
-  { icon: 'map-outline', label: 'Harita', route: '/map', color: '#7CB87C' },
-  { icon: 'chatbubble-ellipses-outline', label: "Söz'e Sor", route: '/ask', color: ACCENT },
-  { icon: 'bar-chart-outline', label: 'İstatistik', route: '/stats', color: '#9B8BB8' },
-] as const;
+function getQuickAccess(t: Tx) {
+  return [
+    { icon: 'moon-outline', label: t('quickFocusLabel'), route: '/focus', color: '#6BA3BE' },
+    { icon: 'map-outline', label: t('map'), route: '/map', color: '#7CB87C' },
+    { icon: 'chatbubble-ellipses-outline', label: t('askSoz'), route: '/ask', color: ACCENT },
+    { icon: 'bar-chart-outline', label: t('quickStatsLabel'), route: '/stats', color: '#9B8BB8' },
+  ] as const;
+}
 
-const HOLIDAYS = [
-  { name: 'Paskalya', date: new Date(2026, 3, 5) },
-  { name: 'Noel', date: new Date(2026, 11, 25) },
-  { name: 'Epifani', date: new Date(2026, 0, 6) },
-] as const;
+function getHolidays(t: Tx) {
+  return [
+    { name: t('holidayEaster'), date: new Date(2026, 3, 5) },
+    { name: t('holidayChristmas'), date: new Date(2026, 11, 25) },
+    { name: t('holidayEpiphany'), date: new Date(2026, 0, 6) },
+  ] as const;
+}
 
 function itemMatches(q: string, ...parts: (string | number | undefined | null)[]): boolean {
   if (!q) return true;
@@ -139,10 +138,10 @@ function quickRouteActive(pathname: string, route: string): boolean {
   return pathname.toLowerCase().includes(key);
 }
 
-function watchCardBadgeLabel(item: WatchItem): 'ÖNERİ' | 'YENİ' | 'KISA' | null {
-  if (item.mustWatch) return 'ÖNERİ';
-  if (item.type === 'kısa') return 'KISA';
-  return 'YENİ';
+function watchCardBadgeLabel(item: WatchItem, t: Tx): string {
+  if (item.mustWatch) return t('watchRecommendedBadge');
+  if (item.type === 'kısa') return t('watchFilterShort').toLocaleUpperCase('tr-TR');
+  return t('newBadge');
 }
 
 function WatchCardPoster({
@@ -191,7 +190,12 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { refreshDenomination } = useDenomination();
+  const { t } = useTranslation();
   const styles = useMemo(() => makeStyles(colors, fonts), [colors]);
+  const GAMES = useMemo(() => getGames(t), [t]);
+  const TOOLS_GRID = useMemo(() => getToolsGrid(t), [t]);
+  const QUICK_ACCESS = useMemo(() => getQuickAccess(t), [t]);
+  const HOLIDAYS = useMemo(() => getHolidays(t), [t]);
   const [searchText, setSearchText] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [watchFilter, setWatchFilter] = useState<'all' | WatchItem['type']>('all');
@@ -202,6 +206,11 @@ export default function ExploreScreen() {
   const { alertConfig, hideAlert } = useSozAlert();
   const [shareRandomText, setShareRandomText] = useState('');
   const [shareRandomRef, setShareRandomRef] = useState('');
+  const [shareRandomLink, setShareRandomLink] = useState<{
+    bookId: string;
+    chapter: number;
+    verse: number;
+  } | null>(null);
   const [gameStreaks, setGameStreaks] = useState<Record<string, number>>({
     'who-said': 0,
     'true-false': 0,
@@ -214,6 +223,7 @@ export default function ExploreScreen() {
   });
   const [refreshing, setRefreshing] = useState(false);
   const gamesScrollRef = useRef<ScrollView | null>(null);
+  const exploreScrollRef = useRegisterTabScrollToTop<ScrollView>('explore');
 
   const fetchExploreSnapshot = useCallback(async () => {
     await refreshDenomination();
@@ -225,7 +235,7 @@ export default function ExploreScreen() {
     }
     const ids = await getWatchFavoriteIds();
     return { streaks, done, ids };
-  }, [refreshDenomination]);
+  }, [refreshDenomination, GAMES]);
 
   useFocusEffect(
     useCallback(() => {
@@ -356,11 +366,11 @@ export default function ExploreScreen() {
         route: g.route,
         icon: g.cardIcon,
       })),
-      ...TOOLS_GRID.filter((t) => t.title.toLowerCase().includes(needle)).map((t) => ({
+      ...TOOLS_GRID.filter((tool) => tool.title.toLowerCase().includes(needle)).map((tool) => ({
         type: 'tool' as const,
-        title: t.title,
-        route: t.route,
-        icon: t.icon as keyof typeof Ionicons.glyphMap,
+        title: tool.title,
+        route: tool.route,
+        icon: tool.icon as keyof typeof Ionicons.glyphMap,
       })),
       ...WATCH_CONTENT.filter((w) => w.title.toLowerCase().includes(needle)).map((w) => ({
         type: 'watch' as const,
@@ -369,22 +379,22 @@ export default function ExploreScreen() {
         item: w,
       })),
     ];
-  }, [isSearching, searchText]);
+  }, [isSearching, searchText, GAMES, TOOLS_GRID]);
 
   const quickFiltered = useMemo(() => {
     if (!isSearching) return [...QUICK_ACCESS];
     return QUICK_ACCESS.filter((e) => itemMatches(q, e.label));
-  }, [isSearching, q]);
+  }, [isSearching, q, QUICK_ACCESS]);
 
   const gameItems = useMemo(() => {
     if (!isSearching) return [...GAMES];
     const filtered = GAMES.filter((g) =>
-      itemMatches(q, g.title, g.desc, g.badgeKind === 'daily' ? 'GÜNLÜK' : 'YENİ')
+      itemMatches(q, g.title, g.desc, g.badgeKind === 'daily' ? t('dailyBadge') : t('newBadge'))
     );
     if (filtered.length > 0) return filtered;
-    if (itemMatches(q, 'Günlük Oyunlar', 'Her gün yeni sorular')) return [...GAMES];
+    if (itemMatches(q, t('dailyGamesTitle'), t('dailyGamesSubtitle'))) return [...GAMES];
     return [];
-  }, [isSearching, q]);
+  }, [isSearching, q, GAMES, t]);
 
   const filteredWatchContent = useMemo(() => {
     if (watchFilter === 'all') return WATCH_CONTENT
@@ -410,37 +420,37 @@ export default function ExploreScreen() {
     if (
       itemMatches(
         q,
-        'İzle & Keşfet',
-        'Film dizi animasyon belgesel kısa video',
-        'Tümü',
-        'Dizi',
-        'Film',
-        'Animasyon',
-        'Kısa Video',
-        'Belgesel'
+        t('watchExploreTitle'),
+        t('watchExploreSubtitle'),
+        t('watchFilterAll'),
+        t('watchFilterSeries'),
+        t('watchFilterMovie'),
+        t('watchFilterAnimation'),
+        t('watchFilterShort'),
+        t('watchFilterDocumentary')
       )
     ) {
       return filteredWatchContent;
     }
     return [];
-  }, [isSearching, q, filteredWatchContent]);
+  }, [isSearching, q, filteredWatchContent, t]);
 
   const toolsFiltered = useMemo(() => {
     if (!isSearching) return [...TOOLS_GRID];
-    const filtered = TOOLS_GRID.filter((t) => itemMatches(q, t.title, t.desc));
+    const filtered = TOOLS_GRID.filter((tool) => itemMatches(q, tool.title, tool.desc));
     if (filtered.length > 0) return filtered;
-    if (itemMatches(q, 'Araçlar', 'Büyümek için')) return [...TOOLS_GRID];
+    if (itemMatches(q, t('toolsTitle'), t('toolsSubtitle'))) return [...TOOLS_GRID];
     return [];
-  }, [isSearching, q]);
+  }, [isSearching, q, TOOLS_GRID, t]);
 
   const showFeaturedMap = useMemo(() => {
     if (!isSearching) return true;
     if (
       itemMatches(
         q,
-        'ANADOLU HARİTASI',
-        'İncil Türkiyede Yaşandı',
-        '12 kutsal yer',
+        t('anatoliaMapBadge'),
+        t('anatoliaMapCardTitle'),
+        t('anatoliaMapCardDesc'),
         'harita',
         'anadolu',
         'keşfet',
@@ -452,22 +462,22 @@ export default function ExploreScreen() {
     )
       return true;
     return false;
-  }, [isSearching, q]);
+  }, [isSearching, q, t]);
 
   const showFeaturedCal = useMemo(() => {
     if (!isSearching) return true;
-    return itemMatches(q, 'Yaklaşan', 'Kutsal Günler', 'kutsal gün', 'takvim', 'calendar');
-  }, [isSearching, q]);
+    return itemMatches(q, t('holyDaysCardTitle'), 'yaklaşan', 'kutsal gün', 'takvim', 'calendar');
+  }, [isSearching, q, t]);
 
   const showFeaturedRand = useMemo(() => {
     if (!isSearching) return true;
-    return itemMatches(q, 'Bugün', 'Rastgele Ayet', 'rastgele', 'ayet');
-  }, [isSearching, q]);
+    return itemMatches(q, t('randomVerseCardTitle'), 'bugün', 'rastgele', 'ayet');
+  }, [isSearching, q, t]);
 
   const learnHeaderMatch = useMemo(() => {
     if (!isSearching) return false;
-    return itemMatches(q, 'Öğren & Keşfet', 'Öğren ve Keşfet', 'Anadolu tarih kültür');
-  }, [isSearching, q]);
+    return itemMatches(q, t('learnExploreTitle'), 'öğren ve keşfet', 'anadolu tarih kültür');
+  }, [isSearching, q, t]);
 
   const forceShowAllFeatured = useMemo(
     () =>
@@ -502,11 +512,11 @@ export default function ExploreScreen() {
     const nextHoliday = [...HOLIDAYS]
       .filter((h) => h.date > now)
       .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
-    if (!nextHoliday) return 'Kilise takvimine göz at';
+    if (!nextHoliday) return t('holyDaysDefaultSubtitle');
     const dayMs = 24 * 60 * 60 * 1000;
     const daysLeft = Math.max(0, Math.ceil((nextHoliday.date.getTime() - now.getTime()) / dayMs));
-    return `${nextHoliday.name} · ${daysLeft} gün kaldı`;
-  }, []);
+    return t('holyDaysCountdown', { name: nextHoliday.name, days: daysLeft });
+  }, [HOLIDAYS, t]);
 
   const exploreScrollPadding = useMemo(
     () => ({
@@ -519,6 +529,7 @@ export default function ExploreScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
+        ref={exploreScrollRef}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         contentContainerStyle={[styles.exploreScrollContent, exploreScrollPadding]}
@@ -533,8 +544,8 @@ export default function ExploreScreen() {
       >
         <View style={styles.exploreSection}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Keşfet</Text>
-            <Text style={styles.headerSubtitle}>Ne öğrenmek istiyorsun?</Text>
+            <Text style={styles.headerTitle}>{t('exploreHeaderTitle')}</Text>
+            <Text style={styles.headerSubtitle}>{t('exploreHeaderSubtitle')}</Text>
           </View>
 
           <View style={styles.searchWrap}>
@@ -542,7 +553,7 @@ export default function ExploreScreen() {
               <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Özellik ve içerik ara..."
+                placeholder={t('exploreSearchPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={searchText}
                 onChangeText={setSearchText}
@@ -550,7 +561,11 @@ export default function ExploreScreen() {
                 onBlur={() => setSearchFocused(false)}
               />
               {searchText.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchText('')}>
+                <TouchableOpacity
+                  onPress={() => setSearchText('')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('clearSearch')}
+                >
                   <Ionicons name="close-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
@@ -562,8 +577,8 @@ export default function ExploreScreen() {
           <View style={styles.exploreSection}>
             <View style={styles.searchEmpty}>
               <Ionicons name="search-outline" size={48} color={colors.border} />
-              <Text style={styles.searchEmptyText}>"{searchText}" için sonuç bulunamadı</Text>
-              <Text style={styles.searchEmptySubText}>Farklı bir kelime dene</Text>
+              <Text style={styles.searchEmptyText}>{t('noResultsForQuery', { query: searchText })}</Text>
+              <Text style={styles.searchEmptySubText}>{t('tryDifferentWord')}</Text>
             </View>
           </View>
         )}
@@ -599,8 +614,8 @@ export default function ExploreScreen() {
         {isSearching && showVerseResults && verseResults.length > 0 && (
           <View style={styles.exploreSection}>
             <SectionHeader
-              title="Ayetlerde Bulunanlar"
-              subtitle={`Yeni Ahit'te "${searchText.trim()}" için eşleşen ayetler`}
+              title={t('verseResultsTitle')}
+              subtitle={t('verseResultsSubtitle', { query: searchText.trim() })}
               styles={styles}
             />
             <View style={styles.verseSearchResults}>
@@ -656,8 +671,8 @@ export default function ExploreScreen() {
         {!isSearching && gameItems.length > 0 && (
           <View style={styles.exploreSection}>
             <SectionHeader
-              title="Günlük Oyunlar"
-              subtitle="Her gün yeni sorular"
+              title={t('dailyGamesTitle')}
+              subtitle={t('dailyGamesSubtitle')}
               styles={styles}
             />
             <ScrollView
@@ -684,7 +699,7 @@ export default function ExploreScreen() {
                     {completed ? (
                       <View style={styles.gameCardOverlay} pointerEvents="none">
                         <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
-                        <Text style={styles.gameCardOverlayText}>Tamamlandı</Text>
+                        <Text style={styles.gameCardOverlayText}>{t('gameCompletedBadge')}</Text>
                       </View>
                     ) : null}
 
@@ -701,7 +716,7 @@ export default function ExploreScreen() {
                             daily ? styles.gameTopBadgeTextDaily : styles.gameTopBadgeTextNew,
                           ]}
                         >
-                          {daily ? 'GÜNLÜK' : 'YENİ'}
+                          {daily ? t('dailyBadge') : t('newBadge')}
                         </Text>
                       </View>
 
@@ -732,8 +747,8 @@ export default function ExploreScreen() {
         {!isSearching && watchItemsForList.length > 0 && (
           <View style={styles.exploreSection}>
             <SectionHeader
-              title="İzle & Keşfet"
-              subtitle="Film, dizi, animasyon"
+              title={t('watchExploreTitle')}
+              subtitle={t('watchExploreSubtitle')}
               styles={styles}
             />
 
@@ -745,12 +760,12 @@ export default function ExploreScreen() {
                   contentContainerStyle={styles.watchFilters}
                 >
                   {([
-                    { key: 'all', label: 'Tümü' },
-                    { key: 'dizi', label: 'Dizi' },
-                    { key: 'film', label: 'Film' },
-                    { key: 'animasyon', label: 'Animasyon' },
-                    { key: 'kısa', label: 'Kısa' },
-                    { key: 'belgesel', label: 'Belgesel' },
+                    { key: 'all', label: t('watchFilterAll') },
+                    { key: 'dizi', label: t('watchFilterSeries') },
+                    { key: 'film', label: t('watchFilterMovie') },
+                    { key: 'animasyon', label: t('watchFilterAnimation') },
+                    { key: 'kısa', label: t('watchFilterShort') },
+                    { key: 'belgesel', label: t('watchFilterDocumentary') },
                   ] as const).map((f) => (
                     <TouchableOpacity
                       key={f.key}
@@ -770,7 +785,7 @@ export default function ExploreScreen() {
                 </ScrollView>
 
                 <View style={styles.watchMustBadge}>
-                  <Text style={styles.watchMustText}>🔥 {mustWatchItems.length} öneri</Text>
+                  <Text style={styles.watchMustText}>🔥 {t('watchRecommendedCount', { count: mustWatchItems.length })}</Text>
                 </View>
               </>
             )}
@@ -782,7 +797,7 @@ export default function ExploreScreen() {
               decelerationRate="fast"
             >
               {watchItemsForList.map((item) => {
-                const badge = watchCardBadgeLabel(item);
+                const badge = watchCardBadgeLabel(item, t);
                 return (
                   <TouchableOpacity
                     key={item.id}
@@ -821,8 +836,8 @@ export default function ExploreScreen() {
         {!isSearching && hasLearnHit && (
           <View style={styles.exploreSection}>
             <SectionHeader
-              title="Öğren & Keşfet"
-              subtitle="Anadolu, tarih, kültür"
+              title={t('learnExploreTitle')}
+              subtitle={t('learnExploreSubtitle')}
               styles={styles}
               subtitleNoGap
             />
@@ -837,11 +852,11 @@ export default function ExploreScreen() {
                   <Text style={styles.featuredEmoji}>🗺️</Text>
                 </View>
                 <View style={styles.featuredContent}>
-                  <Text style={styles.featuredLabel}>ANADOLU HARİTASI</Text>
-                  <Text style={styles.featuredTitle}>İncil Türkiye'de{'\n'}Yaşandı</Text>
-                  <Text style={styles.featuredDesc}>12 kutsal yer, her birinin hikayesi</Text>
+                  <Text style={styles.featuredLabel}>{t('anatoliaMapBadge')}</Text>
+                  <Text style={styles.featuredTitle}>{t('anatoliaMapCardTitle')}</Text>
+                  <Text style={styles.featuredDesc}>{t('anatoliaMapCardDesc')}</Text>
                   <View style={styles.featuredBtn}>
-                    <Text style={styles.featuredBtnText}>Keşfet</Text>
+                    <Text style={styles.featuredBtnText}>{t('exploreHeaderTitle')}</Text>
                     <Ionicons name="arrow-forward" size={12} color={ACCENT} />
                   </View>
                 </View>
@@ -859,7 +874,7 @@ export default function ExploreScreen() {
                     <View style={styles.learnTwinInner}>
                       <Ionicons name="calendar-outline" size={28} color={ACCENT} />
                       <View style={styles.learnTwinTextCol}>
-                        <Text style={styles.learnTwinTitle}>Kutsal Günler</Text>
+                        <Text style={styles.learnTwinTitle}>{t('holyDaysCardTitle')}</Text>
                         <Text style={styles.learnTwinSubtitle} numberOfLines={2}>
                           {nextHolyDaySubtitle}
                         </Text>
@@ -877,6 +892,11 @@ export default function ExploreScreen() {
                       if (r) {
                         setShareRandomText(r.verseText);
                         setShareRandomRef(r.verseRef);
+                        setShareRandomLink(
+                          r.bookId
+                            ? { bookId: r.bookId, chapter: r.chapter, verse: r.verse }
+                            : null
+                        );
                         setShareRandomVisible(true);
                       }
                     }}
@@ -885,9 +905,9 @@ export default function ExploreScreen() {
                     <View style={styles.learnTwinInner}>
                       <Ionicons name="shuffle-outline" size={28} color="#7C9A8A" />
                       <View style={styles.learnTwinTextCol}>
-                        <Text style={styles.learnTwinTitle}>Rastgele Ayet</Text>
+                        <Text style={styles.learnTwinTitle}>{t('randomVerseCardTitle')}</Text>
                         <Text style={styles.learnTwinSubtitle} numberOfLines={2}>
-                          Her dokunuşta yeni bir ayet
+                          {t('randomVerseCardDesc')}
                         </Text>
                       </View>
                     </View>
@@ -900,7 +920,7 @@ export default function ExploreScreen() {
 
         {!isSearching && toolsFiltered.length > 0 && (
           <View style={styles.exploreSection}>
-            <SectionHeader title="Araçlar" subtitle="Büyümek için" styles={styles} />
+            <SectionHeader title={t('toolsTitle')} subtitle={t('toolsSubtitle')} styles={styles} />
             <View style={styles.toolsGrid}>
               {toolsFiltered.map((tool, i) => (
                 <TouchableOpacity
@@ -960,7 +980,7 @@ export default function ExploreScreen() {
                     }}
                   >
                     <Ionicons name="play-circle-outline" size={20} color={ACCENT_LIGHT} />
-                    <Text style={styles.watchModalPrimaryBtnText}>İzle</Text>
+                    <Text style={styles.watchModalPrimaryBtnText}>{t('watchBtnPlay')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.watchModalSecondaryBtn}
@@ -979,13 +999,13 @@ export default function ExploreScreen() {
                       }
                     />
                     <Text style={styles.watchModalSecondaryBtnText}>
-                      {watchFavoriteIds.includes(selectedWatch.id) ? 'Favorilerden çıkar' : 'Favoriye ekle'}
+                      {watchFavoriteIds.includes(selectedWatch.id) ? t('removeFromFavorites') : t('addToFavorites')}
                     </Text>
                   </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity style={styles.watchCloseBtn} onPress={() => setShowWatchModal(false)}>
-                  <Text style={styles.watchCloseBtnText}>Kapat</Text>
+                  <Text style={styles.watchCloseBtnText}>{t('watchBtnClose')}</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -999,6 +1019,7 @@ export default function ExploreScreen() {
         onClose={() => setShareRandomVisible(false)}
         verseText={shareRandomText}
         verseRef={shareRandomRef}
+        deepLinkParams={shareRandomLink}
       />
     </View>
   );
@@ -1016,19 +1037,22 @@ const SectionHeader = ({
   styles: ReturnType<typeof makeStyles>;
   onMore?: () => void;
   subtitleNoGap?: boolean;
-}) => (
-  <View style={styles.sectionHeader}>
-    <View>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={[styles.sectionSubtitle, subtitleNoGap && styles.sectionSubtitleNoGap]}>{subtitle}</Text>
+}) => {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.sectionHeader}>
+      <View>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={[styles.sectionSubtitle, subtitleNoGap && styles.sectionSubtitleNoGap]}>{subtitle}</Text>
+      </View>
+      {onMore ? (
+        <TouchableOpacity onPress={onMore}>
+          <Text style={styles.sectionMore}>{t('moreLink')}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
-    {onMore ? (
-      <TouchableOpacity onPress={onMore}>
-        <Text style={styles.sectionMore}>Tümü →</Text>
-      </TouchableOpacity>
-    ) : null}
-  </View>
-);
+  );
+};
 
 type AppFonts = typeof appFonts;
 

@@ -539,6 +539,8 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
           onPress={() => safeBack()}
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityRole="button"
+          accessibilityLabel="Geri git"
         >
           <Ionicons name="arrow-back" size={22} color={colors.textMuted} />
         </TouchableOpacity>

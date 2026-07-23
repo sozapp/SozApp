@@ -191,6 +191,8 @@ export default function AuthScreen() {
           style={styles.headerLeft}
           hitSlop={12}
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)'))}
+          accessibilityRole="button"
+          accessibilityLabel="Geri git"
         >
           <Ionicons name="arrow-back" size={22} color={text} />
         </Pressable>
@@ -251,6 +253,8 @@ export default function AuthScreen() {
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
+            textContentType="emailAddress"
+            autoComplete="email"
             editable={!loading}
           />
 
@@ -267,12 +271,16 @@ export default function AuthScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!passwordVisible}
+              textContentType={mode === 'signup' ? 'newPassword' : 'password'}
+              autoComplete={mode === 'signup' ? 'new-password' : 'password'}
               editable={!loading}
             />
             <Pressable
               style={styles.eyeBtn}
               onPress={() => setPasswordVisible((v) => !v)}
               hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={passwordVisible ? 'Şifreyi gizle' : 'Şifreyi göster'}
             >
               <Ionicons
                 name={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
