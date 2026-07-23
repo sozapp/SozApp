@@ -16,11 +16,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeBack } from '@/hooks/useSafeBack';
+import { markGameCompletedToday } from '@/constants/game-storage';
+import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { GameLeaderboardModal } from '@/components/GameLeaderboardModal';
 
 const ACCENT = '#C4956A';
 const SUCCESS = '#4CAF50';
 const DANGER = '#E57373';
 const STREAK_KEY = '@soz/game/missing-word/streak';
+const GAME_ID = 'missing-word';
 
 type VerseQuestion = {
   template: string;
@@ -144,9 +148,18 @@ export default function MissingWord() {
   const [streak, setStreak] = useState(0);
   const [questions, setQuestions] = useState<VerseQuestion[]>(() => pickQuestions());
   const [locked, setLocked] = useState(false);
+  const [leaderboardVisible, setLeaderboardVisible] = useState(false);
+  const { submitScore } = useLeaderboard(GAME_ID);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const fillWordAnim = useRef(new Animated.Value(0)).current;
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    };
+  }, []);
 
   const totalQuestions = questions.length;
   const current = questions[currentIndex];
@@ -198,6 +211,8 @@ export default function MissingWord() {
       const finalScore = wasCorrect ? score + 1 : score;
       const nextStreak = finalScore >= 8 ? streak + 1 : 0;
       await saveStreak(nextStreak);
+      await markGameCompletedToday(GAME_ID);
+      void submitScore(finalScore);
       setGameOver(true);
       return;
     }
@@ -222,7 +237,8 @@ export default function MissingWord() {
       }).start();
     }
 
-    setTimeout(() => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    advanceTimer.current = setTimeout(() => {
       void goNext(correct);
     }, 850);
   };
@@ -369,6 +385,16 @@ export default function MissingWord() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => setLeaderboardVisible(true)}
+              activeOpacity={0.9}
+            >
+              <Ionicons name="trophy-outline" size={16} color={colors.text} />
+              <Text style={[styles.secondaryBtnText, { color: colors.text, fontFamily: fonts.regular }]}>
+                Liderlik Tablosu
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
               onPress={() => router.push('/(tabs)' as never)}
               activeOpacity={0.9}
             >
@@ -379,6 +405,12 @@ export default function MissingWord() {
           </View>
         )}
       </ScrollView>
+      <GameLeaderboardModal
+        visible={leaderboardVisible}
+        onClose={() => setLeaderboardVisible(false)}
+        gameId={GAME_ID}
+        title="Eksik Kelime — Liderlik"
+      />
     </SafeAreaView>
   );
 }
@@ -488,7 +520,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   secondaryBtnText: { fontSize: 15 },
 });

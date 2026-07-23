@@ -50,6 +50,7 @@ const ALL_ITEMS = [
   { title: 'Odak Modu', route: '/focus', icon: 'moon-outline' },
   { title: "Söz'e Sor", route: '/ask', icon: 'chatbubble-outline' },
   { title: 'İstatistikler', route: '/stats', icon: 'bar-chart-outline' },
+  { title: 'Videolar', route: '/videos', icon: 'play-circle-outline' },
   { title: 'Çok Dilli', route: '/(tabs)/read', icon: 'language-outline' },
   { title: 'Kim Söyledi?', route: '/games/who-said', icon: 'help-circle-outline' },
   { title: 'Doğru mu Yanlış mı?', route: '/games/true-false', icon: 'shuffle-outline' },
@@ -90,6 +91,7 @@ const TOOLS_GRID = [
   { key: 'church', icon: 'people-outline', title: 'Kilise Grubu', desc: 'Birlikte oku', route: '/church' },
   { key: 'multilang', icon: 'language-outline', title: 'Çok Dilli', desc: '7 dil desteği', route: '/(tabs)/read' },
   { key: 'stats', icon: 'bar-chart-outline', title: 'İstatistikler', desc: 'İlerlemeni gör', route: '/stats' },
+  { key: 'videos', icon: 'play-circle-outline', title: 'Videolar', desc: 'Bible Project özetleri', route: '/videos' },
 ] as const;
 
 const toolColors = {
@@ -99,6 +101,7 @@ const toolColors = {
   church: '#8A8A9A',
   multilang: '#7C8A9A',
   stats: '#8A9A7C',
+  videos: '#B88A6A',
 } as const;
 
 const QUICK_ACCESS = [

@@ -16,11 +16,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeBack } from '@/hooks/useSafeBack';
+import { markGameCompletedToday } from '@/constants/game-storage';
+import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { GameLeaderboardModal } from '@/components/GameLeaderboardModal';
 
 const ACCENT = '#C4956A';
 const SUCCESS = '#4CAF50';
 const DANGER = '#E57373';
 const STREAK_KEY = '@soz/game/who-said/streak';
+const GAME_ID = 'who-said';
 
 type Question = {
   verse: string;
@@ -70,6 +74,8 @@ export default function WhoSaid() {
   const [streak, setStreak] = useState(0);
   const [questions, setQuestions] = useState<Question[]>(() => pickQuestions());
   const [locked, setLocked] = useState(false);
+  const [leaderboardVisible, setLeaderboardVisible] = useState(false);
+  const { submitScore } = useLeaderboard(GAME_ID);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -143,9 +149,10 @@ export default function WhoSaid() {
     if (!selectedAnswer) return;
     const isLast = currentIndex >= totalQuestions - 1;
     if (isLast) {
-      const finalScore = selectedAnswer === currentQuestion.correct ? score : score;
-      const nextStreak = finalScore >= 8 ? streak + 1 : 0;
+      const nextStreak = score >= 8 ? streak + 1 : 0;
       await persistStreak(nextStreak);
+      await markGameCompletedToday(GAME_ID);
+      void submitScore(score);
       setGameOver(true);
       return;
     }
@@ -281,6 +288,16 @@ export default function WhoSaid() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+              onPress={() => setLeaderboardVisible(true)}
+              activeOpacity={0.9}
+            >
+              <Ionicons name="trophy-outline" size={16} color={colors.text} />
+              <Text style={[styles.secondaryBtnText, { color: colors.text, fontFamily: fonts.regular }]}>
+                Liderlik Tablosu
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
               onPress={() => router.push('/(tabs)' as never)}
               activeOpacity={0.9}
             >
@@ -291,6 +308,12 @@ export default function WhoSaid() {
           </View>
         )}
       </ScrollView>
+      <GameLeaderboardModal
+        visible={leaderboardVisible}
+        onClose={() => setLeaderboardVisible(false)}
+        gameId={GAME_ID}
+        title="Kim Söyledi? — Liderlik"
+      />
     </SafeAreaView>
   );
 }
@@ -378,7 +401,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   secondaryBtnText: { fontSize: 15 },
 });

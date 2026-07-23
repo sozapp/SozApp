@@ -495,3 +495,51 @@ ALTER TABLE church_prayers ADD CONSTRAINT church_prayers_user_id_fkey FOREIGN KE
 
 ALTER TABLE church_plan_completions DROP CONSTRAINT IF EXISTS church_plan_completions_user_id_fkey;
 ALTER TABLE church_plan_completions ADD CONSTRAINT church_plan_completions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- Keşfet oyunları liderlik tablosu. Kullanıcı başına oyun başına tek satır
+-- (en yüksek skor tutulur) — church_group_members ile aynı desen: display_name
+-- satıra denormalize edilir, profiles tablosuna herkese açık okuma izni
+-- vermeye gerek kalmaz. Yazma sadece submit_game_score() RPC'si üzerinden
+-- yapılır ki skor artışı (GREATEST) atomik ve sahtecilik client'tan rastgele
+-- bir sayı yollayarak değil sadece gerçek oyun akışından mümkün olsun.
+CREATE TABLE IF NOT EXISTS game_scores (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users NOT NULL,
+  game_id TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  best_score INTEGER NOT NULL DEFAULT 0,
+  best_score_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, game_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_scores_leaderboard
+  ON game_scores(game_id, best_score DESC);
+
+ALTER TABLE game_scores ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "game_scores_select" ON game_scores;
+CREATE POLICY "game_scores_select" ON game_scores FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+-- Doğrudan INSERT/UPDATE politikası yok — tüm yazmalar submit_game_score()
+-- SECURITY DEFINER fonksiyonu üzerinden, RLS'i bilinçli olarak atlayarak yapılır.
+
+CREATE OR REPLACE FUNCTION public.submit_game_score(p_game_id TEXT, p_score INTEGER, p_display_name TEXT)
+RETURNS void
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  INSERT INTO game_scores (user_id, game_id, display_name, best_score, best_score_at, updated_at)
+  VALUES (auth.uid(), p_game_id, p_display_name, GREATEST(p_score, 0), NOW(), NOW())
+  ON CONFLICT (user_id, game_id) DO UPDATE SET
+    display_name = EXCLUDED.display_name,
+    best_score = GREATEST(game_scores.best_score, EXCLUDED.best_score),
+    best_score_at = CASE WHEN EXCLUDED.best_score > game_scores.best_score
+      THEN EXCLUDED.best_score_at ELSE game_scores.best_score_at END,
+    updated_at = NOW();
+$$;
+
+ALTER TABLE game_scores DROP CONSTRAINT IF EXISTS game_scores_user_id_fkey;
+ALTER TABLE game_scores ADD CONSTRAINT game_scores_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;

@@ -368,6 +368,36 @@ export type Database = {
           },
         ];
       };
+      game_scores: {
+        Row: {
+          id: string;
+          user_id: string;
+          game_id: string;
+          display_name: string;
+          best_score: number;
+          best_score_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          game_id: string;
+          display_name: string;
+          best_score?: number;
+          best_score_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          game_id?: string;
+          display_name?: string;
+          best_score?: number;
+          best_score_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -378,6 +408,10 @@ export type Database = {
       find_user_by_email: {
         Args: { search_email: string };
         Returns: { uid: string; uname: string }[];
+      };
+      submit_game_score: {
+        Args: { p_game_id: string; p_score: number; p_display_name: string };
+        Returns: undefined;
       };
     };
     Enums: Record<string, never>;

@@ -8,7 +8,6 @@ import {
 } from '@/constants/videos';
 import { colors, fonts } from '@/constants/theme';
 import { usePremium } from '@/hooks/usePremium';
-import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
@@ -65,7 +64,6 @@ export default function VideosScreen() {
   const safeBack = useSafeBack();
   const { isPremium } = usePremium();
   const [category, setCategory] = useState<VideoCategory | 'all'>('all');
-  const swipeBack = useSwipeBack();
 
   const filtered = useMemo(() => {
     if (category === 'all') return videos;
@@ -133,7 +131,7 @@ export default function VideosScreen() {
   );
 
   return (
-    <View style={styles.safe} {...swipeBack}>
+    <View style={styles.safe}>
       <SafeAreaView style={styles.safeInner} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <Pressable onPress={() => safeBack()} style={styles.backBtn} hitSlop={12}>
