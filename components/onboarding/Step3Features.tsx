@@ -172,13 +172,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   featureDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(196,149,80,0.2)',
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: 'rgba(196,149,80,0.25)',
   },
   featureDotActive: {
-    width: 18,
+    width: 5,
+    height: 7,
+    borderRadius: 2.5,
     backgroundColor: OB.accent,
   },
   featureGrid: {

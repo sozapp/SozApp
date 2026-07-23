@@ -52,7 +52,13 @@ export function RootLayoutContent() {
 
   useFocusEffect(
     useCallback(() => {
-      void checkBadges();
+      let cancelled = false;
+      void isOnboardingCompleteInStorage().then((done) => {
+        if (done && !cancelled) void checkBadges();
+      });
+      return () => {
+        cancelled = true;
+      };
     }, [checkBadges])
   );
 

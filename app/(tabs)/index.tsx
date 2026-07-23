@@ -1421,18 +1421,18 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     },
     tooltip: {
       position: 'absolute',
-      bottom: 10,
-      right: 60,
+      bottom: 6,
+      right: 64,
     },
     tooltipInner: {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: 'rgba(196,149,80,0.3)',
-      borderRadius: 10,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       minWidth: 0,
-      maxWidth: 160,
+      maxWidth: 200,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.15,
@@ -1442,18 +1442,18 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 8,
     },
     tooltipIconWrap: {
-      width: 20,
-      height: 20,
-      borderRadius: 6,
+      width: 26,
+      height: 26,
+      borderRadius: 8,
       backgroundColor: 'rgba(196,149,80,0.1)',
       alignItems: 'center',
       justifyContent: 'center',
     },
     tooltipTitle: {
-      fontSize: 13,
+      fontSize: 15,
       color: colors.text,
       fontFamily: fonts.regular,
     },
@@ -1468,7 +1468,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipArrowBorder: {
       position: 'absolute',
       right: -7,
-      bottom: 12,
+      bottom: 19,
       width: 0,
       height: 0,
       borderTopWidth: 6,
@@ -1481,7 +1481,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipArrowFill: {
       position: 'absolute',
       right: -5,
-      bottom: 13,
+      bottom: 20,
       width: 0,
       height: 0,
       borderTopWidth: 5,
@@ -2999,7 +2999,7 @@ export default function HomeScreen() {
                 <View style={styles.tooltipInner}>
                   <View style={styles.tooltipHeader}>
                     <View style={styles.tooltipIconWrap}>
-                      <Svg width={11} height={11} viewBox="0 0 40 40" fill="none">
+                      <Svg width={15} height={15} viewBox="0 0 40 40" fill="none">
                         <Line x1="13" y1="11" x2="27" y2="11" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" />
                         <Path d="M27 11C27 11 13 11 13 20C13 29 27 29 27 29" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" fill="none" />
                         <Line x1="13" y1="29" x2="27" y2="29" stroke={ACCENT} strokeWidth="3" strokeLinecap="round" />

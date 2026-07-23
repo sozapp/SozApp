@@ -7,7 +7,7 @@ import {
 } from '@expo-google-fonts/cormorant-garamond';
 import * as SplashScreen from 'expo-splash-screen';
 import { usePathname } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { registerForPushNotifications } from '@/hooks/useNotifications';
 import { incrementOpenCount, requestReviewIfAppropriate } from '@/hooks/useStoreReview';
@@ -34,20 +34,25 @@ export default function RootLayout() {
     CormorantGaramond_400Regular_Italic,
   });
   const [showSplash, setShowSplash] = useState(true);
+  const splashHiddenRef = useRef(false);
+
+  const hideNativeSplash = useCallback(() => {
+    if (splashHiddenRef.current) return;
+    splashHiddenRef.current = true;
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync().catch(() => {});
+      hideNativeSplash();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, hideNativeSplash]);
 
   // Fonts asla gelmezse native splash'te kalmamak için
   useEffect(() => {
-    const t = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 4000);
+    const t = setTimeout(hideNativeSplash, 4000);
     return () => clearTimeout(t);
-  }, []);
+  }, [hideNativeSplash]);
 
   useEffect(() => {
     let cancelled = false;

@@ -370,7 +370,7 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
     statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     statCard: {
       width: STAT_CARD_WIDTH,
-      backgroundColor: colors.card,
+      backgroundColor: colors.surface,
       borderRadius: 16,
       padding: 16,
       alignItems: 'flex-start',
