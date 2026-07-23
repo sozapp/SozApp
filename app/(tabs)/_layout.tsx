@@ -1,5 +1,6 @@
 import { fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
+import { useTabPulse } from '@/context/TabPulseContext';
 import { useTheme } from '@/hooks/useTheme';
 import { useWidgetUpdate } from '@/hooks/useWidgetUpdate';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,6 +77,39 @@ const BouncingTabBarButton = forwardRef<View, BottomTabBarButtonProps>(
     );
   }
 );
+
+// ─── NotesTabIcon ─────────────────────────────────────────────────────────────
+// Diğer ekranlardan (Oku, Odaklan vb.) TabPulseContext üzerinden tetiklenen
+// "kaydedildi" zıplama animasyonu — BouncingTabBarButton'daki basma animasyonundan
+// bağımsız, dışarıdan sinyal ile çalışır.
+function NotesTabIcon({ color, size }: { color: string; size: number }) {
+  const { notesPulseSignal } = useTabPulse();
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const pulseTranslateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    // 0 = henüz hiç pulse tetiklenmedi (mount anında zıplama olmasın)
+    if (notesPulseSignal === 0) return;
+    pulseScale.setValue(1);
+    pulseTranslateY.setValue(0);
+    Animated.parallel([
+      Animated.sequence([
+        Animated.timing(pulseScale, { toValue: 1.3, duration: 120, useNativeDriver: false }),
+        Animated.spring(pulseScale, { toValue: 1, useNativeDriver: false, friction: 5, tension: 200 }),
+      ]),
+      Animated.sequence([
+        Animated.timing(pulseTranslateY, { toValue: -6, duration: 120, useNativeDriver: false }),
+        Animated.spring(pulseTranslateY, { toValue: 0, useNativeDriver: false, friction: 5, tension: 200 }),
+      ]),
+    ]).start();
+  }, [notesPulseSignal, pulseScale, pulseTranslateY]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale: pulseScale }, { translateY: pulseTranslateY }] }}>
+      <Ionicons name="bookmark-outline" size={size} color={color} />
+    </Animated.View>
+  );
+}
 
 // ─── TabLabel ─────────────────────────────────────────────────────────────────
 const ACCENT = '#C4956A';
@@ -335,7 +369,7 @@ export default function TabsLayout() {
             options={{
               title: t('tabNotes'),
               tabBarIcon: ({ color, size }) => (
-                <Ionicons name="bookmark-outline" size={size} color={color} />
+                <NotesTabIcon color={color} size={size} />
               ),
             }}
           />

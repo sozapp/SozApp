@@ -1,5 +1,9 @@
-import { bookList } from '@/constants/bible-index';
-import { newTestament } from '@/constants/new-testament';
+import {
+  getBookIdByVerseBookName,
+  normalize,
+  searchVerseText,
+  type VerseSearchResult,
+} from '@/constants/verse-search';
 import { fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
@@ -54,33 +58,7 @@ const FILTER_OPTIONS: (string | null)[] = [
   'Vahiy',
 ];
 
-function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/ı/g, 'i')
-    .replace(/ğ/g, 'g')
-    .replace(/ü/g, 'u')
-    .replace(/ş/g, 's')
-    .replace(/ö/g, 'o')
-    .replace(/ç/g, 'c')
-    .replace(/İ/g, 'i')
-    .replace(/Ğ/g, 'g')
-    .replace(/Ü/g, 'u')
-    .replace(/Ş/g, 's')
-    .replace(/Ö/g, 'o')
-    .replace(/Ç/g, 'c');
-}
-
-function getBookIdByName(bookName: string): string | null {
-  return bookList.find((b) => b.name === bookName)?.id ?? null;
-}
-
-type SearchResult = {
-  book: string;
-  chapter: number;
-  verse: number;
-  text: string;
-};
+type SearchResult = VerseSearchResult;
 
 async function loadSearchHistory(): Promise<string[]> {
   try {
@@ -133,29 +111,7 @@ export default function SearchScreen() {
     } catch (_) {}
   }, []);
 
-  const results = useMemo(() => {
-    if (searchText.trim().length < 2) return [];
-    const query = normalize(searchText.trim());
-    const found: SearchResult[] = [];
-    for (const book of newTestament) {
-      for (const chapter of book.chapters) {
-        for (const verse of chapter.verses) {
-          if (normalize(verse.text).includes(query)) {
-            found.push({
-              book: book.name,
-              chapter: chapter.chapter,
-              verse: verse.verse,
-              text: verse.text,
-            });
-            if (found.length >= 50) break;
-          }
-        }
-        if (found.length >= 50) break;
-      }
-      if (found.length >= 50) break;
-    }
-    return found;
-  }, [searchText]);
+  const results = useMemo(() => searchVerseText(searchText), [searchText]);
 
   const filteredResults = useMemo(() => {
     if (filterBook == null) return results;
@@ -197,7 +153,7 @@ export default function SearchScreen() {
     (item: SearchResult) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       saveToHistory(searchText.trim());
-      const bookId = getBookIdByName(item.book);
+      const bookId = getBookIdByVerseBookName(item.book);
       if (bookId) {
         router.push({
           pathname: '/(tabs)/read',

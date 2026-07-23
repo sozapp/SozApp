@@ -36,6 +36,7 @@ import { useSpeech } from '@/context/SpeechContext';
 import { useSync } from '@/hooks/useSync';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
 import { useNetwork } from '@/context/NetworkContext';
+import { useTabPulse } from '@/context/TabPulseContext';
 import { useTranslation } from '@/context/LanguageContext';
 import AmbientMusicModal, { MiniWaveBar } from '@/components/AmbientMusicModal';
 import { useTheme } from '@/hooks/useTheme';
@@ -231,6 +232,7 @@ export default function ReadScreen() {
   const { isPremium } = usePremium();
   const { isSpeaking, currentVerseId, speak, speakChapter, stop } = useSpeech();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { pulseNotesTab } = useTabPulse();
   const { syncNotes, syncHighlights, syncFavorites } = useSync();
   const haptics = useHaptics();
   const { currentTrack: ambientTrack, isPlaying: ambientPlaying } = useAmbientMusic();
@@ -1166,6 +1168,7 @@ export default function ReadScreen() {
     const id = getVerseId(listChapter.book, listChapter.chapterNumber, selectedVerse.number);
     const next = { ...highlights, [id]: colorId };
     saveHighlights(next);
+    pulseNotesTab();
     (async () => {
       try {
         if (!supabase) {
@@ -2350,6 +2353,7 @@ export default function ReadScreen() {
                           await toggleFavorite(selectedVerseId, selectedVerse.text);
                           if (!wasFav) {
                             animateFavorite();
+                            pulseNotesTab();
                             haptics.success();
                             try {
                               if (!supabase) {

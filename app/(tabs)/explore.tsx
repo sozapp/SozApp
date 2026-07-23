@@ -33,6 +33,7 @@ import * as Haptics from 'expo-haptics'
 import { fonts as appFonts } from '@/constants/theme';
 import { readGameCompletedToday, readGameStreak } from '@/constants/game-storage'
 import { pickRandomVerseForShare } from '@/constants/bibleVersions'
+import { getBookIdByVerseBookName, searchVerseText } from '@/constants/verse-search'
 import ShareVerseModal from '@/components/ShareVerseModal'
 import { SozAlert } from '@/components/SozAlert'
 import { useSozAlert } from '@/hooks/useSozAlert'
@@ -42,6 +43,12 @@ import { useTheme, type ThemeColors } from '../../hooks/useTheme'
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
 const SCREEN_WIDTH = Dimensions.get('window').width;
+
+// Ayet metni araması Yeni Ahit'in tamamını taradığı için debounce + minimum karakter
+// eşiği ile her tuş vuruşunda tetiklenmesi engelleniyor.
+const VERSE_SEARCH_DEBOUNCE_MS = 300;
+const VERSE_SEARCH_MIN_CHARS = 3;
+const VERSE_SEARCH_MAX_RESULTS = 8;
 
 const ALL_ITEMS = [
   { title: 'Harita', route: '/map', icon: 'map-outline' },
@@ -285,6 +292,41 @@ export default function ExploreScreen() {
   const q = searchText.trim().toLocaleLowerCase('tr-TR');
   const isSearching = q.length > 0;
 
+  // Ayet metni araması — search.tsx ile aynı algoritma (constants/verse-search.ts),
+  // debounce ile Yeni Ahit'in tamamının her tuş vuruşunda taranması önleniyor.
+  const [debouncedVerseQuery, setDebouncedVerseQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedVerseQuery(searchText);
+    }, VERSE_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  const showVerseResults = debouncedVerseQuery.trim().length >= VERSE_SEARCH_MIN_CHARS;
+
+  const verseResults = useMemo(() => {
+    if (!showVerseResults) return [];
+    return searchVerseText(debouncedVerseQuery, VERSE_SEARCH_MAX_RESULTS);
+  }, [showVerseResults, debouncedVerseQuery]);
+
+  const onVerseResultPress = useCallback(
+    (item: { book: string; chapter: number; verse: number }) => {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const bookId = getBookIdByVerseBookName(item.book);
+      if (!bookId) return;
+      router.push({
+        pathname: '/(tabs)/read',
+        params: {
+          bookId,
+          chapter: String(item.chapter),
+          highlightVerse: String(item.verse),
+        },
+      });
+      setSearchText('');
+    },
+    [router]
+  );
+
   const searchResults = useMemo(() => {
     if (!isSearching) return [] as Array<
       | {
@@ -444,8 +486,11 @@ export default function ExploreScreen() {
 
   const searchHasNoResults = useMemo(() => {
     if (!isSearching) return false;
-    return searchResults.length === 0;
-  }, [isSearching, searchResults.length]);
+    if (searchResults.length > 0) return false;
+    // Ayet araması henüz debounce bekliyorsa (kısa query) erken "sonuç yok" gösterme.
+    if (showVerseResults && verseResults.length > 0) return false;
+    return true;
+  }, [isSearching, searchResults.length, showVerseResults, verseResults.length]);
 
   const mustWatchItems = useMemo(
     () => WATCH_CONTENT.filter((item) => item.mustWatch),
@@ -547,6 +592,36 @@ export default function ExploreScreen() {
                 <Ionicons name="arrow-forward" size={14} color={colors.textMuted} />
               </TouchableOpacity>
             ))}
+            </View>
+          </View>
+        )}
+
+        {isSearching && showVerseResults && verseResults.length > 0 && (
+          <View style={styles.exploreSection}>
+            <SectionHeader
+              title="Ayetlerde Bulunanlar"
+              subtitle={`Yeni Ahit'te "${searchText.trim()}" için eşleşen ayetler`}
+              styles={styles}
+            />
+            <View style={styles.verseSearchResults}>
+              {verseResults.map((item, i) => (
+                <TouchableOpacity
+                  key={`verse-${item.book}-${item.chapter}-${item.verse}-${i}`}
+                  style={styles.verseSearchItem}
+                  onPress={() => onVerseResultPress(item)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.verseSearchBar} />
+                  <View style={styles.verseSearchContent}>
+                    <Text style={styles.verseSearchRef}>
+                      {item.book} {item.chapter}:{item.verse}
+                    </Text>
+                    <Text style={styles.verseSearchText} numberOfLines={2}>
+                      {item.text}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         )}
@@ -1024,6 +1099,42 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       justifyContent: 'center',
     },
     searchResultText: { flex: 1, fontSize: 15, color: colors.text, fontFamily: fonts.regular },
+    verseSearchResults: {
+      marginHorizontal: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 0.5,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    verseSearchItem: {
+      flexDirection: 'row',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.border,
+    },
+    verseSearchBar: {
+      width: 2,
+      borderRadius: 1,
+      backgroundColor: A,
+      alignSelf: 'stretch',
+    },
+    verseSearchContent: { flex: 1, gap: 4 },
+    verseSearchRef: {
+      fontSize: 11,
+      color: A,
+      letterSpacing: 0.1,
+      fontFamily: fonts.medium,
+    },
+    verseSearchText: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.text,
+      fontStyle: 'italic',
+      fontFamily: fonts.italic ?? fonts.regular,
+    },
     quickAccess: { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
     quickItem: { flex: 1, alignItems: 'center', gap: 8 },
     quickIcon: {

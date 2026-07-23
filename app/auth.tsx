@@ -374,8 +374,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 16,
   },
-  passwordWrap: { position: 'relative', marginBottom: 4 },
-  passwordInput: { paddingRight: 48 },
+  passwordWrap: { position: 'relative', marginBottom: 16 },
+  passwordInput: { paddingRight: 48, marginBottom: 0 },
   eyeBtn: {
     position: 'absolute',
     right: 14,

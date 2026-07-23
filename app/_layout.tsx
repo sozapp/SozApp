@@ -15,6 +15,7 @@ import { AmbientMusicProvider } from '@/context/AmbientMusicContext';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { NetworkProvider } from '@/context/NetworkContext';
 import { SpeechProvider } from '@/context/SpeechContext';
+import { TabPulseProvider } from '@/context/TabPulseContext';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { RootLayoutContent } from '@/components/RootLayoutContent';
 import SozSplashScreen from '@/components/SplashScreen';
@@ -96,7 +97,9 @@ export default function RootLayout() {
             <SpeechProvider>
               <LanguageProvider>
                 <NetworkProvider>
-                  <RootLayoutContent />
+                  <TabPulseProvider>
+                    <RootLayoutContent />
+                  </TabPulseProvider>
                 </NetworkProvider>
               </LanguageProvider>
             </SpeechProvider>

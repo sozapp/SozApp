@@ -6,6 +6,7 @@ import { loadReadHistory } from '@/constants/read-history';
 import { colors, fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
 import { useAmbientMusic } from '@/context/AmbientMusicContext';
+import { useTabPulse } from '@/context/TabPulseContext';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useTheme, type ThemeColors } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -283,6 +284,7 @@ export default function FocusScreen() {
   const { theme } = useTheme();
   const exitSheetStyles = useMemo(() => makeExitSheetStyles(theme), [theme]);
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { pulseNotesTab } = useTabPulse();
   const { playTrack, suspendPlayback } = useAmbientMusic();
   const { t } = useTranslation();
 
@@ -610,9 +612,14 @@ export default function FocusScreen() {
               <View style={styles.verseActions}>
                 <Pressable
                   style={styles.verseActionBtn}
-                  onPress={() =>
-                    verse.verseId && void toggleFavorite(verse.verseId, verse.text)
-                  }
+                  onPress={() => {
+                    const verseId = verse.verseId;
+                    if (!verseId) return;
+                    void (async () => {
+                      const added = await toggleFavorite(verseId, verse.text);
+                      if (added) pulseNotesTab();
+                    })();
+                  }}
                 >
                   <Ionicons
                     name={verse.verseId && isFavorite(verse.verseId) ? 'heart' : 'heart-outline'}
