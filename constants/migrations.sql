@@ -543,3 +543,68 @@ $$;
 
 ALTER TABLE game_scores DROP CONSTRAINT IF EXISTS game_scores_user_id_fkey;
 ALTER TABLE game_scores ADD CONSTRAINT game_scores_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- Kilise Modu düzeltmesi: church_group_members'ta sadece UNIQUE(group_id, user_id)
+-- vardı — bu bir kullanıcının AYNI gruba iki kez katılmasını engelliyordu ama
+-- FARKLI iki gruba (mesela grup oluşturma denemesi testte tekrarlanınca) üye
+-- olmasını engellemiyordu. useChurch.ts'in refresh() sorgusu .maybeSingle()
+-- kullandığı için kullanıcı 2+ satıra düşünce Postgrest "multiple rows"
+-- hatası veriyor, bu da sessizce "gruba üye değilsin" gibi yorumlanıp Kilise
+-- Modu'nu kalıcı olarak bozuyordu. Önce var olan kopya satırları temizle
+-- (kullanıcı başına en eski üyeliği tut), sonra tekrar oluşmasın diye
+-- kullanıcı başına tek grup kısıtı ekle.
+DELETE FROM church_group_members a
+USING church_group_members b
+WHERE a.user_id = b.user_id
+  AND (a.joined_at > b.joined_at OR (a.joined_at = b.joined_at AND a.id > b.id));
+
+ALTER TABLE church_group_members DROP CONSTRAINT IF EXISTS church_group_members_user_id_unique;
+ALTER TABLE church_group_members ADD CONSTRAINT church_group_members_user_id_unique UNIQUE (user_id);
+
+-- Arkadaşlar arası anlık mesajlaşma. friendships tablosundaki gibi tek yönlü
+-- satır (sender/recipient), okundu bilgisi read_at ile tutuluyor. Yazma sadece
+-- kabul edilmiş (accepted) bir arkadaşlık varsa mümkün — davet göndermeden
+-- birine mesaj atılamaz.
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  sender_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  recipient_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  read_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conversation
+  ON messages(sender_id, recipient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_rev
+  ON messages(recipient_id, sender_id, created_at DESC);
+
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "messages_select" ON messages;
+DROP POLICY IF EXISTS "messages_insert" ON messages;
+DROP POLICY IF EXISTS "messages_update" ON messages;
+
+CREATE POLICY "messages_select" ON messages FOR SELECT
+  USING (auth.uid() = sender_id OR auth.uid() = recipient_id);
+
+CREATE POLICY "messages_insert" ON messages FOR INSERT
+  WITH CHECK (
+    auth.uid() = sender_id
+    AND EXISTS (
+      SELECT 1 FROM friendships f
+      WHERE f.status = 'accepted'
+        AND (
+          (f.user_id = auth.uid() AND f.friend_id = messages.recipient_id)
+          OR (f.friend_id = auth.uid() AND f.user_id = messages.recipient_id)
+        )
+    )
+  );
+
+-- Sadece alıcı, kendine gelen mesajı okundu işaretleyebilir.
+CREATE POLICY "messages_update" ON messages FOR UPDATE
+  USING (auth.uid() = recipient_id)
+  WITH CHECK (auth.uid() = recipient_id);
+
+-- Postgres Changes ile anlık teslimat için tabloyu realtime yayınına ekle.
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;

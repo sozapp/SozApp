@@ -15,10 +15,11 @@ import { useNetwork } from '@/context/NetworkContext';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
+import { useUnreadMessageCounts } from '@/hooks/useMessages';
 import type { User } from '@supabase/supabase-js';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -332,6 +333,13 @@ export default function FriendsScreen() {
     }
   };
 
+  const uid = user?.id ?? '';
+  const friendIdsForUnread = useMemo(
+    () => friendsRows.map((r) => (r.user_id === uid ? r.friend_id : r.user_id)),
+    [friendsRows, uid]
+  );
+  const { unreadCounts } = useUnreadMessageCounts(friendIdsForUnread);
+
   if (!loading && !isRealAccount(user)) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -353,8 +361,6 @@ export default function FriendsScreen() {
       </SafeAreaView>
     );
   }
-
-  const uid = user?.id ?? '';
 
   return (
     <>
@@ -451,6 +457,7 @@ export default function FriendsScreen() {
               const sub = last
                 ? `${lastActivityLine(last.type, last.verse_id, last.book, last.chapter, last.note)} · ${formatActivityTimeLong(last.created_at)}`
                 : 'Henüz aktivite yok';
+              const unread = unreadCounts[fid] ?? 0;
               return (
                 <View key={row.id} style={[styles.friendRow, { backgroundColor: theme.surface }]}>
                   <View style={[styles.avatar, { backgroundColor: ACCENT }]}>
@@ -461,6 +468,20 @@ export default function FriendsScreen() {
                     <Text style={[styles.friendEmail, { color: theme.textMuted }]}>{p?.email ?? ''}</Text>
                     <Text style={[styles.lastAct, { color: theme.textMuted }]}>{sub}</Text>
                   </View>
+                  <Pressable
+                    style={styles.msgBtn}
+                    onPress={() =>
+                      router.push({ pathname: '/chat/[friendId]', params: { friendId: fid, friendName: name } })
+                    }
+                    hitSlop={8}
+                  >
+                    <Ionicons name="chatbubble-outline" size={20} color={ACCENT} />
+                    {unread > 0 ? (
+                      <View style={styles.msgBadge}>
+                        <Text style={styles.msgBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
                 </View>
               );
             })
@@ -605,9 +626,33 @@ const styles = StyleSheet.create({
   },
   friendRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
+  },
+  msgBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  msgBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: '#E57373',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  msgBadgeText: {
+    fontSize: 9,
+    color: '#fff',
+    fontFamily: fonts.medium,
   },
   avatar: {
     width: 44,

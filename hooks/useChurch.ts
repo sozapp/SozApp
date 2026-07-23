@@ -99,7 +99,8 @@ export function useChurch() {
           })
         )
       );
-    } catch {
+    } catch (e) {
+      console.warn('[Church] loadMembers failed:', e);
       setMembers([]);
     }
   }, []);
@@ -128,15 +129,16 @@ export function useChurch() {
           createdAt: p.created_at,
         }))
       );
-    } catch {
+    } catch (e) {
+      console.warn('[Church] loadPrayers failed:', e);
       setPrayers([]);
     }
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<ChurchGroup | null> => {
     if (!supabase) {
       setLoading(false);
-      return;
+      return null;
     }
     setLoading(true);
     try {
@@ -147,15 +149,25 @@ export function useChurch() {
         setChurchState(null);
         setMembers([]);
         setPrayers([]);
-        return;
+        return null;
       }
-      const { data: membership, error } = await supabase
+      // .maybeSingle() beklediği tek satır yerine 2+ satır dönerse Postgrest
+      // hata fırlatır (kullanıcı DB kısıtı eklenmeden önce birden fazla gruba
+      // üye olmuşsa) — order+limit(1) ile en eski üyeliği deterministik
+      // olarak seçip bu senaryoda da sessizce "üye değilsin" durumuna
+      // düşmemiş oluyoruz.
+      const { data: membershipRows, error } = await supabase
         .from('church_group_members')
         .select(
           'group_id, role, joined_at, church_groups(id, code, group_name, church_name, plan_reference, plan_days_left)'
         )
         .eq('user_id', user.id)
-        .maybeSingle();
+        .order('joined_at', { ascending: true })
+        .limit(1);
+      if (error) {
+        console.warn('[Church] refresh membership fetch:', error.message);
+      }
+      const membership = membershipRows?.[0] ?? null;
       const groupRow = (
         membership as {
           role: string;
@@ -175,7 +187,7 @@ export function useChurch() {
         setMembers([]);
         setPrayers([]);
         await AsyncStorage.removeItem(CACHE_KEY);
-        return;
+        return null;
       }
       const next: ChurchGroup = {
         id: groupRow.id,
@@ -190,8 +202,11 @@ export function useChurch() {
       setChurchState(next);
       await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(next));
       await Promise.all([loadMembers(groupRow.id, groupRow.plan_reference), loadPrayers(groupRow.id)]);
-    } catch {
+      return next;
+    } catch (e) {
       // Çevrimdışıyken cache'ten yüklenen değer ekranda kalsın
+      console.warn('[Church] refresh failed:', e);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -233,11 +248,14 @@ export function useChurch() {
         });
         if (insertErr) {
           if ((insertErr as { code?: string }).code === '23505') {
-            return { ok: false, error: 'Zaten bu gruptasınız.' };
+            return { ok: false, error: 'Zaten bir gruba üyesiniz. Önce mevcut gruptan ayrılmalısınız.' };
           }
           return { ok: false, error: insertErr.message };
         }
-        await refresh();
+        const joined = await refresh();
+        if (!joined) {
+          return { ok: false, error: 'Gruba katıldınız ama yüklenemedi, lütfen tekrar deneyin.' };
+        }
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : 'Bir hata oluştu.' };
@@ -272,8 +290,16 @@ export function useChurch() {
             display_name: name,
             role: 'admin',
           });
-          if (memberErr) return { ok: false, error: memberErr.message };
-          await refresh();
+          if (memberErr) {
+            if ((memberErr as { code?: string }).code === '23505') {
+              return { ok: false, error: 'Zaten bir gruba üyesiniz. Önce mevcut gruptan ayrılmalısınız.' };
+            }
+            return { ok: false, error: memberErr.message };
+          }
+          const created = await refresh();
+          if (!created) {
+            return { ok: false, error: 'Grup oluşturuldu ama yüklenemedi, lütfen tekrar deneyin.' };
+          }
           return { ok: true };
         } catch (e) {
           return { ok: false, error: e instanceof Error ? e.message : 'Bir hata oluştu.' };
@@ -297,8 +323,8 @@ export function useChurch() {
             .eq('group_id', church.id)
             .eq('user_id', user.id);
         }
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.warn('[Church] leaveGroup failed:', e);
       }
     }
     setChurchState(null);
@@ -372,8 +398,8 @@ export function useChurch() {
           .insert({ group_id: church.id, user_id: user.id, plan_reference: church.planReference });
       }
       await loadMembers(church.id, church.planReference);
-    } catch {
-      /* ignore */
+    } catch (e) {
+      console.warn('[Church] toggleMyCompletion failed:', e);
     }
   }, [church, members, loadMembers]);
 
