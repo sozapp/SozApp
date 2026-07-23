@@ -8,7 +8,12 @@ export default {
     version: '1.0.0',
     orientation: 'portrait',
     userInterfaceStyle: 'dark',
-    extra: {},
+    extra: {
+      eas: {
+        projectId: '47e34af9-c3d3-4627-9434-6eedbcdbef3d',
+      },
+    },
+    owner: 'alihaydin',
     ios: {
       bundleIdentifier: 'com.soz.incil',
       supportsTablet: false,
