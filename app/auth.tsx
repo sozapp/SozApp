@@ -1,8 +1,10 @@
 import { colors, fonts, borderRadius } from '@/constants/theme';
+import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { supabase } from '@/constants/supabase';
+import { trackEvent } from '@/constants/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useRouter } from 'expo-router';
@@ -39,6 +41,7 @@ function getErrorMessage(err: unknown): string {
 
 export default function AuthScreen() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const router = useRouter();
   const [name, setName] = useState('');
@@ -68,16 +71,16 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (!supabase) {
-        console.log('Supabase not available, using local storage');
         showAlert('Söz', 'Sunucuya bağlanılamıyor. Misafir olarak uygulamayı kullanabilirsiniz.');
         return;
       }
       const { error } = await supabase.auth.signUp({
         email: e,
         password: p,
-        options: { data: { full_name: n } },
+        options: { data: { display_name: n } },
       });
       if (error) throw new Error(error.message);
+      trackEvent('signup_completed');
       showAlert(
         'Kayıt başarılı',
         'E-posta adresinize gelen bağlantı ile hesabınızı doğrulayabilirsiniz. Ardından giriş yapabilirsiniz.'
@@ -101,7 +104,6 @@ export default function AuthScreen() {
     setLoading(true);
     try {
       if (!supabase) {
-        console.log('Supabase not available, using local storage');
         showAlert('Söz', 'Sunucuya bağlanılamıyor. Misafir olarak uygulamayı kullanabilirsiniz.');
         return;
       }
@@ -124,7 +126,6 @@ export default function AuthScreen() {
     setResetLoading(true);
     try {
       if (!supabase) {
-        console.log('Supabase not available, using local storage');
         showAlert('Söz', 'Sunucuya bağlanılamıyor. Misafir olarak uygulamayı kullanabilirsiniz.');
         return;
       }
@@ -290,6 +291,20 @@ export default function AuthScreen() {
             </Pressable>
           </View>
 
+          {mode === 'signup' ? (
+            <Text style={[styles.privacyNotice, { color: muted }]}>
+              {t('signupPrivacyNoticePrefix')}
+              <Text
+                style={[styles.privacyNoticeLink, { color: ACCENT }]}
+                onPress={() => router.push('/privacy-policy')}
+                accessibilityRole="link"
+              >
+                {t('privacyPolicy')}
+              </Text>
+              {t('signupPrivacyNoticeSuffix')}
+            </Text>
+          ) : null}
+
           {mode === 'signin' && (
             <Pressable
               style={styles.forgotWrap}
@@ -395,6 +410,17 @@ const styles = StyleSheet.create({
   },
   forgotWrap: { alignItems: 'flex-end', marginBottom: 16 },
   forgotText: { fontFamily: fonts.regular, fontSize: 14 },
+  privacyNotice: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  privacyNoticeLink: {
+    fontFamily: fonts.medium,
+    textDecorationLine: 'underline',
+  },
   submitBtn: {
     borderRadius: borderRadius.button,
     paddingVertical: 16,

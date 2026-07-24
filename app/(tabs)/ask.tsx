@@ -7,6 +7,7 @@ import { useNetwork } from '@/context/NetworkContext';
 import { usePremium } from '@/hooks/usePremium';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import { SozAlert } from '@/components/SozAlert';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -226,6 +227,7 @@ function formatTime(date: Date): string {
 }
 
 export default function AskScreen() {
+  useAnalyticsScreen('ask');
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -1079,7 +1081,7 @@ export default function AskScreen() {
                   await AsyncStorage.setItem(SAVED_ANSWERS_KEY, JSON.stringify(arr.slice(0, 50)));
                   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 } catch (e) {
-                  console.log('Save error:', e);
+                  console.warn('Save error:', e);
                 }
                 closeMsgActions();
               }}

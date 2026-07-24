@@ -14,8 +14,10 @@ import { supabase } from '@/constants/supabase';
 import { colors, fonts, borderRadius } from '@/constants/theme';
 import { useNetwork } from '@/context/NetworkContext';
 import { SozAlert } from '@/components/SozAlert';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import { useUnreadMessageCounts } from '@/hooks/useMessages';
 import { useTranslation } from '@/context/LanguageContext';
 import type { User } from '@supabase/supabase-js';
@@ -24,7 +26,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -66,6 +71,7 @@ function initials(name: string, email: string | null): string {
 }
 
 export default function FriendsScreen() {
+  useAnalyticsScreen('friends');
   const { theme } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
@@ -73,6 +79,7 @@ export default function FriendsScreen() {
   const { isOnline } = useNetwork();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
   const [shareActivity, setShareActivityState] = useState(true);
@@ -82,12 +89,12 @@ export default function FriendsScreen() {
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [lastByUser, setLastByUser] = useState<Record<string, ActivityRow>>({});
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
+  const haptics = useHaptics();
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
+  const loadAll = useCallback(async (opts?: { soft?: boolean }) => {
+    if (!opts?.soft) setLoading(true);
     try {
       if (!supabase) {
-        console.log('Supabase not available, using local storage');
         setUser(null);
         setPendingIn([]);
         setFriendsRows([]);
@@ -104,7 +111,7 @@ export default function FriendsScreen() {
         setFriendsRows([]);
         setActivities([]);
         setLastByUser({});
-        setLoading(false);
+        if (!opts?.soft) setLoading(false);
         return;
       }
       const uid = u!.id;
@@ -205,9 +212,18 @@ export default function FriendsScreen() {
       }
       setActivities(feed);
     } finally {
-      setLoading(false);
+      if (!opts?.soft) setLoading(false);
     }
   }, [isOnline]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadAll({ soft: true });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadAll]);
 
   useFocusEffect(
     useCallback(() => {
@@ -231,11 +247,15 @@ export default function FriendsScreen() {
   const sendInvite = async () => {
     const email = inviteEmail.trim().toLowerCase();
     if (!supabase) {
+      haptics.error();
       showAlert('Söz', t('serverOfflineMsg'));
       return;
     }
     if (!email || !isRealAccount(user) || !isOnline) {
-      if (!isOnline) showAlert('Söz', t('internetRequiredMsg'));
+      if (!isOnline) {
+        haptics.error();
+        showAlert('Söz', t('internetRequiredMsg'));
+      }
       return;
     }
     setInviteBusy(true);
@@ -246,11 +266,13 @@ export default function FriendsScreen() {
       if (error) throw error;
       const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
       if (!row?.uid) {
+        haptics.error();
         showAlert('Söz', t('userNotFoundByEmail'));
         return;
       }
       const targetId = row.uid as string;
       if (targetId === user!.id) {
+        haptics.error();
         showAlert('Söz', t('cannotInviteSelf'));
         return;
       }
@@ -261,6 +283,7 @@ export default function FriendsScreen() {
       });
       if (insErr) {
         if (insErr.code === '23505') {
+          haptics.error();
           showAlert('Söz', t('requestAlreadyExists'));
         } else {
           throw insErr;
@@ -268,9 +291,41 @@ export default function FriendsScreen() {
         return;
       }
       setInviteEmail('');
+      haptics.success();
       showAlert('Söz', t('inviteSent'));
       loadAll();
+
+      // Push: istek başarılıysa karşı tarafa bildir (başarısız olsa da UI etkilenmez)
+      void (async () => {
+        try {
+          let senderName = t('defaultFriendName');
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('display_name, email')
+            .eq('id', user!.id)
+            .maybeSingle();
+          const name =
+            (profile as { display_name: string | null; email: string | null } | null)
+              ?.display_name?.trim() ||
+            (profile as { display_name: string | null; email: string | null } | null)?.email
+              ?.split('@')[0]
+              ?.trim();
+          if (name) senderName = name;
+
+          await supabase.functions.invoke('send-push', {
+            body: {
+              recipientUserId: targetId,
+              title: 'Arkadaşlık isteği',
+              body: `${senderName} sana arkadaşlık isteği gönderdi`,
+              data: { type: 'friend_request' },
+            },
+          });
+        } catch (e) {
+          console.warn('[Push] friend_request notify skipped:', e);
+        }
+      })();
     } catch (e) {
+      haptics.error();
       showAlert('Söz', t('inviteSendFailed'));
     } finally {
       setInviteBusy(false);
@@ -280,14 +335,15 @@ export default function FriendsScreen() {
   const acceptRequest = async (row: FriendshipRow) => {
     if (!isOnline) return;
     if (!supabase) {
-      console.log('Supabase not available, using local storage');
       return;
     }
     try {
       const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', row.id);
       if (error) throw error;
+      haptics.success();
       loadAll();
     } catch {
+      haptics.error();
       showAlert('Söz', t('requestAcceptFailed'));
     }
   };
@@ -295,14 +351,15 @@ export default function FriendsScreen() {
   const rejectRequest = async (row: FriendshipRow) => {
     if (!isOnline) return;
     if (!supabase) {
-      console.log('Supabase not available, using local storage');
       return;
     }
     try {
       const { error } = await supabase.from('friendships').delete().eq('id', row.id);
       if (error) throw error;
+      haptics.light();
       loadAll();
     } catch {
+      haptics.error();
       showAlert('Söz', t('requestRejectFailed'));
     }
   };
@@ -341,7 +398,49 @@ export default function FriendsScreen() {
     () => friendsRows.map((r) => (r.user_id === uid ? r.friend_id : r.user_id)),
     [friendsRows, uid]
   );
-  const { unreadCounts } = useUnreadMessageCounts(friendIdsForUnread);
+  const { unreadCounts, reloadUnread } = useUnreadMessageCounts(friendIdsForUnread);
+
+  const removeFriend = (row: FriendshipRow, friendName: string) => {
+    if (!isOnline) {
+      haptics.error();
+      showAlert('Söz', t('internetRequiredMsg'));
+      return;
+    }
+    showAlert(t('removeFriendConfirmTitle'), t('removeFriendConfirmMsg', { name: friendName }), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('removeFriendShort'),
+        style: 'destructive',
+        onPress: async () => {
+          if (!supabase) return;
+          const fid = row.user_id === uid ? row.friend_id : row.user_id;
+          const prevFriends = friendsRows;
+          const prevActivities = activities;
+          const prevLast = lastByUser;
+          setFriendsRows((r) => r.filter((x) => x.id !== row.id));
+          setActivities((a) => a.filter((x) => x.user_id !== fid));
+          setLastByUser((m) => {
+            const next = { ...m };
+            delete next[fid];
+            return next;
+          });
+          try {
+            const { error } = await supabase.from('friendships').delete().eq('id', row.id);
+            if (error) throw error;
+            haptics.success();
+            showAlert('Söz', t('friendRemoved'));
+            void reloadUnread();
+          } catch {
+            setFriendsRows(prevFriends);
+            setActivities(prevActivities);
+            setLastByUser(prevLast);
+            haptics.error();
+            showAlert('Söz', t('removeFriendFailed'));
+          }
+        },
+      },
+    ]);
+  };
 
   if (!loading && !isRealAccount(user)) {
     return (
@@ -400,11 +499,24 @@ export default function FriendsScreen() {
           <ActivityIndicator color={ACCENT} />
         </View>
       ) : (
+        <KeyboardAvoidingView
+          style={styles.keyboard}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        >
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={ACCENT}
+              colors={[ACCENT]}
+            />
+          }
         >
           <View style={[styles.card, { backgroundColor: theme.surface }]}>
             <Text style={[styles.cardTitle, { color: theme.text }]}>{t('friendInviteCardTitle')}</Text>
@@ -485,14 +597,22 @@ export default function FriendsScreen() {
               const unread = unreadCounts[fid] ?? 0;
               return (
                 <View key={row.id} style={[styles.friendRow, { backgroundColor: theme.surface }]}>
-                  <View style={[styles.avatar, { backgroundColor: colorForUserId(fid) }]}>
-                    <Text style={styles.avatarText}>{initials(name, p?.email ?? null)}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.friendName, { color: theme.text }]}>{name}</Text>
-                    <Text style={[styles.friendEmail, { color: theme.textMuted }]}>{p?.email ?? ''}</Text>
-                    <Text style={[styles.lastAct, { color: theme.textMuted }]}>{sub}</Text>
-                  </View>
+                  <Pressable
+                    style={styles.friendMain}
+                    onLongPress={() => removeFriend(row, name)}
+                    delayLongPress={450}
+                    accessibilityRole="text"
+                    accessibilityLabel={`${name}. ${sub}`}
+                  >
+                    <View style={[styles.avatar, { backgroundColor: colorForUserId(fid) }]}>
+                      <Text style={styles.avatarText}>{initials(name, p?.email ?? null)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.friendName, { color: theme.text }]}>{name}</Text>
+                      <Text style={[styles.friendEmail, { color: theme.textMuted }]}>{p?.email ?? ''}</Text>
+                      <Text style={[styles.lastAct, { color: theme.textMuted }]}>{sub}</Text>
+                    </View>
+                  </Pressable>
                   <Pressable
                     style={styles.msgBtn}
                     onPress={() =>
@@ -508,6 +628,15 @@ export default function FriendsScreen() {
                         <Text style={styles.msgBadgeText}>{unread > 9 ? '9+' : unread}</Text>
                       </View>
                     ) : null}
+                  </Pressable>
+                  <Pressable
+                    style={styles.moreBtn}
+                    onPress={() => removeFriend(row, name)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('removeFriendConfirmTitle')}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={18} color={theme.textMuted} />
                   </Pressable>
                 </View>
               );
@@ -561,6 +690,7 @@ export default function FriendsScreen() {
             })
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
     </SafeAreaView>
     <SozAlert {...alertConfig} onDismiss={hideAlert} />
@@ -570,6 +700,7 @@ export default function FriendsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  keyboard: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -658,8 +789,19 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
   },
+  friendMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   msgBtn: {
     width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreBtn: {
+    width: 32,
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,6 +1,9 @@
+import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+
+import { supabase } from '@/constants/supabase';
 
 const DAILY_REMINDER_ID = 'soz-daily-reminder';
 
@@ -35,6 +38,35 @@ export async function registerForPushNotifications(): Promise<boolean> {
     finalStatus = status;
   }
   return finalStatus === 'granted';
+}
+
+/**
+ * Expo push token alıp profiles.push_token'a yazar.
+ * İzin yok / simülatör / hata → sessizce no-op (mesajlaşma etkilenmez).
+ */
+export async function registerPushTokenForUser(userId: string): Promise<void> {
+  if (!userId || !supabase || !Device.isDevice) return;
+  try {
+    const granted = await registerForPushNotifications();
+    if (!granted) return;
+
+    const projectId =
+      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
+        ?.projectId ?? undefined;
+    const tokenResult = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined
+    );
+    const token = tokenResult.data?.trim();
+    if (!token) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ push_token: token })
+      .eq('id', userId);
+    if (error) console.warn('[Push] save token failed:', error.message);
+  } catch (e) {
+    console.warn('[Push] registerPushTokenForUser:', e);
+  }
 }
 
 export async function scheduleDailyReminder(hour: number, minute: number): Promise<void> {

@@ -15,18 +15,23 @@ import {
   type PrayerEntry,
   STORAGE_PRAYERS,
 } from '@/constants/prayer-journal';
+import { isRealAccount } from '@/constants/friend-activity';
 import { FREE_LIMITS } from '@/constants/premium';
 import { buildShareMessage, deepLinkParamsFromVerseId } from '@/constants/share-verse';
+import { supabase } from '@/constants/supabase';
 import { colors as palette, fonts as sheetFonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
+import { useNetwork } from '@/context/NetworkContext';
 import { useFavorites, type FavoriteItem } from '@/hooks/useFavorites';
 import { useHaptics } from '@/hooks/useHaptics';
 import { usePremium } from '@/hooks/usePremium';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useSync } from '@/hooks/useSync';
 import { useTheme, type ThemeColors } from '@/hooks/useTheme';
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import ShareVerseModal from '@/components/ShareVerseModal';
 import { SozAlert } from '@/components/SozAlert';
@@ -34,7 +39,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
+  Dimensions,
   FlatList,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -59,11 +66,20 @@ import { useSafeBack } from '@/hooks/useSafeBack';
 
 const STORAGE_NOTES = '@soz/notes';
 const STORAGE_NOTE_TIMESTAMPS = '@soz/noteTimestamps';
+/** Ayet notlarına bağlı fotoğraf URI'leri — @soz/notes senkronundan bağımsız paralel map */
+const STORAGE_NOTE_IMAGES = '@soz/noteImages';
 const STORAGE_HIGHLIGHTS = '@soz/highlights';
 const STORAGE_HIGHLIGHT_TIMESTAMPS = '@soz/highlightTimestamps';
 
 const ACCENT = '#C4956A';
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+/** Storage object yolu: note-images/{userId}/{safeVerseId}.jpg */
+function noteImageObjectPath(userId: string, verseId: string): string {
+  const safeVerseId = verseId.replace(/[^a-zA-Z0-9._-]+/g, '_');
+  return `${userId}/${safeVerseId}.jpg`;
+}
 
 /** Vurgu paleti (Kehribar / Adaçayı / Gül / Gökyüzü) — sol şerit ve filtre chip'leri */
 const HIGHLIGHT_HEX: Record<HighlightColorId, string> = {
@@ -102,6 +118,7 @@ function bookOrderIndex(bookName: string): number {
 
 type NotesMap = Record<string, string>;
 type NoteTimestampsMap = Record<string, string>;
+type NoteImagesMap = Record<string, string>;
 type HighlightsMap = Record<string, string>;
 
 type NoteSort = 'newest' | 'oldest' | 'book' | 'length';
@@ -159,28 +176,34 @@ function sortHighlightEntries(
 type NotesScreenRouteProps = { asTab?: boolean };
 
 export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProps = {}) {
+  useAnalyticsScreen('notes');
   const { colors, fonts } = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const safeBack = useSafeBack();
   const haptics = useHaptics();
   const { isPremium } = usePremium();
+  const { isOnline } = useNetwork();
   const { favorites, refreshFavorites, removeFavorite } = useFavorites();
   const { syncNotes, syncHighlights, syncFavorites } = useSync();
 
   const [activeTab, setActiveTab] = useState<'notes' | 'highlights' | 'favorites' | 'prayers'>('notes');
   const [notes, setNotes] = useState<NotesMap>({});
   const [noteTimestamps, setNoteTimestamps] = useState<NoteTimestampsMap>({});
+  const [noteImages, setNoteImages] = useState<NoteImagesMap>({});
+  const [fullscreenImageUri, setFullscreenImageUri] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<HighlightsMap>({});
   const [highlightTimestamps, setHighlightTimestamps] = useState<Record<string, string>>({});
   const [prayers, setPrayers] = useState<PrayerEntry[]>([]);
   const notesRef = useRef(notes);
   const noteTimestampsRef = useRef(noteTimestamps);
+  const noteImagesRef = useRef(noteImages);
   const highlightsRef = useRef(highlights);
   const highlightTimestampsRef = useRef(highlightTimestamps);
   const prayersRef = useRef(prayers);
   notesRef.current = notes;
   noteTimestampsRef.current = noteTimestamps;
+  noteImagesRef.current = noteImages;
   highlightsRef.current = highlights;
   highlightTimestampsRef.current = highlightTimestamps;
   prayersRef.current = prayers;
@@ -221,9 +244,10 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
         console.error('[Notes] Supabase sync error (local devam):', syncErr);
       }
 
-      const [nRaw, ntRaw, hRaw, htRaw, pRaw] = await Promise.all([
+      const [nRaw, ntRaw, niRaw, hRaw, htRaw, pRaw] = await Promise.all([
         AsyncStorage.getItem(STORAGE_NOTES),
         AsyncStorage.getItem(STORAGE_NOTE_TIMESTAMPS),
+        AsyncStorage.getItem(STORAGE_NOTE_IMAGES),
         AsyncStorage.getItem(STORAGE_HIGHLIGHTS),
         AsyncStorage.getItem(STORAGE_HIGHLIGHT_TIMESTAMPS),
         AsyncStorage.getItem(STORAGE_PRAYERS),
@@ -267,6 +291,31 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
         await AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(nextNoteTs));
       }
       setNoteTimestamps(nextNoteTs);
+
+      let nextNoteImages: NoteImagesMap = {};
+      try {
+        if (niRaw) {
+          const parsed = JSON.parse(niRaw) as unknown;
+          nextNoteImages =
+            parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+              ? (parsed as NoteImagesMap)
+              : {};
+        }
+      } catch {
+        nextNoteImages = {};
+      }
+      // Orphan görselleri temizle (notu silinmiş ayetler)
+      let imagesChanged = false;
+      for (const k of Object.keys(nextNoteImages)) {
+        if (!(k in nextNotes)) {
+          delete nextNoteImages[k];
+          imagesChanged = true;
+        }
+      }
+      if (imagesChanged) {
+        await AsyncStorage.setItem(STORAGE_NOTE_IMAGES, JSON.stringify(nextNoteImages));
+      }
+      setNoteImages(nextNoteImages);
 
       let nextHighlights: HighlightsMap = {};
       try {
@@ -317,6 +366,7 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
       console.error('loadData error:', e);
       setNotes({});
       setNoteTimestamps({});
+      setNoteImages({});
       setHighlights({});
       setHighlightTimestamps({});
       setPrayers([]);
@@ -503,30 +553,54 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
       const text = notesRef.current[verseId];
       if (text === undefined) return;
       const ts = noteTimestampsRef.current[verseId];
+      const imageUri = noteImagesRef.current[verseId];
 
       const nextNotes = { ...notesRef.current };
       delete nextNotes[verseId];
       const nextTs = { ...noteTimestampsRef.current };
       delete nextTs[verseId];
+      const nextImages = { ...noteImagesRef.current };
+      delete nextImages[verseId];
 
       runDelete({
         message: t('noteDeleted'),
         apply: () => {
           notesRef.current = nextNotes;
           noteTimestampsRef.current = nextTs;
+          noteImagesRef.current = nextImages;
           setNotes(nextNotes);
           setNoteTimestamps(nextTs);
+          setNoteImages(nextImages);
         },
         commit: async () => {
           const n = { ...notesRef.current };
           delete n[verseId];
           const tmap = { ...noteTimestampsRef.current };
           delete tmap[verseId];
+          const imap = { ...noteImagesRef.current };
+          delete imap[verseId];
           try {
             await AsyncStorage.setItem(STORAGE_NOTES, JSON.stringify(n));
             await AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(tmap));
+            await AsyncStorage.setItem(STORAGE_NOTE_IMAGES, JSON.stringify(imap));
           } catch {
             /* ignore */
+          }
+          // Storage objesini en iyi çabayla sil — başarısızlık not silmeyi engellemez
+          if (imageUri && supabase && isOnline) {
+            try {
+              const {
+                data: { user: u },
+              } = await supabase.auth.getUser();
+              if (u && isRealAccount(u)) {
+                await supabase.storage
+                  .from('note-images')
+                  .remove([noteImageObjectPath(u.id, verseId)])
+                  .catch(() => {});
+              }
+            } catch {
+              /* ignore */
+            }
           }
         },
         restore: () => {
@@ -535,16 +609,109 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
             ts !== undefined
               ? { ...noteTimestampsRef.current, [verseId]: ts }
               : { ...noteTimestampsRef.current };
+          const restoredImages =
+            imageUri !== undefined
+              ? { ...noteImagesRef.current, [verseId]: imageUri }
+              : { ...noteImagesRef.current };
           notesRef.current = restoredNotes;
           noteTimestampsRef.current = restoredTs;
+          noteImagesRef.current = restoredImages;
           setNotes(restoredNotes);
           setNoteTimestamps(restoredTs);
+          setNoteImages(restoredImages);
           void AsyncStorage.setItem(STORAGE_NOTES, JSON.stringify(restoredNotes));
           void AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(restoredTs));
+          void AsyncStorage.setItem(STORAGE_NOTE_IMAGES, JSON.stringify(restoredImages));
         },
       });
     },
-    [runDelete, t]
+    [runDelete, t, isOnline]
+  );
+
+  const persistNoteImages = useCallback(async (next: NoteImagesMap) => {
+    noteImagesRef.current = next;
+    setNoteImages(next);
+    try {
+      await AsyncStorage.setItem(STORAGE_NOTE_IMAGES, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const handleAddNotePhoto = useCallback(
+    async (verseId: string) => {
+      try {
+        // Sadece çevrimiçi — çevrimdışı yükleme sessizce atlanır
+        if (!isOnline || !supabase) return;
+
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          showAlert(t('permTitle'), t('permGallery'));
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.7,
+        });
+        if (result.canceled || !result.assets[0]) return;
+
+        // Picker sırasında bağlantı düşmüş olabilir
+        if (!isOnline) return;
+
+        const {
+          data: { user: u },
+        } = await supabase.auth.getUser();
+        if (!u || !isRealAccount(u)) return;
+
+        try {
+          const uri = result.assets[0].uri;
+          const response = await fetch(uri);
+          const blob = await response.blob();
+          const path = noteImageObjectPath(u.id, verseId);
+          const { error: uploadError } = await supabase.storage
+            .from('note-images')
+            .upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+          if (uploadError) throw uploadError;
+
+          const { data: publicUrlData } = supabase.storage.from('note-images').getPublicUrl(path);
+          const publicUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+          await persistNoteImages({ ...noteImagesRef.current, [verseId]: publicUrl });
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } catch {
+          // Çevrimiçi yükleme başarısız → sessizce atla; not metni etkilenmez
+        }
+      } catch {
+        /* ignore */
+      }
+    },
+    [isOnline, persistNoteImages, showAlert, t]
+  );
+
+  const handleRemoveNotePhoto = useCallback(
+    async (verseId: string) => {
+      const prev = noteImagesRef.current[verseId];
+      if (!prev) return;
+      const next = { ...noteImagesRef.current };
+      delete next[verseId];
+      await persistNoteImages(next);
+
+      if (!isOnline || !supabase) return;
+      try {
+        const {
+          data: { user: u },
+        } = await supabase.auth.getUser();
+        if (!u || !isRealAccount(u)) return;
+        await supabase.storage
+          .from('note-images')
+          .remove([noteImageObjectPath(u.id, verseId)])
+          .catch(() => {});
+      } catch {
+        /* ignore */
+      }
+    },
+    [isOnline, persistNoteImages]
   );
 
   const handleDeleteHighlight = useCallback(
@@ -823,9 +990,22 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
               <Ionicons name="arrow-back" size={24} color={colors.text} />
             </Pressable>
           )}
-          <Text style={[styles.headerTitle, { color: colors.text, fontFamily: fonts.thin }]}>
-            {t('myNotes')}
-          </Text>
+          <View style={styles.headerCenter}>
+            <Text style={[styles.headerTitle, { color: colors.text, fontFamily: fonts.thin }]}>
+              {t('myNotes')}
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
+              {activeTabStats.thisWeek > 0
+                ? `Bu hafta ${activeTabStats.thisWeek} ${activeTabStats.noun} ekledin`
+                : `Bu hafta henüz ${activeTabStats.noun} eklemedin`}
+              {` · ${activeTabStats.total} toplam`}
+            </Text>
+            {atNotesLimit && (
+              <Text style={[styles.limitWarning, { color: colors.textMuted }]}>
+                5/5 not kullanıldı · Premium ile sınırsız
+              </Text>
+            )}
+          </View>
           <View style={styles.headerRight}>
             {activeTab === 'prayers' ? (
               <Pressable
@@ -873,27 +1053,6 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
             </Pressable>
           </View>
         </Animated.View>
-
-        {!searchVisible && activeTabStats.total > 0 && (
-          <>
-            <View style={styles.statsBanner}>
-              <View style={styles.statsBannerLeft}>
-                <Ionicons name="create-outline" size={18} color={ACCENT} />
-                <Text style={styles.statsBannerText}>
-                  {activeTabStats.thisWeek > 0
-                    ? `Bu hafta ${activeTabStats.thisWeek} ${activeTabStats.noun} ekledin`
-                    : `Bu hafta henüz ${activeTabStats.noun} eklemedin`}
-                </Text>
-              </View>
-              <Text style={styles.statsBannerTotal}>{activeTabStats.total} toplam</Text>
-            </View>
-            {atNotesLimit && (
-              <Text style={[styles.limitWarning, { color: colors.textMuted }]}>
-                5/5 not kullanıldı · Premium ile sınırsız
-              </Text>
-            )}
-          </>
-        )}
 
         <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
           {tabs.map((tab) => (
@@ -1036,11 +1195,15 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                               key={verseId}
                               verseId={verseId}
                               noteText={noteText}
+                              imageUri={noteImages[verseId]}
                               theme={colors}
                               fonts={fonts}
                               noteTimestamps={noteTimestamps}
                               onDelete={handleDeleteNote}
                               onEditNote={openNoteInReader}
+                              onAddPhoto={handleAddNotePhoto}
+                              onRemovePhoto={handleRemoveNotePhoto}
+                              onOpenImage={setFullscreenImageUri}
                               renderRightActions={renderRightActions}
                             />
                           ))}
@@ -1051,11 +1214,15 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                           key={verseId}
                           verseId={verseId}
                           noteText={noteText}
+                          imageUri={noteImages[verseId]}
                           theme={colors}
                           fonts={fonts}
                           noteTimestamps={noteTimestamps}
                           onDelete={handleDeleteNote}
                           onEditNote={openNoteInReader}
+                          onAddPhoto={handleAddNotePhoto}
+                          onRemovePhoto={handleRemoveNotePhoto}
+                          onOpenImage={setFullscreenImageUri}
                           renderRightActions={renderRightActions}
                         />
                       ))}
@@ -1506,6 +1673,27 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
         </View>
       </Modal>
       <SozAlert {...alertConfig} onDismiss={hideAlert} />
+      <Modal
+        visible={!!fullscreenImageUri}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullscreenImageUri(null)}
+      >
+        <Pressable
+          style={styles.fullscreenOverlay}
+          onPress={() => setFullscreenImageUri(null)}
+          accessibilityRole="button"
+          accessibilityLabel={t('close')}
+        >
+          {fullscreenImageUri ? (
+            <Image
+              source={{ uri: fullscreenImageUri }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          ) : null}
+        </Pressable>
+      </Modal>
       <UndoToast
         visible={!!undoToast}
         message={undoToast?.message ?? ''}
@@ -1520,22 +1708,30 @@ function NoteCard({
   verseId,
   noteText,
   noteTag,
+  imageUri,
   theme,
   fonts,
   noteTimestamps,
   onDelete,
   onEditNote,
+  onAddPhoto,
+  onRemovePhoto,
+  onOpenImage,
   renderRightActions,
 }: {
   verseId: string;
   noteText: string;
   /** İleride not meta / etiket alanı doldurulunca chip gösterilir */
   noteTag?: string | null;
+  imageUri?: string;
   theme: ThemeColors;
   fonts: { regular: string; italic: string };
   noteTimestamps: NoteTimestampsMap;
   onDelete: (id: string) => void;
   onEditNote: (verseId: string) => void;
+  onAddPhoto: (verseId: string) => void;
+  onRemovePhoto: (verseId: string) => void;
+  onOpenImage: (uri: string) => void;
   renderRightActions: (onDelete: () => void) => React.ReactNode;
 }) {
   const { t } = useTranslation();
@@ -1579,6 +1775,16 @@ function NoteCard({
         >
           {noteText}
         </Text>
+        {imageUri ? (
+          <Pressable
+            onPress={() => onOpenImage(imageUri)}
+            style={styles.noteThumbWrap}
+            accessibilityRole="button"
+            accessibilityLabel={t('viewNotePhoto')}
+          >
+            <Image source={{ uri: imageUri }} style={styles.noteThumb} />
+          </Pressable>
+        ) : null}
         {tag ? (
           <View style={[styles.noteTagChip, { backgroundColor: `${ACCENT}20` }]}>
             <Text style={[styles.noteTagChipText, { color: ACCENT }]}>{tag}</Text>
@@ -1603,6 +1809,30 @@ function NoteCard({
           >
             <Ionicons name="pencil-outline" size={18} color={theme.textSecondary} />
           </Pressable>
+          {imageUri ? (
+            <Pressable
+              onPress={() => onRemovePhoto(verseId)}
+              style={styles.noteCardActionHit}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('removePhotoOption')}
+            >
+              <Ionicons name="image" size={18} color={theme.textSecondary} />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => onAddPhoto(verseId)}
+              style={styles.noteCardPhotoBtn}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('addNotePhoto')}
+            >
+              <Ionicons name="image-outline" size={18} color={ACCENT} />
+              <Text style={[styles.noteCardPhotoBtnText, { color: ACCENT, fontFamily: fonts.regular }]}>
+                {t('addNotePhoto')}
+              </Text>
+            </Pressable>
+          )}
           <Pressable
             onPress={() => onDelete(verseId)}
             style={styles.noteCardActionHit}
@@ -1749,10 +1979,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   backBtn: { padding: 4 },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
   headerTitle: {
     fontSize: 28,
-    flex: 1,
     textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontFamily: sheetFonts.italic,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 4,
   },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   headerIconBtn: { padding: 6 },
@@ -1772,31 +2012,11 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   searchCloseBtn: { padding: 8 },
-  statsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(196,149,80,0.06)',
-    borderWidth: 0.5,
-    borderColor: 'rgba(196,149,80,0.15)',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-  },
-  statsBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statsBannerText: {
-    fontFamily: sheetFonts.italic,
-    fontSize: 13,
-    color: 'rgba(196,149,80,0.8)',
-  },
-  statsBannerTotal: { fontSize: 12, color: ACCENT },
   limitWarning: {
     fontFamily: sheetFonts.regular,
-    fontSize: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 4,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -1945,6 +2165,17 @@ const styles = StyleSheet.create({
   noteCardRef: { fontSize: 12, flex: 1 },
   noteCardDate: { fontSize: 11 },
   noteCardBody: { fontSize: 15, lineHeight: 22, marginTop: 8 },
+  noteThumbWrap: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  noteThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 10,
+  },
   noteTagChip: {
     alignSelf: 'flex-start',
     borderRadius: 8,
@@ -1955,12 +2186,31 @@ const styles = StyleSheet.create({
   noteTagChipText: { fontSize: 11, fontFamily: sheetFonts.medium },
   noteCardActionsRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 16,
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
   },
   noteCardActionHit: { paddingVertical: 4 },
+  noteCardPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  noteCardPhotoBtnText: { fontSize: 13 },
+  fullscreenOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImage: {
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT * 0.85,
+  },
   cardIconBtn: { padding: 6 },
   highlightCard: {
     marginHorizontal: 16,

@@ -105,6 +105,48 @@ struct DailyVerseWidgetEntryView: View {
   @Environment(\.widgetFamily) private var family
 
   var body: some View {
+    Group {
+      switch family {
+      case .accessoryInline:
+        Text(entry.ref)
+          .widgetAccentable()
+
+      case .accessoryCircular:
+        ZStack {
+          AccessoryWidgetBackground()
+          VStack(spacing: 1) {
+            Text("S")
+              .font(.system(size: 20, weight: .semibold, design: .rounded))
+            Text(circularLabel)
+              .font(.system(size: 8, weight: .medium))
+              .minimumScaleFactor(0.5)
+              .lineLimit(1)
+          }
+          .widgetAccentable()
+        }
+
+      case .accessoryRectangular:
+        VStack(alignment: .leading, spacing: 3) {
+          Text(truncatedVerse(entry.text, limit: 60))
+            .font(.caption2)
+            .lineLimit(3)
+            .widgetAccentable()
+          Text(entry.ref)
+            .font(.caption2.weight(.semibold))
+            .lineLimit(1)
+            .widgetAccentable()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+      default:
+        homeScreenBody
+      }
+    }
+    .widgetURL(URL(string: "soz://read"))
+  }
+
+  /// Ana ekran (.systemSmall / Medium / Large) — mevcut koyu kart düzeni.
+  private var homeScreenBody: some View {
     ZStack {
       Color.black.opacity(0.95)
       VStack(alignment: .leading, spacing: 6) {
@@ -130,7 +172,24 @@ struct DailyVerseWidgetEntryView: View {
       }
       .padding()
     }
-    .widgetURL(URL(string: "soz://read"))
+  }
+
+  /// Dairesel kilit ekranı için kısa etiket (kitap kısaltması / ref).
+  private var circularLabel: String {
+    let parts = entry.ref.split(separator: " ")
+    if parts.count >= 2 {
+      let book = String(parts[0].prefix(3))
+      let chapterVerse = parts.dropFirst().joined(separator: " ")
+      return "\(book) \(chapterVerse)"
+    }
+    return String(entry.ref.prefix(10))
+  }
+
+  private func truncatedVerse(_ text: String, limit: Int) -> String {
+    guard text.count > limit else { return text }
+    let end = text.index(text.startIndex, offsetBy: limit)
+    let slice = String(text[..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+    return slice + "…"
   }
 }
 
@@ -144,6 +203,13 @@ struct DailyVerseWidget: Widget {
     }
     .configurationDisplayName("Günün Ayeti")
     .description("Söz uygulamasından günlük ayet.")
-    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    .supportedFamilies([
+      .systemSmall,
+      .systemMedium,
+      .systemLarge,
+      .accessoryCircular,
+      .accessoryRectangular,
+      .accessoryInline,
+    ])
   }
 }

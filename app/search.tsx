@@ -111,6 +111,13 @@ export default function SearchScreen() {
     } catch (_) {}
   }, []);
 
+  const clearAllHistory = useCallback(async () => {
+    try {
+      await AsyncStorage.removeItem(SEARCH_HISTORY_KEY);
+      setSearchHistory([]);
+    } catch (_) {}
+  }, []);
+
   const results = useMemo(() => searchVerseText(searchText), [searchText]);
 
   const filteredResults = useMemo(() => {
@@ -267,7 +274,20 @@ export default function SearchScreen() {
 
         {showHistorySection && (
           <View style={styles.historySection}>
-            <Text style={[styles.historyTitle, { color: colors.textMuted }]}>{t('recentSearches')}</Text>
+            <View style={styles.historyHeader}>
+              <Text style={[styles.historyTitle, { color: colors.textMuted }]}>{t('recentSearches')}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  void clearAllHistory();
+                  Haptics.selectionAsync();
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('clearHistory')}
+              >
+                <Text style={styles.clearAllText}>{t('clearHistory')}</Text>
+              </TouchableOpacity>
+            </View>
             {searchHistory.map((item) => (
               <TouchableOpacity
                 key={item}
@@ -484,11 +504,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
   },
+  historyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    gap: 12,
+  },
   historyTitle: {
     fontSize: 11,
     letterSpacing: 0.2,
-    marginBottom: 14,
     fontFamily: fonts.regular,
+    flexShrink: 1,
+  },
+  clearAllText: {
+    fontSize: 12,
+    color: '#C4956A',
+    fontFamily: fonts.medium,
   },
   historyItem: {
     flexDirection: 'row',

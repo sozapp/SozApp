@@ -1,8 +1,10 @@
 import { ALL_BADGES, type Badge, type UserStats } from '@/constants/badges';
+import { getVisitedMapLocationCount } from '@/constants/map-visits';
+import type { TranslationKey } from '@/constants/i18n';
+import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
@@ -44,7 +46,15 @@ type TopBook = {
   count: number;
 };
 
-const WEEK_LABELS = ['Pz', 'Pt', 'Sa', 'Ca', 'Pe', 'Cu', 'Ct'];
+const WEEKDAY_KEYS: TranslationKey[] = [
+  'weekdayShortSun',
+  'weekdayShortMon',
+  'weekdayShortTue',
+  'weekdayShortWed',
+  'weekdayShortThu',
+  'weekdayShortFri',
+  'weekdayShortSat',
+];
 
 function getDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -91,6 +101,12 @@ function computeBadgeProgress(badge: Badge, stats: UserStats): { current: number
         target: 7,
         done: stats.reflectionsCompleted >= 7,
       };
+    case 'anatolia_explorer':
+      return {
+        current: Math.min(stats.mapLocationsVisited, badge.target),
+        target: badge.target,
+        done: stats.mapLocationsVisited >= badge.target,
+      };
     default:
       return { current: 0, target: 1, done: false };
   }
@@ -98,7 +114,7 @@ function computeBadgeProgress(badge: Badge, stats: UserStats): { current: number
 
 export default function StatsScreen() {
   const { colors, fonts } = useTheme();
-  const router = useRouter();
+  const { t } = useTranslation();
   const safeBack = useSafeBack();
   const [summary, setSummary] = useState<SummaryStats>({
     totalVersesRead: 0,
@@ -117,6 +133,7 @@ export default function StatsScreen() {
     daysActive: 1,
     memorizeCount: 0,
     reflectionsCompleted: 0,
+    mapLocationsVisited: 0,
   });
 
   const load = useCallback(async () => {
@@ -168,7 +185,7 @@ export default function StatsScreen() {
         const key = getDateKey(d);
         return {
           key,
-          label: WEEK_LABELS[d.getDay()] ?? '??',
+          label: t(WEEKDAY_KEYS[d.getDay()] ?? 'weekdayShortSun'),
           count: dailyCounts[key] ?? 0,
           isToday: key === todayKey,
         };
@@ -195,11 +212,12 @@ export default function StatsScreen() {
         daysActive: Number(daysRaw[1] ?? 1),
         memorizeCount: memorizeRaw[1] ? JSON.parse(memorizeRaw[1]).length : 0,
         reflectionsCompleted: Number(reflectionsRaw[1] ?? 0),
+        mapLocationsVisited: await getVisitedMapLocationCount(),
       });
     } catch (e) {
       console.error('stats load error:', e);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -216,11 +234,11 @@ export default function StatsScreen() {
           style={styles.backBtn}
           hitSlop={12}
           accessibilityRole="button"
-          accessibilityLabel="Geri git"
+          accessibilityLabel={t('goBackA11y')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </Pressable>
-        <Text style={[styles.title, { color: colors.text, fontFamily: fonts.regular }]}>İstatistikler</Text>
+        <Text style={[styles.title, { color: colors.text, fontFamily: fonts.regular }]}>{t('statistics')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -230,29 +248,39 @@ export default function StatsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>Ozet</Text>
+          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>{t('statsSummary')}</Text>
           <View style={styles.grid}>
             <View style={[styles.gridCard, { backgroundColor: colors.surface }]}>
               <Text style={[styles.gridValue, { color: ACCENT, fontFamily: fonts.regular }]}>{summary.totalVersesRead}</Text>
-              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>Toplam okunan ayet</Text>
+              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+                {t('statsTotalVersesRead')}
+              </Text>
             </View>
             <View style={[styles.gridCard, { backgroundColor: colors.surface }]}>
               <Text style={[styles.gridValue, { color: ACCENT, fontFamily: fonts.regular }]}>{summary.totalChaptersRead}</Text>
-              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>Toplam okunan bolum</Text>
+              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+                {t('statsTotalChaptersRead')}
+              </Text>
             </View>
             <View style={[styles.gridCard, { backgroundColor: colors.surface }]}>
               <Text style={[styles.gridValue, { color: ACCENT, fontFamily: fonts.regular }]}>{summary.longestStreak}</Text>
-              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>En uzun seri</Text>
+              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+                {t('longestStreak')}
+              </Text>
             </View>
             <View style={[styles.gridCard, { backgroundColor: colors.surface }]}>
               <Text style={[styles.gridValue, { color: ACCENT, fontFamily: fonts.regular }]}>{summary.totalNotes}</Text>
-              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>Toplam not sayisi</Text>
+              <Text style={[styles.gridLabel, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+                {t('statsTotalNotesCount')}
+              </Text>
             </View>
           </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>Haftalik aktivite</Text>
+          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>
+            {t('statsWeeklyActivity')}
+          </Text>
           <FlatList
             horizontal
             data={weeklyData}
@@ -282,10 +310,10 @@ export default function StatsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>En cok okunan kitaplar</Text>
+          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>{t('statsTopBooks')}</Text>
           {topBooks.length === 0 ? (
             <Text style={[styles.placeholder, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
-              Henüz veri yok
+              {t('statsNoDataYet')}
             </Text>
           ) : (
             topBooks.map((b) => (
@@ -308,7 +336,9 @@ export default function StatsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>Rozet ilerlemesi</Text>
+          <Text style={[styles.cardTitle, { color: colors.text, fontFamily: fonts.regular }]}>
+            {t('statsBadgeProgress')}
+          </Text>
           {ALL_BADGES.map((badge) => {
             const prog = computeBadgeProgress(badge, badgeStats);
             const pct = Math.max(0, Math.min(100, Math.round((prog.current / prog.target) * 100)));
@@ -326,7 +356,7 @@ export default function StatsScreen() {
                     </Text>
                   </View>
                   <Text style={[styles.badgeMeta, { color: prog.done ? '#4CAF50' : colors.textSecondary, fontFamily: fonts.regular }]}>
-                    {prog.done ? 'tamamlandi ✓' : `${prog.current}/${prog.target}`}
+                    {prog.done ? t('statsBadgeCompleted') : `${prog.current}/${prog.target}`}
                   </Text>
                 </View>
                 <View style={[styles.progressBg, { backgroundColor: colors.border }]}>
@@ -337,17 +367,20 @@ export default function StatsScreen() {
           })}
           <View style={[styles.exampleRow, { borderColor: colors.border }]}>
             <Text style={[styles.exampleText, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
-              Ilk Adim:
+              {t('statsExampleFirstStep')}
             </Text>
-            <Text style={[styles.exampleText, { color: '#4CAF50', fontFamily: fonts.regular }]}> tamamlandi ✓</Text>
+            <Text style={[styles.exampleText, { color: '#4CAF50', fontFamily: fonts.regular }]}>
+              {' '}
+              {t('statsBadgeCompleted')}
+            </Text>
           </View>
           <View style={styles.exampleRow}>
             <Text style={[styles.exampleText, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
-              7 Gun Seri:
+              {t('statsExampleSevenDay')}
             </Text>
             <Text style={[styles.exampleText, { color: ACCENT, fontFamily: fonts.regular }]}>
               {' '}
-              {Math.min(summary.longestStreak, 7)}/7 gun
+              {t('statsExampleDaysOfSeven', { n: Math.min(summary.longestStreak, 7) })}
             </Text>
           </View>
         </View>

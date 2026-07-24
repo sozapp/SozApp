@@ -30,6 +30,7 @@ describe('useChurch — refresh()', () => {
       // sessizce ve doğru şekilde seçilmeli.
       tableData.church_group_members = [
         {
+          user_id: 'user-1',
           group_id: 'group-old',
           role: 'member',
           joined_at: '2020-01-01T00:00:00.000Z',
@@ -43,6 +44,7 @@ describe('useChurch — refresh()', () => {
           },
         },
         {
+          user_id: 'user-1',
           group_id: 'group-new',
           role: 'admin',
           joined_at: '2024-06-01T00:00:00.000Z',

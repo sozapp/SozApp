@@ -10,6 +10,7 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
+import { supabase } from '@/constants/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -185,13 +186,34 @@ export default function OnboardingScreen() {
   }, []);
 
   const finishOnboarding = useCallback(async () => {
+    const name = userName.trim();
     try {
       await AsyncStorage.multiSet([
         ['@soz/onboardingSeen', 'true'],
-        ['@soz/userName', userName.trim()],
+        ['@soz/userName', name],
         ['@soz/userProfile', selectedProfile ?? ''],
         ['@soz/userChurch', selectedChurch ?? ''],
       ]);
+
+      if (name && supabase) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const uid = session?.user?.id;
+        if (uid) {
+          const emailPrefix = session.user.email?.split('@')[0]?.trim() ?? '';
+          const { data: prof } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', uid)
+            .maybeSingle();
+          const current = (prof?.display_name as string | null)?.trim() ?? '';
+          const shouldOverwrite = !current || current === emailPrefix;
+          if (shouldOverwrite) {
+            await supabase.from('profiles').update({ display_name: name }).eq('id', uid);
+          }
+        }
+      }
     } catch (e) {
       console.error('Onboarding kayıt hatası:', e);
     }

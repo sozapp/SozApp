@@ -8,6 +8,20 @@ export const BOOK_SHORT_TO_ID: Record<string, string> = {
   Mar: 'mar',
   Luk: 'luk',
   Yuh: 'joh',
+  Elç: 'act',
+  Rom: 'rom',
+  '1Ko': '1co',
+  '2Ko': '2co',
+  Gal: 'gal',
+  Ef: 'eph',
+  Flp: 'php',
+  Kol: 'col',
+  '1Se': '1th',
+  '2Se': '2th',
+  '1Ti': '1ti',
+  '2Ti': '2ti',
+  Tit: 'tit',
+  Flm: 'phm',
 };
 
 export function getPlanCurrentDay(progress: PlanProgress | null, totalDays: number): number {

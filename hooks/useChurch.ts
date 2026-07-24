@@ -339,6 +339,40 @@ export function useChurch() {
     await AsyncStorage.removeItem(CACHE_KEY);
   }, [church]);
 
+  const removeMember = useCallback(
+    async (targetUserId: string): Promise<void> => {
+      if (!supabase || !church) {
+        throw new Error('Grup bulunamadı.');
+      }
+      if (church.role !== 'admin') {
+        throw new Error('Bu işlem için admin olmalısınız.');
+      }
+      if (targetUserId === '') {
+        throw new Error('Geçersiz üye.');
+      }
+
+      let rollback: ChurchMember[] = [];
+      setMembers((curr) => {
+        rollback = curr;
+        return curr.filter((m) => m.userId !== targetUserId);
+      });
+
+      try {
+        const { error } = await supabase.rpc('remove_church_group_member', {
+          p_group_id: church.id,
+          p_target_user_id: targetUserId,
+        });
+        if (error) throw error;
+      } catch (e) {
+        setMembers(rollback);
+        console.warn('[Church] removeMember failed:', e);
+        reportError('Church.removeMember', e);
+        throw e instanceof Error ? e : new Error('Üye çıkarılamadı.');
+      }
+    },
+    [church]
+  );
+
   const setWeeklyPlan = useCallback(
     async (reference: string, daysLeft: number): Promise<ActionResult> => {
       if (!supabase || !church) return { ok: false, error: 'Grup bulunamadı.' };
@@ -418,6 +452,7 @@ export function useChurch() {
     joinGroup,
     createGroup,
     leaveGroup,
+    removeMember,
     setWeeklyPlan,
     sendPrayer,
     toggleMyCompletion,

@@ -1,3 +1,5 @@
+import { reportError } from '@/constants/sentry';
+import { trackEvent } from '@/constants/analytics';
 import { supabase } from '@/constants/supabase';
 import { useTranslation } from '@/context/LanguageContext';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -134,12 +136,147 @@ export function useChatThread(friendId: string) {
           .single();
         if (error) return { ok: false, error: error.message };
         setMessages((prev) => [...prev, fromRow(data as MessageRow)]);
+        trackEvent('message_sent');
+
+        // Push: mesajı engellemeden fire-and-forget
+        void (async () => {
+          try {
+            let senderName = 'Yeni mesaj';
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name, email')
+              .eq('id', user.id)
+              .maybeSingle();
+            const name =
+              (profile as { display_name: string | null; email: string | null } | null)
+                ?.display_name?.trim() ||
+              (profile as { display_name: string | null; email: string | null } | null)?.email
+                ?.split('@')[0]
+                ?.trim();
+            if (name) senderName = name;
+
+            const preview =
+              trimmed.length > 60 ? `${trimmed.slice(0, 57).trimEnd()}…` : trimmed;
+
+            await supabase.functions.invoke('send-push', {
+              body: {
+                recipientUserId: friendId,
+                title: senderName,
+                body: preview,
+                data: { type: 'message', friendId: user.id },
+              },
+            });
+          } catch (e) {
+            console.warn('[Push] message notify skipped:', e);
+          }
+        })();
+
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : t('genericErrorOccurred') };
       }
     },
     [friendId, t]
+  );
+
+  const deleteMessage = useCallback(
+    async (messageId: string): Promise<void> => {
+      if (!supabase) throw new Error(t('serverConnectionError'));
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error(t('mustSignInFirst'));
+
+      let snapshot: ChatMessage[] = [];
+      setMessages((prev) => {
+        snapshot = prev;
+        return prev.filter((m) => m.id !== messageId);
+      });
+
+      try {
+        const { error } = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', messageId)
+          .eq('sender_id', user.id);
+        if (error) throw error;
+      } catch (e) {
+        setMessages(snapshot);
+        console.warn('[Chat] deleteMessage failed:', e);
+        throw e;
+      }
+    },
+    [t]
+  );
+
+  const reportMessage = useCallback(
+    async (messageId: string): Promise<void> => {
+      if (!supabase) throw new Error(t('serverConnectionError'));
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error(t('mustSignInFirst'));
+
+      const { error } = await supabase.from('message_reports').insert({
+        message_id: messageId,
+        reporter_id: user.id,
+      });
+      if (error) {
+        if (error.code === '23505') return; // zaten şikayet edilmiş, sessizce geç
+        throw error;
+      }
+      console.warn('[Chat] message report filed', { messageId, reporterId: user.id });
+      reportError('Chat.reportMessage', new Error(`message_report:${messageId}`));
+    },
+    [t]
+  );
+
+  const blockUser = useCallback(
+    async (userId: string): Promise<void> => {
+      if (!supabase) throw new Error(t('serverConnectionError'));
+      if (!userId) throw new Error(t('genericErrorOccurred'));
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error(t('mustSignInFirst'));
+      if (user.id === userId) throw new Error(t('genericErrorOccurred'));
+
+      const { error: blockError } = await supabase.from('blocked_users').insert({
+        blocker_id: user.id,
+        blocked_id: userId,
+      });
+      if (blockError) throw blockError;
+
+      // Engelleme arkadaşlığı da sonlandırır (her iki yön).
+      const { error: friendError } = await supabase
+        .from('friendships')
+        .delete()
+        .or(
+          `and(user_id.eq.${user.id},friend_id.eq.${userId}),and(user_id.eq.${userId},friend_id.eq.${user.id})`
+        );
+      if (friendError) {
+        console.warn('[Chat] blockUser friendship cleanup failed:', friendError.message);
+      }
+    },
+    [t]
+  );
+
+  const unblockUser = useCallback(
+    async (userId: string): Promise<void> => {
+      if (!supabase) throw new Error(t('serverConnectionError'));
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error(t('mustSignInFirst'));
+
+      const { error } = await supabase
+        .from('blocked_users')
+        .delete()
+        .eq('blocker_id', user.id)
+        .eq('blocked_id', userId);
+      if (error) throw error;
+    },
+    [t]
   );
 
   useEffect(() => {
@@ -188,6 +325,16 @@ export function useChatThread(friendId: string) {
           );
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'messages' },
+        (payload) => {
+          const row = payload.old as Partial<MessageRow> | undefined;
+          const id = row?.id;
+          if (!id) return;
+          setMessages((prev) => prev.filter((m) => m.id !== id));
+        }
+      )
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         const userId = (payload as { userId?: string } | null)?.userId;
         if (!userId || userId === myId) return;
@@ -226,7 +373,20 @@ export function useChatThread(friendId: string) {
     }, TYPING_DEBOUNCE_MS);
   }, [myId]);
 
-  return { messages, loading, myId, theirTyping, notifyTyping, sendMessage, markRead, reload: load };
+  return {
+    messages,
+    loading,
+    myId,
+    theirTyping,
+    notifyTyping,
+    sendMessage,
+    deleteMessage,
+    reportMessage,
+    blockUser,
+    unblockUser,
+    markRead,
+    reload: load,
+  };
 }
 
 export function useUnreadMessageCounts(friendIds: string[]) {

@@ -1,4 +1,6 @@
 import { fonts } from '@/constants/theme';
+import type { TranslationKey } from '@/constants/i18n';
+import { useTranslation } from '@/context/LanguageContext';
 import { useHaptics } from '@/hooks/useHaptics';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,40 +32,40 @@ const PADDING = 32;
 // —— Step data: component DIŞINDA, hook yok ——
 type StepData = {
   id: number;
-  title: string;
-  description: string;
+  titleKey: TranslationKey;
+  descriptionKey: TranslationKey;
   icon: keyof typeof Ionicons.glyphMap;
 };
 
 const STEPS: StepData[] = [
   {
     id: 0,
-    title: "Söz'ü Oku",
-    description: "Tüm Yeni Ahit Türkçe olarak parmaklarının ucunda. Ayetlere uzun basarak not ekle, vurgula veya paylaş.",
+    titleKey: 'tutorialStepReadTitle',
+    descriptionKey: 'tutorialStepReadDesc',
     icon: 'book-outline',
   },
   {
     id: 1,
-    title: 'İşaretle & Not Al',
-    description: 'Önemli ayetleri renklerle vurgula, kişisel notlar ekle. Hepsi sende saklı kalır.',
+    titleKey: 'tutorialStepHighlightTitle',
+    descriptionKey: 'tutorialStepHighlightDesc',
     icon: 'color-palette-outline',
   },
   {
     id: 2,
-    title: 'Kutsal Topraklar',
-    description: "Efes, Antakya, Tarsus... İncil'in geçtiği yerler bugün Türkiye'de. Haritada keşfet.",
+    titleKey: 'tutorialStepMapTitle',
+    descriptionKey: 'tutorialStepMapDesc',
     icon: 'map-outline',
   },
   {
     id: 3,
-    title: 'Paylaş & İlham Ver',
-    description: "Ayetleri güzel kartlara dönüştür, Instagram ve WhatsApp'ta paylaş.",
+    titleKey: 'tutorialStepShareTitle',
+    descriptionKey: 'tutorialStepShareDesc',
     icon: 'share-social-outline',
   },
   {
     id: 4,
-    title: 'Birlikte Oku',
-    description: 'Kilisenizle grup oluşturun, aynı planı takip edin, birlikte büyüyün.',
+    titleKey: 'tutorialStepGroupTitle',
+    descriptionKey: 'tutorialStepGroupDesc',
     icon: 'people-outline',
   },
 ];
@@ -117,6 +119,7 @@ function HighlightMockup(): ReactNode {
 }
 
 function MapMockup(): ReactNode {
+  const { t } = useTranslation();
   return (
     <View style={styles.mockupContainer}>
       <View style={styles.mapPreview}>
@@ -136,7 +139,7 @@ function MapMockup(): ReactNode {
           <SvgText x="175" y="92" fontSize="9" fill="#C4956A" textAnchor="middle">Antakya</SvgText>
           <SvgText x="260" y="72" fontSize="9" fill="#C4956A" textAnchor="middle">Tarsus</SvgText>
         </Svg>
-        <Text style={styles.mapLabel}>10 kutsal yer · Türkiye topraklarında</Text>
+        <Text style={styles.mapLabel}>{t('tutorialMapLabel')}</Text>
       </View>
     </View>
   );
@@ -154,10 +157,11 @@ function VerseCardMockup(): ReactNode {
 }
 
 function GroupMockup(): ReactNode {
+  const { t } = useTranslation();
   return (
     <View style={styles.mockupContainer}>
       <View style={[styles.mockupGroup, { backgroundColor: 'rgba(26,22,18,0.95)' }]}>
-        <Text style={styles.mockupGroupTitle}>Kilise Grubu</Text>
+        <Text style={styles.mockupGroupTitle}>{t('churchGroup')}</Text>
         <View style={styles.mockupMember}>
           <View style={styles.mockupAvatar} />
           <Text style={styles.mockupMemberName}>Ahmet</Text>
@@ -190,6 +194,7 @@ function renderTopForStep(stepId: number): ReactNode {
 export default function TutorialScreen() {
   // 1. Tüm hook'lar en üstte
   const router = useRouter();
+  const { t } = useTranslation();
   const haptics = useHaptics();
   const flatListRef = useRef<FlatList>(null);
   const [step, setStep] = useState(0);
@@ -245,27 +250,27 @@ export default function TutorialScreen() {
           <View style={styles.iconWrap}>
             <Ionicons name={item.icon} size={56} color={ACCENT} />
           </View>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.description}>{item.description}</Text>
+          <Text style={styles.title}>{t(item.titleKey)}</Text>
+          <Text style={styles.description}>{t(item.descriptionKey)}</Text>
           {item.id === STEPS.length - 1 ? (
             <Pressable
               style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
               onPress={finishTutorial}
             >
-              <Text style={styles.primaryBtnText}>Başlayalım!</Text>
+              <Text style={styles.primaryBtnText}>{t('letsGo')}</Text>
             </Pressable>
           ) : (
             <Pressable
               style={({ pressed }) => [styles.nextBtn, pressed && styles.nextBtnPressed]}
               onPress={goNext}
             >
-              <Text style={styles.nextBtnText}>Devam →</Text>
+              <Text style={styles.nextBtnText}>{t('continueShortArrow')}</Text>
             </Pressable>
           )}
         </View>
       </View>
     ),
-    [goNext, finishTutorial]
+    [goNext, finishTutorial, t]
   );
 
   // 3. Return
@@ -274,7 +279,7 @@ export default function TutorialScreen() {
       <View style={styles.header}>
         <StepIndicator step={step} total={STEPS.length} />
         <Pressable onPress={skipTutorial} style={styles.skipBtn} hitSlop={12}>
-          <Text style={styles.skipText}>Atla</Text>
+          <Text style={styles.skipText}>{t('skip')}</Text>
         </Pressable>
       </View>
       <Animated.View style={[styles.animatedWrap, { opacity: fadeAnim }]}>

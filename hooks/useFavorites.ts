@@ -158,29 +158,18 @@ export function useFavorites() {
   const loadFavorites = useCallback(async () => {
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      if (__DEV__) {
-        console.log('=== FAVORİLER RAW ===');
-        console.log(raw);
-        console.log('====================');
-      }
       if (!raw) {
         setFavorites([]);
         return;
       }
-      if (__DEV__) {
-        console.log('Favorites raw:', raw);
-      }
       const valid = parseFavoritesRaw(raw);
-      if (__DEV__) {
-        console.log('Valid favorites:', valid.length);
-      }
       setFavorites(valid);
       const normalized = JSON.stringify(valid);
       if (normalized !== raw) {
         await AsyncStorage.setItem(STORAGE_KEY, normalized);
       }
     } catch (e) {
-      if (__DEV__) console.log('Load favorites error:', e);
+      console.warn('Load favorites error:', e);
       setFavorites([]);
     }
   }, []);
@@ -203,7 +192,6 @@ export function useFavorites() {
       }
       const text = (verseText ?? getVerseTextByVerseId(canonical) ?? '').trim();
       if (!text) {
-        if (__DEV__) console.log('Favorite error: empty text for', canonical);
         return false;
       }
       const item = itemFromCanonical(canonical, text, new Date().toISOString());
@@ -231,7 +219,7 @@ export function useFavorites() {
         setFavorites(updated);
         await persistFavorites(updated);
       } catch (e) {
-        if (__DEV__) console.log('Remove error:', e);
+        console.warn('Remove favorite error:', e);
       }
     },
     [favorites]
@@ -244,4 +232,35 @@ export function useFavorites() {
     refreshFavorites: loadFavorites,
     removeFavorite,
   };
+}
+
+/**
+ * Bugünün ay/günüyle eşleşen ve en az ~1 yıl önce eklenmiş favoriler.
+ * En son eklenen önce (birden fazla yıl geriye gidebilir).
+ */
+export function getOnThisDayFavorites(
+  favorites: FavoriteItem[],
+  now: Date = new Date()
+): FavoriteItem[] {
+  const month = now.getMonth();
+  const day = now.getDate();
+  const MS_PER_YEAR = 365 * 24 * 60 * 60 * 1000;
+  const nowMs = now.getTime();
+
+  return favorites
+    .filter((f) => {
+      const added = new Date(f.addedAt);
+      if (Number.isNaN(added.getTime())) return false;
+      if (added.getMonth() !== month || added.getDate() !== day) return false;
+      return nowMs - added.getTime() >= MS_PER_YEAR;
+    })
+    .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+}
+
+/** On This Day başlığı için yıl farkı (en az 1). */
+export function yearsSinceFavorite(addedAt: string, now: Date = new Date()): number {
+  const added = new Date(addedAt);
+  if (Number.isNaN(added.getTime())) return 1;
+  const years = now.getFullYear() - added.getFullYear();
+  return Math.max(1, years);
 }

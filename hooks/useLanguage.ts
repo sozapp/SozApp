@@ -41,7 +41,7 @@ export function useLanguage() {
         // Kullanıcıya bildirim göstermek için bu değeri döndürebilirsiniz
       }
     } catch (e) {
-      console.log('Language save error:', e);
+      console.warn('Language save error:', e);
     }
   }, []);
 

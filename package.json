@@ -10,7 +10,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "jest"
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "ci": "npm run lint && npm run typecheck && npm test -- --ci"
   },
   "dependencies": {
     "@expo-google-fonts/cormorant-garamond": "^0.4.1",
@@ -24,10 +26,12 @@
     "@supabase/supabase-js": "^2.99.2",
     "dotenv": "^17.3.1",
     "expo": "~54.0.36",
+    "expo-application": "~7.0.8",
     "expo-av": "~16.0.8",
     "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
     "expo-device": "~8.0.10",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.23",
@@ -54,6 +58,7 @@
     "expo-web-browser": "~15.0.11",
     "expo-widgets": "^55.0.8",
     "groq-sdk": "^1.1.1",
+    "posthog-react-native": "^4.60.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",

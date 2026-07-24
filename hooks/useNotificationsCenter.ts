@@ -50,8 +50,8 @@ export function useNotificationsCenter() {
   const [friendIds, setFriendIds] = useState<string[]>([]);
   const [profileMap, setProfileMap] = useState<Record<string, ProfileMini>>({});
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { soft?: boolean }) => {
+    if (!opts?.soft) setLoading(true);
     try {
       if (!supabase) {
         setUser(null);
@@ -121,7 +121,7 @@ export function useNotificationsCenter() {
         setProfileMap({});
       }
     } finally {
-      setLoading(false);
+      if (!opts?.soft) setLoading(false);
     }
   }, []);
 
@@ -184,9 +184,9 @@ export function useNotificationsCenter() {
     void syncAppIconBadge(totalCount);
   }, [totalCount]);
 
-  const reload = useCallback(() => {
-    void load();
-    void reloadUnread();
+  const reload = useCallback(async () => {
+    await load({ soft: true });
+    await reloadUnread();
   }, [load, reloadUnread]);
 
   const acceptRequest = useCallback(
@@ -224,6 +224,25 @@ export function useNotificationsCenter() {
     [reload]
   );
 
+  /** Okunmamış sohbetlerdeki mesajları tek sorguda okundu işaretle. */
+  const markAllThreadsRead = useCallback(async (): Promise<void> => {
+    if (!supabase || !user?.id) return;
+    const senderIds = unreadThreads.map((t) => t.friendId);
+    if (senderIds.length === 0) return;
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ read_at: new Date().toISOString() })
+        .eq('recipient_id', user.id)
+        .in('sender_id', senderIds)
+        .is('read_at', null);
+      if (error) throw error;
+      reload();
+    } catch (e) {
+      console.warn('[NotificationsCenter] markAllThreadsRead failed:', e);
+    }
+  }, [user, unreadThreads, reload]);
+
   return {
     loading,
     user,
@@ -233,5 +252,6 @@ export function useNotificationsCenter() {
     reload,
     acceptRequest,
     rejectRequest,
+    markAllThreadsRead,
   };
 }

@@ -595,7 +595,7 @@ export default function FocusScreen() {
             </Svg>
             <View style={styles.timerOverlay}>
               <Text style={styles.timerText}>{timeStr}</Text>
-              <Text style={styles.timerSub}>dakika kaldı</Text>
+              <Text style={styles.timerSub}>{t('minutesLeft')}</Text>
             </View>
           </View>
 
@@ -631,7 +631,7 @@ export default function FocusScreen() {
                     size={18}
                     color={ACCENT}
                   />
-                  <Text style={styles.verseActionText}>Favori</Text>
+                  <Text style={styles.verseActionText}>{t('favorite')}</Text>
                 </Pressable>
                 <Pressable
                   style={styles.verseActionBtn}
@@ -642,12 +642,12 @@ export default function FocusScreen() {
                         verse.ref,
                         verse.verseId ? deepLinkParamsFromVerseId(verse.verseId) : null
                       ),
-                      title: 'Söz',
+                      title: t('appName'),
                     }).catch(() => {})
                   }
                 >
                   <Ionicons name="share-outline" size={18} color={ACCENT} />
-                  <Text style={styles.verseActionText}>Paylaş</Text>
+                  <Text style={styles.verseActionText}>{t('share')}</Text>
                 </Pressable>
                 <Pressable
                   style={styles.verseActionBtn}
@@ -662,7 +662,7 @@ export default function FocusScreen() {
                   }}
                 >
                   <Ionicons name="book-outline" size={18} color={ACCENT} />
-                  <Text style={styles.verseActionText}>Oku</Text>
+                  <Text style={styles.verseActionText}>{t('read')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -696,11 +696,11 @@ export default function FocusScreen() {
                     <Ionicons name="moon-outline" size={24} color="#C4956A" />
                   </View>
                   <View style={exitSheetStyles.exitTitleWrap}>
-                    <Text style={exitSheetStyles.exitTitle}>Odak Modundan Çık</Text>
+                    <Text style={exitSheetStyles.exitTitle}>{t('exitFocusSheetTitle')}</Text>
                     <Text style={exitSheetStyles.exitSubtitle}>
                       {elapsedMinutes > 0
-                        ? `${elapsedMinutes} dakika odaklandın`
-                        : 'Henüz yeni başladın'}
+                        ? t('minutesFocused', { n: elapsedMinutes })
+                        : t('justStartedFocus')}
                     </Text>
                   </View>
                 </View>
@@ -716,8 +716,8 @@ export default function FocusScreen() {
                     <Ionicons name="exit-outline" size={18} color="rgba(232,100,80,0.9)" />
                   </View>
                   <View style={exitSheetStyles.exitConfirmText}>
-                    <Text style={exitSheetStyles.exitConfirmTitle}>Odak Modunu Bitir</Text>
-                    <Text style={exitSheetStyles.exitConfirmDesc}>İlerleme kaydedilecek</Text>
+                    <Text style={exitSheetStyles.exitConfirmTitle}>{t('endFocusTitle')}</Text>
+                    <Text style={exitSheetStyles.exitConfirmDesc}>{t('progressWillBeSaved')}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={14} color={theme.textMuted} />
                 </TouchableOpacity>
@@ -731,14 +731,14 @@ export default function FocusScreen() {
                     <Ionicons name="play-outline" size={18} color="#C4956A" />
                   </View>
                   <View style={exitSheetStyles.exitConfirmText}>
-                    <Text style={exitSheetStyles.exitContinueTitle}>Odaklanmaya Devam Et</Text>
-                    <Text style={exitSheetStyles.exitConfirmDesc}>Kaldığın yerden devam et</Text>
+                    <Text style={exitSheetStyles.exitContinueTitle}>{t('keepFocusing')}</Text>
+                    <Text style={exitSheetStyles.exitConfirmDesc}>{t('resumeFromWhere')}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={14} color={theme.textMuted} />
                 </TouchableOpacity>
 
                 <TouchableOpacity style={exitSheetStyles.exitCancelBtn} onPress={closeExitSheet}>
-                  <Text style={exitSheetStyles.exitCancelText}>İptal</Text>
+                  <Text style={exitSheetStyles.exitCancelText}>{t('cancel')}</Text>
                 </TouchableOpacity>
               </Animated.View>
             </View>
@@ -763,28 +763,28 @@ export default function FocusScreen() {
           <View style={styles.completeCards}>
             <View style={styles.completeCard}>
               <Ionicons name="timer-outline" size={28} color="#C4956A" style={styles.completeCardIcon} />
-              <Text style={styles.completeCardText}>{completedMinutes} dakika odak</Text>
+              <Text style={styles.completeCardText}>{t('minutesFocusCard', { n: completedMinutes })}</Text>
             </View>
             {verse && (
               <View style={styles.completeCard}>
                 <Ionicons name="book-outline" size={28} color="#C4956A" style={styles.completeCardIcon} />
-                <Text style={styles.completeCardText}>{verse.ref} ile</Text>
+                <Text style={styles.completeCardText}>{t('withVerseRef', { ref: verse.ref })}</Text>
               </View>
             )}
             <View style={styles.completeCard}>
               <Ionicons name="flame-outline" size={28} color="#C4956A" style={styles.completeCardIcon} />
-              <Text style={styles.completeCardText}>Streak korundu</Text>
+              <Text style={styles.completeCardText}>{t('streakKept')}</Text>
             </View>
           </View>
           <View style={styles.completeButtons}>
             <Pressable style={styles.completeBtnPrimary} onPress={startFocus}>
-              <Text style={styles.completeBtnPrimaryText}>Tekrar Başlat</Text>
+              <Text style={styles.completeBtnPrimaryText}>{t('restartFocus')}</Text>
             </Pressable>
             <Pressable
               style={styles.completeBtnSecondary}
               onPress={() => router.replace('/(tabs)')}
             >
-              <Text style={styles.completeBtnSecondaryText}>Ana Sayfaya Dön</Text>
+              <Text style={styles.completeBtnSecondaryText}>{t('backHome')}</Text>
             </Pressable>
           </View>
         </SafeAreaView>
@@ -803,7 +803,7 @@ export default function FocusScreen() {
           accessibilityRole="button"
           accessibilityLabel={t('back')}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.textMuted} />
+          <Ionicons name="arrow-back" size={24} color={theme.textMuted} />
         </TouchableOpacity>
         <ScrollView
           contentContainerStyle={styles.configScroll}
@@ -812,11 +812,11 @@ export default function FocusScreen() {
         >
           <View style={styles.configHeader}>
             <Ionicons name="moon-outline" size={48} color={ACCENT} />
-            <Text style={styles.configTitle}>Odak Modu</Text>
-            <Text style={styles.configSub}>Sadece Söz. Sadece şu an.</Text>
+            <Text style={styles.configTitle}>{t('focusMode')}</Text>
+            <Text style={styles.configSub}>{t('focusDesc')}</Text>
           </View>
 
-          <Text style={styles.configLabel}>Süre</Text>
+          <Text style={styles.configLabel}>{t('focusDuration')}</Text>
           <View style={styles.durationRow}>
             {DURATIONS.map((d) => (
               <Pressable
@@ -825,26 +825,26 @@ export default function FocusScreen() {
                 onPress={() => setDuration(d)}
               >
                 <Text style={[styles.durationBtnText, duration === d && styles.durationBtnTextActive]}>
-                  {d} dk
+                  {t('durationMinutesShort', { n: d })}
                 </Text>
               </Pressable>
             ))}
           </View>
 
-          <Text style={[styles.configLabel, { marginTop: 28 }]}>Hangi ayet eşliğinde?</Text>
+          <Text style={[styles.configLabel, { marginTop: 28 }]}>{t('focusVerse')}</Text>
           <Pressable
             style={[styles.verseCard, verseSource === 'daily' && styles.verseCardActive]}
             onPress={() => setVerseSource('daily')}
           >
-            <Text style={styles.verseCardTitle}>Günün Ayeti</Text>
-            <Text style={styles.verseCardHint}>Bugünün özel ayeti</Text>
+            <Text style={styles.verseCardTitle}>{t('todayVerse')}</Text>
+            <Text style={styles.verseCardHint}>{t('todaySpecialVerse')}</Text>
           </Pressable>
           <Pressable
             style={[styles.verseCard, verseSource === 'random' && styles.verseCardActive]}
             onPress={() => setVerseSource('random')}
           >
-            <Text style={styles.verseCardTitle}>Rastgele Ayet</Text>
-            <Text style={styles.verseCardHint}>Şanslı bir ayet</Text>
+            <Text style={styles.verseCardTitle}>{t('randomVerse')}</Text>
+            <Text style={styles.verseCardHint}>{t('luckyVerse')}</Text>
           </Pressable>
           <Pressable
             style={[
@@ -855,15 +855,15 @@ export default function FocusScreen() {
             onPress={() => lastReadAvailable && setVerseSource('lastRead')}
             disabled={!lastReadAvailable}
           >
-            <Text style={styles.verseCardTitle}>Son Okuduğum Yer</Text>
+            <Text style={styles.verseCardTitle}>{t('lastRead')}</Text>
             <Text style={styles.verseCardHint}>
-              {lastReadAvailable ? 'Kaldığın bölümden' : 'Henüz okuma yok'}
+              {lastReadAvailable ? t('fromLastChapter') : t('noReadingYet')}
             </Text>
           </Pressable>
 
           <Pressable style={styles.startBtn} onPress={startFocus}>
             <Ionicons name="play" size={22} color="#0A0A08" />
-            <Text style={styles.startBtnText}>Odak Modunu Başlat</Text>
+            <Text style={styles.startBtnText}>{t('startFocus')}</Text>
           </Pressable>
         </ScrollView>
       </SafeAreaView>

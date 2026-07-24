@@ -8,6 +8,8 @@ const corsHeaders = {
 const FREE_AI_QUESTIONS_PER_DAY = 10;
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+/** Konuşma geçmişi üst sınırı (son N mesaj) — maliyet ve gecikme için. */
+const MAX_HISTORY_MESSAGES = 12;
 
 const SYSTEM_PROMPT = `Sen Söz adlı Türkçe İncil uygulamasının AI asistanısın. Adın "Söz Asistanı".
 
@@ -169,7 +171,8 @@ Deno.serve(async (req) => {
       .map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
-      }));
+      }))
+      .slice(-MAX_HISTORY_MESSAGES);
 
     const profileLine =
       body.userProfileHint?.trim()
@@ -180,10 +183,7 @@ Deno.serve(async (req) => {
     messages = [
       { role: 'system', content: system },
       ...history,
-      {
-        role: 'user',
-        content: JSON.stringify({ conversation: history, question: body.question }, null, 2),
-      },
+      { role: 'user', content: body.question },
     ];
   } else {
     return new Response(JSON.stringify({ error: 'Missing question or prompt' }), {

@@ -5,6 +5,8 @@ import { Animated, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 import { useTheme } from '@/hooks/useTheme';
 import { markGameCompletedToday } from '@/constants/game-storage';
+import { trackEvent } from '@/constants/analytics';
+import { pickDailyItems } from '@/constants/seeded-random';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { GameShell } from '@/components/games/GameShell';
 
@@ -47,7 +49,7 @@ const ALL_QUESTIONS: Question[] = [
 ];
 
 function pickQuestions(): Question[] {
-  return [...ALL_QUESTIONS].sort(() => Math.random() - 0.5).slice(0, 10);
+  return pickDailyItems(ALL_QUESTIONS, 10, GAME_ID);
 }
 
 export default function WhoSaid() {
@@ -126,6 +128,7 @@ export default function WhoSaid() {
       const nextStreak = score >= 8 ? streak + 1 : 0;
       await persistStreak(nextStreak);
       await markGameCompletedToday(GAME_ID);
+      trackEvent('game_completed', { game_id: GAME_ID });
       void submitScore(score);
       setGameOver(true);
       return;

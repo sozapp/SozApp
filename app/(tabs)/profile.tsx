@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Notifications from 'expo-notifications';
 import * as StoreReview from 'expo-store-review';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Svg, { Circle } from 'react-native-svg';
@@ -40,7 +41,7 @@ import {
 } from '@/constants/read-history';
 import { getDailyStats } from '@/constants/stats-storage';
 import type { PlanProgress } from '@/constants/storage';
-import { deleteAccount, supabase } from '@/constants/supabase';
+import { deleteAccount, exportUserData, supabase } from '@/constants/supabase';
 import AmbientMusicModal from '@/components/AmbientMusicModal';
 import { AnimatedCounter } from '@/components/AnimatedCounter';
 import { FontSizeModal } from '@/components/FontSizeModal';
@@ -53,17 +54,20 @@ import { AMBIENT_TRACK_I18N_KEYS } from '@/hooks/useAmbientMusic';
 import { useDenomination } from '@/hooks/useDenomination';
 import { usePremium } from '@/hooks/usePremium';
 import { useTheme, type ThemeColors, type ThemeType } from '@/hooks/useTheme';
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import { useTranslation } from '@/context/LanguageContext';
 import { setI18nLocale, type Language } from '@/constants/i18n';
 import type { User } from '@supabase/supabase-js';
 import { useBadges } from '@/hooks/useBadges';
 import { getBadgeProgress, type Badge } from '@/constants/badges';
 import { exportBackup, importBackup } from '@/constants/backup';
+import { getAnalyticsEnabled, setAnalyticsEnabled } from '@/constants/analytics';
 import {
   isAppLockEnabled,
   setAppLockEnabled,
 } from '@/constants/app-lock';
 import { SozAlert } from '@/components/SozAlert';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import * as LocalAuthentication from 'expo-local-authentication';
 import {
@@ -354,6 +358,7 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
 
     statsSection: { marginHorizontal: 16, marginTop: 20 },
     statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    statsRowAfterPlan: { marginTop: 10 },
     statCard: {
       width: STAT_CARD_WIDTH,
       backgroundColor: colors.surface,
@@ -375,7 +380,7 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
       fontFamily: fonts.regular,
     },
     ntCard: {
-      marginTop: 10,
+      marginTop: 0,
       backgroundColor: colors.surface,
       borderWidth: 0.5,
       borderColor: colors.border,
@@ -483,6 +488,28 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
     rowSub: { fontSize: 12, color: colors.textMuted, marginTop: 2, fontFamily: fonts.regular },
     rowRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     rowValue: { fontSize: 13, color: colors.textMuted, fontFamily: fonts.regular },
+    settingsSubhead: {
+      fontSize: 10,
+      letterSpacing: 1.2,
+      color: colors.textMuted,
+      fontFamily: fonts.medium,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 4,
+      textTransform: 'uppercase',
+    },
+    settingsSubDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: colors.border,
+      marginHorizontal: 16,
+      marginTop: 4,
+    },
+    dangerZone: {
+      marginTop: 4,
+      borderTopWidth: 1,
+      borderTopColor: 'rgba(220,80,60,0.35)',
+      paddingTop: 2,
+    },
     settingRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -713,8 +740,10 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
 }
 
 export default function ProfileScreen() {
+  useAnalyticsScreen('profile');
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const haptics = useHaptics();
   const { t, language, changeLanguage } = useTranslation();
   const { colors, fonts, activeTheme, changeTheme, loadFromStorage } = useTheme();
   const { isPremium } = usePremium();
@@ -733,6 +762,7 @@ export default function ProfileScreen() {
   const [dailyReminder, setDailyReminder] = useState(false);
   const [streakNotif, setStreakNotif] = useState(true);
   const [appLockEnabled, setAppLockEnabledState] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabledState] = useState(true);
   const [reminderTime, setReminderTime] = useState('08:00');
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [speechSpeed, setSpeechSpeed] = useState('Normal');
@@ -812,7 +842,6 @@ export default function ProfileScreen() {
     let avatarFromServer = false;
     try {
       if (!supabase) {
-        console.log('Supabase not available, using local storage');
         setUser(null);
         setUserEmail(null);
         try {
@@ -958,6 +987,12 @@ export default function ProfileScreen() {
       }
 
       try {
+        setAnalyticsEnabledState(await getAnalyticsEnabled());
+      } catch {
+        setAnalyticsEnabledState(true);
+      }
+
+      try {
         const ls = await AsyncStorage.getItem(STORAGE_LINE_SPACING);
         setLineSpacing(parseLineSpacingProfile(ls));
       } catch {
@@ -1072,7 +1107,7 @@ export default function ProfileScreen() {
         setProfileImage(bustedUrl);
         await AsyncStorage.setItem(STORAGE_PROFILE_IMAGE, bustedUrl).catch(() => {});
       } catch (e) {
-        console.log('Avatar upload error:', e);
+        console.warn('Avatar upload error:', e);
         showAlert(t('photoUploadFailedTitle'), t('photoUploadFailedMsg'));
       }
     } catch {
@@ -1097,7 +1132,7 @@ export default function ProfileScreen() {
       await supabase.storage.from('avatars').remove([`${u.id}/avatar.jpg`]).catch(() => {});
       await supabase.from('profiles').update({ avatar_url: null }).eq('id', u.id);
     } catch (e) {
-      console.log('Avatar remove error:', e);
+      console.warn('Avatar remove error:', e);
     }
   }, []);
 
@@ -1125,7 +1160,6 @@ export default function ProfileScreen() {
     try {
       if (user && isRealAccount(user)) {
         if (!supabase) {
-          console.log('Supabase not available, using local storage');
           await AsyncStorage.setItem(STORAGE_USER_NAME, trimmed);
         } else {
           const { error } = await supabase
@@ -1133,6 +1167,7 @@ export default function ProfileScreen() {
             .update({ display_name: trimmed })
             .eq('id', user.id);
           if (error) throw error;
+          await AsyncStorage.setItem(STORAGE_USER_NAME, trimmed);
         }
       } else {
         await AsyncStorage.setItem(STORAGE_USER_NAME, trimmed);
@@ -1183,7 +1218,7 @@ export default function ProfileScreen() {
           await AsyncStorage.setItem('@soz/dailyNotification', 'false');
           await AsyncStorage.setItem('@soz/dailyReminder', 'false');
         }
-        Haptics.selectionAsync();
+        haptics.selection();
       } catch {
         /* ignore */
       }
@@ -1202,11 +1237,17 @@ export default function ProfileScreen() {
         await AsyncStorage.setItem('@soz/streakReminder', 'false');
         await AsyncStorage.setItem('@soz/streakNotif', 'false');
       }
-      Haptics.selectionAsync();
+      haptics.selection();
     } catch {
       /* ignore */
     }
   }, []);
+
+  const toggleAnalytics = useCallback(async (value: boolean) => {
+    setAnalyticsEnabledState(value);
+    await setAnalyticsEnabled(value);
+    haptics.selection();
+  }, [haptics]);
 
   const toggleAppLock = useCallback(
     async (value: boolean) => {
@@ -1230,7 +1271,7 @@ export default function ProfileScreen() {
           await setAppLockEnabled(false);
           setAppLockEnabledState(false);
         }
-        Haptics.selectionAsync();
+        haptics.selection();
       } catch {
         showAlert(t('error'), t('appLockUnavailable'));
       }
@@ -1269,8 +1310,10 @@ export default function ProfileScreen() {
           text: t('deleteMyAccountCta'),
           style: 'destructive',
           onPress: async () => {
+            haptics.medium();
             const result = await deleteAccount();
             if (!result.ok) {
+              haptics.error();
               showAlert(t('couldNotDeleteTitle'), result.error ?? t('genericErrorRetryMsg'));
               return;
             }
@@ -1284,7 +1327,34 @@ export default function ProfileScreen() {
         },
       ]
     );
-  }, [clearAllData, showAlert, t]);
+  }, [clearAllData, showAlert, t, haptics]);
+
+  const handleDownloadMyData = useCallback(async () => {
+    try {
+      haptics.selection();
+      const result = await exportUserData();
+      if (!result.ok) {
+        haptics.error();
+        showAlert(t('error'), result.error || t('downloadMyDataFailed'));
+        return;
+      }
+      const fileName = `soz-hesap-verileri-${new Date().toISOString().split('T')[0]}.json`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+      await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(result.data, null, 2));
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        showAlert(t('error'), t('downloadMyDataFailed'));
+        return;
+      }
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'application/json',
+        dialogTitle: t('downloadMyDataShareTitle'),
+      });
+    } catch (e) {
+      haptics.error();
+      showAlert(t('error'), e instanceof Error ? e.message : t('downloadMyDataFailed'));
+    }
+  }, [haptics, showAlert, t]);
 
   const shareProgress = useCallback(() => {
     Share.share({
@@ -1303,7 +1373,6 @@ export default function ProfileScreen() {
   const currentLang = LANGUAGES.find((o) => o.code === language);
 
   useEffect(() => {
-    console.log('Current language:', language);
   }, [language]);
 
   return (
@@ -1329,7 +1398,12 @@ export default function ProfileScreen() {
       >
         {/* BÖLÜM 1 — Profil Header */}
         <View style={styles.header}>
-          <Pressable style={styles.avatarWrap} onPress={handleAvatarPress}>
+          <Pressable
+            style={styles.avatarWrap}
+            onPress={handleAvatarPress}
+            accessibilityRole="button"
+            accessibilityLabel="Profil fotoğrafını değiştir"
+          >
             <View style={styles.avatarCircle}>
               {profileImage ? (
                 <Image source={{ uri: profileImage }} style={styles.avatarImage} />
@@ -1347,7 +1421,12 @@ export default function ProfileScreen() {
           {userEmail ? <Text style={styles.userEmail}>{userEmail}</Text> : null}
 
           <View style={styles.badgeRow}>
-            <Pressable style={styles.badgePill} onPress={() => setDenomModalVisible(true)}>
+            <Pressable
+              style={styles.badgePill}
+              onPress={() => setDenomModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Mezhep seç: ${denomName}`}
+            >
               <Ionicons
                 name={(denomMeta?.icon ?? 'ellipse-outline') as keyof typeof Ionicons.glyphMap}
                 size={12}
@@ -1365,37 +1444,19 @@ export default function ProfileScreen() {
             ) : null}
           </View>
 
-          <Pressable style={styles.editBtn} onPress={openEditProfile}>
+          <Pressable
+            style={styles.editBtn}
+            onPress={openEditProfile}
+            accessibilityRole="button"
+            accessibilityLabel={t('editProfile')}
+          >
             <Ionicons name="pencil-outline" size={14} color={ACCENT} />
             <Text style={styles.editBtnText}>{t('editShort')}</Text>
           </Pressable>
         </View>
 
-        {/* BÖLÜM 2 — İstatistikler */}
+        {/* BÖLÜM 2 — Okuma planı + İstatistikler */}
         <View style={styles.statsSection}>
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Ionicons name="book-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <AnimatedCounter value={totalVerses} style={styles.statValue} />
-              <Text style={styles.statLabel}>{t('readVerseLabel')}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="star-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <AnimatedCounter value={streak} style={styles.statValue} />
-              <Text style={styles.statLabel}>{t('longestStreak')}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="heart-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <AnimatedCounter value={favCount} style={styles.statValue} />
-              <Text style={styles.statLabel}>{t('favoriteVerseLabel')}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Ionicons name="moon-outline" size={22} color={ACCENT} style={styles.statIcon} />
-              <AnimatedCounter value={focusMinutes} style={styles.statValue} />
-              <Text style={styles.statLabel}>{t('focusMode')}</Text>
-            </View>
-          </View>
-
           <View style={styles.ntCard}>
             <View style={styles.ntRow}>
               <Text style={styles.ntTitle}>{t('newTestamentProgress')}</Text>
@@ -1418,6 +1479,29 @@ export default function ProfileScreen() {
               {t('chaptersLeftDaysLine', { remaining: String(remainingChapters), days: String(estimatedDays) })}
             </Text>
           </View>
+
+          <View style={[styles.statsRow, styles.statsRowAfterPlan]}>
+            <View style={styles.statCard}>
+              <Ionicons name="book-outline" size={22} color={ACCENT} style={styles.statIcon} />
+              <AnimatedCounter value={totalVerses} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('readVerseLabel')}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="star-outline" size={22} color={ACCENT} style={styles.statIcon} />
+              <AnimatedCounter value={streak} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('longestStreak')}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="heart-outline" size={22} color={ACCENT} style={styles.statIcon} />
+              <AnimatedCounter value={favCount} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('favoriteVerseLabel')}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Ionicons name="moon-outline" size={22} color={ACCENT} style={styles.statIcon} />
+              <AnimatedCounter value={focusMinutes} style={styles.statValue} />
+              <Text style={styles.statLabel}>{t('focusMode')}</Text>
+            </View>
+          </View>
         </View>
 
         {/* BÖLÜM 3 — Rozetler */}
@@ -1434,7 +1518,14 @@ export default function ProfileScreen() {
               const ringRadius = 27;
               const ringCircumference = 2 * Math.PI * ringRadius;
               return (
-                <Pressable key={b.id} style={styles.badgeItem} onPress={() => setBadgeTip(b)}>
+                <Pressable
+                  key={b.id}
+                  style={styles.badgeItem}
+                  onPress={() => setBadgeTip(b)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${b.name}${earned ? ', kazanıldı' : ''}`}
+                  accessibilityHint={b.description}
+                >
                   <View style={styles.badgeRingWrap}>
                     <Svg width={58} height={58} style={StyleSheet.absoluteFillObject}>
                       <Circle
@@ -1468,7 +1559,7 @@ export default function ProfileScreen() {
                       ]}
                     >
                       <Ionicons
-                        name={b.icon as keyof typeof Ionicons.glyphMap}
+                        name={b.icon}
                         size={26}
                         color={earned ? ACCENT : colors.border}
                       />
@@ -1496,7 +1587,12 @@ export default function ProfileScreen() {
           {/* Kart 1 — Okuma */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('readingSettings')}</Text>
-            <Pressable style={styles.row} onPress={() => setShowThemePicker(true)}>
+            <Pressable
+              style={styles.row}
+              onPress={() => setShowThemePicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('readingTheme')}: ${themeNames[activeTheme]}`}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="contrast-outline" size={18} color={ACCENT} />
               </View>
@@ -1508,7 +1604,12 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </View>
             </Pressable>
-            <Pressable style={styles.row} onPress={() => setShowFontPicker(true)}>
+            <Pressable
+              style={styles.row}
+              onPress={() => setShowFontPicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('fontSize')}: ${fontSizeLabels[fontSize] ?? `${fontSize}px`}`}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="text-outline" size={18} color={ACCENT} />
               </View>
@@ -1522,7 +1623,12 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </View>
             </Pressable>
-            <Pressable style={styles.row} onPress={() => setShowSpacingPicker(true)}>
+            <Pressable
+              style={styles.row}
+              onPress={() => setShowSpacingPicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('lineSpacing')}: ${spacingLabels[lineSpacing]}`}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="reorder-four-outline" size={18} color={ACCENT} />
               </View>
@@ -1534,7 +1640,12 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </View>
             </Pressable>
-            <Pressable style={[styles.row, styles.rowLast]} onPress={() => setShowMusicModal(true)}>
+            <Pressable
+              style={[styles.row, styles.rowLast]}
+              onPress={() => setShowMusicModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('ambientMusic')}`}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="musical-notes-outline" size={18} color={ACCENT} />
               </View>
@@ -1555,7 +1666,12 @@ export default function ProfileScreen() {
           {/* Kart 2 — Kişiselleştirme */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('personalization')}</Text>
-            <Pressable style={styles.row} onPress={() => setLangModalVisible(true)}>
+            <Pressable
+              style={styles.row}
+              onPress={() => setLangModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('language')}: ${currentLang ? currentLang.name : ''}`}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="language-outline" size={18} color={ACCENT} />
               </View>
@@ -1565,7 +1681,12 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
-            <Pressable style={styles.row} onPress={() => setDenomModalVisible(true)}>
+            <Pressable
+              style={styles.row}
+              onPress={() => setDenomModalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('denomination')}: ${denomName}`}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="triangle-outline" size={18} color={ACCENT} />
               </View>
@@ -1578,6 +1699,8 @@ export default function ProfileScreen() {
             <Pressable
               style={styles.row}
               onPress={() => router.push('/church')}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('churchGroupSetting')}: ${churchGroupName ?? t('noneLabel')}`}
             >
               <View style={styles.rowIcon}>
                 <Ionicons name="people-outline" size={18} color={ACCENT} />
@@ -1588,7 +1711,27 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </Pressable>
-            <Pressable style={[styles.row, styles.rowLast]} onPress={() => router.push('/reading-history')}>
+            <Pressable
+              style={styles.row}
+              onPress={() => router.push('/friends')}
+              accessibilityRole="button"
+              accessibilityLabel={t('friends')}
+            >
+              <View style={styles.rowIcon}>
+                <Ionicons name="person-add-outline" size={18} color={ACCENT} />
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={styles.rowTitle}>{t('friends')}</Text>
+                <Text style={styles.rowSub}>{t('friendInviteCardTitle')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </Pressable>
+            <Pressable
+              style={[styles.row, styles.rowLast]}
+              onPress={() => router.push('/reading-history')}
+              accessibilityRole="button"
+              accessibilityLabel={t('readingHistoryTitle')}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="time-outline" size={18} color={ACCENT} />
               </View>
@@ -1613,6 +1756,9 @@ export default function ProfileScreen() {
               <Switch
                 value={dailyReminder}
                 onValueChange={toggleDailyNotification}
+                accessibilityRole="switch"
+                accessibilityLabel={t('dailyReminder')}
+                accessibilityState={{ checked: dailyReminder }}
                 trackColor={{
                   false: colors.border,
                   true: 'rgba(196,149,80,0.4)',
@@ -1625,6 +1771,8 @@ export default function ProfileScreen() {
                 style={[styles.settingRow, styles.settingRowBorder]}
                 onPress={() => setShowTimePicker(true)}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('reminderTime')}: ${reminderTime}`}
               >
                 <View style={styles.settingIconWrap}>
                   <Ionicons name="time-outline" size={18} color={ACCENT} />
@@ -1647,6 +1795,9 @@ export default function ProfileScreen() {
               <Switch
                 value={streakNotif}
                 onValueChange={toggleStreakReminder}
+                accessibilityRole="switch"
+                accessibilityLabel={t('streakNotif')}
+                accessibilityState={{ checked: streakNotif }}
                 trackColor={{
                   false: colors.border,
                   true: 'rgba(196,149,80,0.4)',
@@ -1661,7 +1812,12 @@ export default function ProfileScreen() {
             <Text style={styles.cardTitle}>{t('account').toUpperCase()}</Text>
             {userEmail ? (
               <>
-                <Pressable style={styles.row} onPress={() => router.push('/change-email')}>
+                <Pressable
+                  style={styles.row}
+                  onPress={() => router.push('/change-email')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`E-posta değiştir: ${userEmail}`}
+                >
                   <View style={styles.rowIcon}>
                     <Ionicons name="person-outline" size={18} color={ACCENT} />
                   </View>
@@ -1670,7 +1826,12 @@ export default function ProfileScreen() {
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
-                <Pressable style={styles.row} onPress={() => router.push('/change-password')}>
+                <Pressable
+                  style={styles.row}
+                  onPress={() => router.push('/change-password')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('changePasswordCta')}
+                >
                   <View style={styles.rowIcon}>
                     <Ionicons name="key-outline" size={18} color={ACCENT} />
                   </View>
@@ -1680,11 +1841,12 @@ export default function ProfileScreen() {
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
                 <Pressable
-                  style={[styles.row, isPremium && styles.rowLast]}
+                  style={styles.row}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('signOut')}
                   onPress={async () => {
                     try {
                       if (supabase) await supabase.auth.signOut();
-                      else console.log('Supabase not available, using local storage');
                       router.replace('/auth');
                     } catch {
                       /* ignore */
@@ -1702,8 +1864,10 @@ export default function ProfileScreen() {
               </>
             ) : (
               <Pressable
-                style={[styles.row, styles.rowLast]}
+                style={[styles.row, isPremium && !userEmail ? styles.rowLast : null]}
                 onPress={() => router.push('/auth')}
+                accessibilityRole="button"
+                accessibilityLabel={t('signIn')}
               >
                 <View style={styles.rowIcon}>
                   <Ionicons name="person-add-outline" size={18} color={ACCENT} />
@@ -1717,7 +1881,12 @@ export default function ProfileScreen() {
             )}
 
             {!isPremium && (
-              <Pressable style={[styles.row, styles.rowLast]} onPress={() => router.push('/paywall')}>
+              <Pressable
+                style={[styles.row, !userEmail && styles.rowLast]}
+                onPress={() => router.push('/paywall')}
+                accessibilityRole="button"
+                accessibilityLabel={t('goPremium')}
+              >
                 <View style={styles.rowIcon}>
                   <Ionicons name="diamond-outline" size={18} color={ACCENT} />
                 </View>
@@ -1727,6 +1896,25 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
             )}
+
+            {userEmail ? (
+              <View style={styles.dangerZone}>
+                <Pressable
+                  style={[styles.row, styles.rowLast]}
+                  onPress={handleDeleteAccount}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('deleteAccountTitle')}
+                >
+                  <View style={styles.rowIcon}>
+                    <Ionicons name="person-remove-outline" size={18} color={DANGER} />
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={styles.dangerText}>{t('deleteAccountTitle')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+              </View>
+            ) : null}
           </View>
 
           {/* Kart 5 — Veri */}
@@ -1743,6 +1931,9 @@ export default function ProfileScreen() {
               <Switch
                 value={appLockEnabled}
                 onValueChange={(v) => void toggleAppLock(v)}
+                accessibilityRole="switch"
+                accessibilityLabel={t('appLockTitle')}
+                accessibilityState={{ checked: appLockEnabled }}
                 trackColor={{
                   false: colors.border,
                   true: 'rgba(196,149,80,0.4)',
@@ -1750,9 +1941,35 @@ export default function ProfileScreen() {
                 thumbColor={appLockEnabled ? ACCENT : colors.surface}
               />
             </View>
+
+            <View style={styles.settingRow}>
+              <View style={styles.settingIconWrap}>
+                <Ionicons name="analytics-outline" size={18} color={ACCENT} />
+              </View>
+              <View style={styles.settingContent}>
+                <Text style={styles.settingTitle}>{t('analyticsTitle')}</Text>
+                <Text style={styles.settingSubtitle}>{t('analyticsDesc')}</Text>
+              </View>
+              <Switch
+                value={analyticsEnabled}
+                onValueChange={(v) => void toggleAnalytics(v)}
+                accessibilityRole="switch"
+                accessibilityLabel={t('analyticsTitle')}
+                accessibilityState={{ checked: analyticsEnabled }}
+                trackColor={{
+                  false: colors.border,
+                  true: 'rgba(196,149,80,0.4)',
+                }}
+                thumbColor={analyticsEnabled ? ACCENT : colors.surface}
+              />
+            </View>
+
+            <Text style={styles.settingsSubhead}>{t('profileLocalBackupSubhead')}</Text>
             <TouchableOpacity
-              style={[styles.row, styles.settingRowBorder]}
+              style={styles.row}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('exportBackupTitle')}
               onPress={async () => {
                 try {
                   await exportBackup();
@@ -1773,6 +1990,8 @@ export default function ProfileScreen() {
             <TouchableOpacity
               style={styles.row}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('importBackupTitle')}
               onPress={async () => {
                 try {
                   const result = await DocumentPicker.getDocumentAsync({
@@ -1796,32 +2015,56 @@ export default function ProfileScreen() {
               </View>
               <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
             </TouchableOpacity>
-            <Pressable style={[styles.row, !userEmail && styles.rowLast]} onPress={handleReset}>
-              <View style={styles.rowIcon}>
-                <Ionicons name="trash-outline" size={18} color={DANGER} />
-              </View>
-              <View style={styles.rowBody}>
-                <Text style={styles.dangerText}>{t('resetDataLabel')}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </Pressable>
+
             {userEmail ? (
-              <Pressable style={[styles.row, styles.rowLast]} onPress={handleDeleteAccount}>
+              <>
+                <View style={styles.settingsSubDivider} />
+                <Text style={styles.settingsSubhead}>{t('profileAccountDataSubhead')}</Text>
+                <Pressable
+                  style={styles.row}
+                  onPress={() => void handleDownloadMyData()}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('downloadMyDataTitle')}
+                >
+                  <View style={styles.rowIcon}>
+                    <Ionicons name="download-outline" size={18} color={ACCENT} />
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={styles.rowTitle}>{t('downloadMyDataTitle')}</Text>
+                    <Text style={styles.rowSub}>{t('downloadMyDataDesc')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+              </>
+            ) : null}
+
+            <View style={styles.dangerZone}>
+              <Pressable
+                style={[styles.row, styles.rowLast]}
+                onPress={handleReset}
+                accessibilityRole="button"
+                accessibilityLabel={t('resetDataLabel')}
+              >
                 <View style={styles.rowIcon}>
-                  <Ionicons name="person-remove-outline" size={18} color={DANGER} />
+                  <Ionicons name="trash-outline" size={18} color={DANGER} />
                 </View>
                 <View style={styles.rowBody}>
-                  <Text style={styles.dangerText}>{t('deleteAccountTitle')}</Text>
+                  <Text style={styles.dangerText}>{t('resetDataLabel')}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
-            ) : null}
+            </View>
           </View>
 
           {/* Kart 6 — Destek & Hakkında */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('supportAboutTitle').toUpperCase()}</Text>
-            <Pressable style={styles.row} onPress={() => router.push('/donate')}>
+            <Pressable
+              style={styles.row}
+              onPress={() => router.push('/donate')}
+              accessibilityRole="button"
+              accessibilityLabel={t('donate')}
+            >
               <View style={styles.rowIcon}>
                 <Ionicons name="heart-outline" size={18} color={ACCENT} />
               </View>
@@ -1833,6 +2076,8 @@ export default function ProfileScreen() {
             </Pressable>
             <Pressable
               style={styles.row}
+              accessibilityRole="button"
+              accessibilityLabel={t('inviteFriend')}
               onPress={() =>
                 Share.share({ message: t('inviteFriendShareMsg') }).catch(() => {})
               }
@@ -1847,6 +2092,8 @@ export default function ProfileScreen() {
             </Pressable>
             <Pressable
               style={styles.row}
+              accessibilityRole="button"
+              accessibilityLabel={t('rateApp')}
               onPress={async () => {
                 try {
                   if (await StoreReview.isAvailableAsync()) {
@@ -1867,7 +2114,9 @@ export default function ProfileScreen() {
             </Pressable>
             <Pressable
               style={styles.row}
-              onPress={() => Linking.openURL('https://sozapp.com/gizlilik').catch(() => {})}
+              accessibilityRole="button"
+              accessibilityLabel={t('privacyPolicy')}
+              onPress={() => router.push('/privacy-policy')}
             >
               <View style={styles.rowIcon}>
                 <Ionicons name="shield-outline" size={18} color={ACCENT} />
@@ -1879,6 +2128,8 @@ export default function ProfileScreen() {
             </Pressable>
             <Pressable
               style={styles.row}
+              accessibilityRole="button"
+              accessibilityLabel={t('termsOfUse')}
               onPress={() => Linking.openURL('https://sozapp.com/kosullar').catch(() => {})}
             >
               <View style={styles.rowIcon}>
@@ -1905,7 +2156,12 @@ export default function ProfileScreen() {
 
         {/* BÖLÜM 5 — Footer */}
         <View style={styles.footer}>
-          <Pressable style={styles.shareBtn} onPress={shareProgress}>
+          <Pressable
+            style={styles.shareBtn}
+            onPress={shareProgress}
+            accessibilityRole="button"
+            accessibilityLabel={t('shareYourProgressCta')}
+          >
             <Ionicons name="share-outline" size={18} color={ACCENT} />
             <Text style={styles.shareBtnText}>{t('shareYourProgressCta')}</Text>
           </Pressable>
@@ -1914,14 +2170,27 @@ export default function ProfileScreen() {
 
       {/* Modals */}
       <Modal visible={langModalVisible} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setLangModalVisible(false)}>
-          <Pressable style={styles.langSheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.overlay}
+          onPress={() => setLangModalVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Dil seçimini kapat"
+        >
+          <Pressable
+            style={styles.langSheet}
+            onPress={(e) => e.stopPropagation()}
+            accessibilityRole="summary"
+            accessibilityLabel={t('selectLanguageTitle')}
+          >
             <View style={styles.langDragHandle} />
             <Text style={styles.langSheetTitle}>{t('selectLanguageTitle')}</Text>
             <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
               {LANGUAGES.map((item) => (
                 <TouchableOpacity
                   key={item.code}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.name}
+                  accessibilityState={{ selected: language === item.code }}
                   onPress={async () => {
                     try {
                       await AsyncStorage.setItem('@soz/language', item.code);
@@ -1931,9 +2200,9 @@ export default function ProfileScreen() {
                       setLangModalVisible(false);
                       setLangToastVisible(true);
                       setTimeout(() => setLangToastVisible(false), 1200);
-                      Haptics.selectionAsync();
+                      haptics.selection();
                     } catch (e) {
-                      console.log('Language change error:', e);
+                      console.warn('Language change error:', e);
                     }
                   }}
                   style={[
@@ -1974,14 +2243,27 @@ export default function ProfileScreen() {
       ) : null}
 
       <Modal visible={denomModalVisible} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setDenomModalVisible(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.overlay}
+          onPress={() => setDenomModalVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Mezhep seçimini kapat"
+        >
+          <Pressable
+            style={styles.sheet}
+            onPress={(e) => e.stopPropagation()}
+            accessibilityRole="summary"
+            accessibilityLabel={t('denomination')}
+          >
             <Text style={styles.sheetTitle}>{t('denomination')}</Text>
             <ScrollView style={{ maxHeight: 400 }} showsVerticalScrollIndicator={false}>
               {denominations.map((d) => (
                 <Pressable
                   key={d.id}
                   style={styles.sheetRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={d.name}
+                  accessibilityState={{ selected: denomination === d.id }}
                   onPress={() => {
                     try {
                       changeDenomination(d.id);
@@ -2003,8 +2285,18 @@ export default function ProfileScreen() {
       </Modal>
 
       <Modal visible={editModalVisible} transparent animationType="slide">
-        <Pressable style={styles.overlay} onPress={() => setEditModalVisible(false)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.overlay}
+          onPress={() => setEditModalVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Profil düzenlemeyi kapat"
+        >
+          <Pressable
+            style={styles.sheet}
+            onPress={(e) => e.stopPropagation()}
+            accessibilityRole="summary"
+            accessibilityLabel={t('editProfile')}
+          >
             <Text style={styles.sheetTitle}>{t('editProfile')}</Text>
             <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('nameLabel')}</Text>
             <TextInput
@@ -2024,10 +2316,17 @@ export default function ProfileScreen() {
               style={styles.saveBtn}
               onPress={saveEditProfile}
               disabled={savingProfile}
+              accessibilityRole="button"
+              accessibilityLabel={t('save')}
             >
               <Text style={styles.saveBtnText}>{savingProfile ? t('savingEllipsis') : t('save')}</Text>
             </Pressable>
-            <Pressable style={styles.cancelBtn} onPress={() => setEditModalVisible(false)}>
+            <Pressable
+              style={styles.cancelBtn}
+              onPress={() => setEditModalVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('cancel')}
+            >
               <Text style={[styles.rowValue, { color: colors.textMuted }]}>{t('cancel')}</Text>
             </Pressable>
           </Pressable>
@@ -2035,8 +2334,18 @@ export default function ProfileScreen() {
       </Modal>
 
       <Modal visible={badgeTip != null} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setBadgeTip(null)}>
-          <Pressable style={styles.badgeTipBox} onPress={(e) => e.stopPropagation()}>
+        <Pressable
+          style={styles.overlay}
+          onPress={() => setBadgeTip(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Rozet bilgisini kapat"
+        >
+          <Pressable
+            style={styles.badgeTipBox}
+            onPress={(e) => e.stopPropagation()}
+            accessibilityRole="summary"
+            accessibilityLabel={badgeTip ? badgeTip.name : 'Rozet bilgisi'}
+          >
             {badgeTip ? (
               <>
                 <View style={{ marginBottom: 8 }}>
@@ -2071,6 +2380,9 @@ export default function ProfileScreen() {
                   styles.timeOption,
                   reminderTime === time && styles.timeOptionActive,
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('reminderTime')} ${time}`}
+                accessibilityState={{ selected: reminderTime === time }}
                 onPress={async () => {
                   setReminderTime(time);
                   try {
@@ -2080,7 +2392,7 @@ export default function ProfileScreen() {
                       await scheduleDailyVerseNotification(Number.isNaN(hour) ? 8 : hour);
                     }
                     setShowTimePicker(false);
-                    Haptics.selectionAsync();
+                    haptics.selection();
                   } catch {
                     /* ignore */
                   }

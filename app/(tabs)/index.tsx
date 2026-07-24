@@ -19,7 +19,7 @@ import {
   Pressable,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -30,13 +30,14 @@ import * as Haptics from 'expo-haptics';
 import Svg, { Line, Path, Circle } from 'react-native-svg';
 import { useNetwork } from '@/context/NetworkContext';
 import { useRegisterTabScrollToTop } from '@/context/ScrollToTopContext';
-import { bookList, oldTestamentBooks } from '@/constants/bible-index';
+import { bookList, getBookIdByBookName, oldTestamentBooks } from '@/constants/bible-index';
 import { newTestament } from '@/constants/new-testament';
 import { loadLastRead, type LastReadPayload } from '@/constants/read-history';
 import { devotionals, getTodaysDevotional } from '@/constants/devotionals';
 import { resolveBookIdForShare } from '@/constants/share-verse';
 import { fonts as appFonts } from '@/constants/theme';
 import { useTheme, type ThemeColors } from '@/hooks/useTheme';
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import { useTranslation } from '@/context/LanguageContext';
 import type { TranslationKey } from '@/constants/i18n';
 import AmbientMusicModal from '@/components/AmbientMusicModal';
@@ -46,12 +47,23 @@ import { AMBIENT_TRACK_I18N_KEYS } from '@/hooks/useAmbientMusic';
 import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useNotificationsCenter } from '@/hooks/useNotificationsCenter';
+import {
+  getOnThisDayFavorites,
+  useFavorites,
+  yearsSinceFavorite,
+} from '@/hooks/useFavorites';
 
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
 const TUTORIAL_SEEN_KEY = '@soz/tutorialSeen';
+/** React Navigation varsayılan tab bar içerik yüksekliği (safe area hariç). */
+const TAB_BAR_HEIGHT = 49;
+const TUTORIAL_GAP = 12;
+const TUTORIAL_TOOLTIP_FALLBACK_H = 140;
 const STREAK_CARD_DISMISSED_AT_KEY = '@soz/streakCardDismissedAt';
 const STREAK_CARD_COOLDOWN_MS = 4 * 24 * 60 * 60 * 1000;
+
+type TutorialLayoutRect = { x: number; y: number; width: number; height: number };
 
 function getHomeTutorialSteps(t: (key: TranslationKey) => string) {
   return [
@@ -1038,6 +1050,56 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       paddingBottom: 8,
     },
 
+    onThisDayCard: {
+      marginHorizontal: 16,
+      marginBottom: 12,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 0.5,
+      borderColor: colors.border,
+      borderLeftWidth: 3,
+      borderLeftColor: ACCENT,
+      padding: 16,
+      gap: 10,
+    },
+    onThisDayLabel: {
+      fontSize: 9,
+      letterSpacing: 0.2,
+      color: 'rgba(196,149,80,0.7)',
+      fontFamily: fonts.regular,
+    },
+    onThisDayTitle: {
+      fontSize: 16,
+      color: colors.text,
+      fontFamily: fonts.medium,
+      letterSpacing: -0.02,
+    },
+    onThisDayVerse: {
+      fontSize: 14,
+      color: colors.text,
+      fontFamily: fonts.italic ?? fonts.regular,
+      fontStyle: 'italic',
+      lineHeight: 21,
+    },
+    onThisDayRef: {
+      fontSize: 12,
+      color: ACCENT,
+      fontFamily: fonts.regular,
+    },
+    onThisDayCta: {
+      alignSelf: 'flex-start',
+      marginTop: 2,
+      backgroundColor: ACCENT,
+      borderRadius: 20,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    onThisDayCtaText: {
+      fontSize: 13,
+      color: colors.background,
+      fontFamily: fonts.medium,
+    },
+
     moodCard: {
       marginHorizontal: 16,
       marginBottom: 12,
@@ -1443,10 +1505,11 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    /** FAB 52px + 12px boşluk — balon FAB'ın soluna oturur */
     tooltip: {
       position: 'absolute',
-      bottom: 10,
-      right: 60,
+      right: 64,
+      overflow: 'visible',
     },
     tooltipInner: {
       backgroundColor: colors.surface,
@@ -1457,6 +1520,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       paddingVertical: 9,
       minWidth: 0,
       maxWidth: 175,
+      overflow: 'visible',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.15,
@@ -1467,6 +1531,7 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 7,
+      minWidth: 0,
     },
     tooltipIconWrap: {
       width: 22,
@@ -1475,11 +1540,15 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       backgroundColor: 'rgba(196,149,80,0.1)',
       alignItems: 'center',
       justifyContent: 'center',
+      flexShrink: 0,
     },
     tooltipTitle: {
       fontSize: 14,
+      lineHeight: 18,
       color: colors.text,
       fontFamily: fonts.regular,
+      flexShrink: 1,
+      minWidth: 0,
     },
     tooltipDesc: {
       fontSize: 12,
@@ -1492,7 +1561,6 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipArrowBorder: {
       position: 'absolute',
       right: -7,
-      bottom: 14,
       width: 0,
       height: 0,
       borderTopWidth: 6,
@@ -1505,7 +1573,6 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
     tooltipArrowFill: {
       position: 'absolute',
       right: -5,
-      bottom: 15,
       width: 0,
       height: 0,
       borderTopWidth: 5,
@@ -1625,6 +1692,7 @@ function getTodayReading(planDay: number) {
 }
 
 export default function HomeScreen() {
+  useAnalyticsScreen('home');
   const isHomeFocused = useIsFocused();
   const { colors, fonts } = useTheme();
   const { t, language } = useTranslation();
@@ -1657,6 +1725,11 @@ export default function HomeScreen() {
   const [isHomeLoading, setIsHomeLoading] = useState(true);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const { totalCount: notificationsCount } = useNotificationsCenter();
+  const { favorites } = useFavorites();
+  const onThisDayFavorite = useMemo(
+    () => getOnThisDayFavorites(favorites)[0] ?? null,
+    [favorites]
+  );
   const {
     isPlaying,
     currentTrack,
@@ -1682,8 +1755,18 @@ export default function HomeScreen() {
   const tooltipScale = useRef(new Animated.Value(0.85)).current;
   const lastScrollY = useRef(0);
   const [showTooltip, setShowTooltip] = useState(false);
+  /** FAB tanıtım balonu yüksekliği — oku dikey ortalamak için */
+  const [fabTooltipH, setFabTooltipH] = useState(40);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
+  const insets = useSafeAreaInsets();
+  const verseCardRef = useRef<View>(null);
+  const moodCardRef = useRef<View>(null);
+  const tutorialOverlayRef = useRef<View>(null);
+  const [verseRect, setVerseRect] = useState<TutorialLayoutRect | null>(null);
+  const [moodRect, setMoodRect] = useState<TutorialLayoutRect | null>(null);
+  const [overlayOrigin, setOverlayOrigin] = useState({ x: 0, y: 0 });
+  const [tooltipHeight, setTooltipHeight] = useState(TUTORIAL_TOOLTIP_FALLBACK_H);
 
   useEffect(() => {
     const load = async () => {
@@ -1691,7 +1774,7 @@ export default function HomeScreen() {
         const seen = await AsyncStorage.getItem('@soz/fabTooltipSeen');
         if (!seen) setShowTooltip(true);
       } catch (e) {
-        console.log('Offline mode:', e);
+        console.warn('Offline mode:', e);
       }
     };
     void load();
@@ -1708,7 +1791,7 @@ export default function HomeScreen() {
         if (at) setLastMoodAt(at);
         else setLastMoodAt(null);
       } catch (e) {
-        console.log('Offline mode:', e);
+        console.warn('Offline mode:', e);
       }
     };
     void load();
@@ -1765,7 +1848,7 @@ export default function HomeScreen() {
     try {
       void AsyncStorage.setItem('@soz/fabTooltipSeen', 'true');
     } catch (e) {
-      console.log('Offline mode:', e);
+      console.warn('Offline mode:', e);
     }
     Animated.parallel([
       Animated.timing(tooltipOpacity, {
@@ -1873,7 +1956,7 @@ export default function HomeScreen() {
     try {
       return getTodaysDevotional(new Date());
     } catch (e) {
-      console.log('Offline mode:', e);
+      console.warn('Offline mode:', e);
       return devotionals[0];
     }
   }, []);
@@ -1910,7 +1993,7 @@ export default function HomeScreen() {
         const raw = await AsyncStorage.getItem(`@soz/reflection/${todayDevotional.day}`);
         setReflectionNote(raw ?? '');
       } catch (e) {
-        console.log('Offline mode:', e);
+        console.warn('Offline mode:', e);
         setReflectionNote('');
       }
     };
@@ -2020,7 +2103,7 @@ export default function HomeScreen() {
       }
       await AsyncStorage.setItem('@soz/favorites', JSON.stringify(next));
     } catch (e) {
-      console.log('Offline mode:', e);
+      console.warn('Offline mode:', e);
     }
   };
 
@@ -2065,7 +2148,7 @@ export default function HomeScreen() {
             setUserName('');
           }
         } catch (e) {
-          console.log('Offline mode:', e);
+          console.warn('Offline mode:', e);
           setUserName('');
         }
       };
@@ -2126,7 +2209,7 @@ export default function HomeScreen() {
           setReflectionDoneToday(vals[5][1] === 'true');
           setLastRead(await loadLastRead());
         } catch (e) {
-          console.log('Offline mode:', e);
+          console.warn('Offline mode:', e);
           setStreak(0);
           setPlanDay(1);
           setFavoritedVerse(false);
@@ -2166,26 +2249,125 @@ export default function HomeScreen() {
     setTutorialStep((prev) => prev + 1);
   }, [finishTutorial, tutorialStep, homeTutorialSteps.length]);
 
+  const measureTutorialTarget = useCallback(
+    (ref: React.RefObject<View | null>, setter: (rect: TutorialLayoutRect) => void) => {
+      ref.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) {
+          setter({ x, y, width, height });
+        }
+      });
+    },
+    []
+  );
+
+  const measureTutorialOverlay = useCallback(() => {
+    tutorialOverlayRef.current?.measureInWindow((x, y) => {
+      setOverlayOrigin({ x, y });
+    });
+  }, []);
+
+  const remeasureTutorialAnchors = useCallback(() => {
+    if (!showTutorial) return;
+    measureTutorialOverlay();
+    if (!isHomeLoading) {
+      measureTutorialTarget(verseCardRef, setVerseRect);
+      measureTutorialTarget(moodCardRef, setMoodRect);
+    }
+  }, [showTutorial, isHomeLoading, measureTutorialOverlay, measureTutorialTarget]);
+
+  useEffect(() => {
+    if (!showTutorial) return;
+    const id = requestAnimationFrame(() => {
+      remeasureTutorialAnchors();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showTutorial, tutorialStep, isHomeLoading, remeasureTutorialAnchors]);
+
+  // Mood adımında kart görünür alandaysa kaydırıp yeniden ölç
+  useEffect(() => {
+    if (!showTutorial || isHomeLoading) return;
+    if (homeTutorialSteps[tutorialStep]?.target !== 'mood') return;
+
+    const timer = setTimeout(() => {
+      moodCardRef.current?.measureInWindow((_x, y, _w, h) => {
+        const winH = Dimensions.get('window').height;
+        const visibleBottom = winH - (TAB_BAR_HEIGHT + Math.max(insets.bottom, 0) + 24);
+        if (y + h > visibleBottom || y < overlayOrigin.y + 64) {
+          const desiredY = winH * 0.36;
+          const delta = y - desiredY;
+          homeScrollRef.current?.scrollTo({
+            y: Math.max(0, lastScrollY.current + delta),
+            animated: true,
+          });
+          setTimeout(() => {
+            remeasureTutorialAnchors();
+          }, 380);
+        } else {
+          setMoodRect({ x: _x, y, width: _w, height: h });
+        }
+      });
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [
+    showTutorial,
+    tutorialStep,
+    isHomeLoading,
+    homeTutorialSteps,
+    insets.bottom,
+    overlayOrigin.y,
+    remeasureTutorialAnchors,
+    homeScrollRef,
+  ]);
+
   const tutorialPosition = useMemo(() => {
-    const h = Dimensions.get('window').height;
     const currentTarget = homeTutorialSteps[tutorialStep]?.target;
-    if (currentTarget === 'verse') {
+    const left = 20;
+    const th = tooltipHeight > 0 ? tooltipHeight : TUTORIAL_TOOLTIP_FALLBACK_H;
+
+    const placeAbove = (rect: TutorialLayoutRect) => {
+      const top = rect.y - overlayOrigin.y - th - TUTORIAL_GAP;
+      if (top >= 8) {
+        return { cardStyle: { top, left }, showArrowDown: true as const };
+      }
+      // Üstte yer yoksa kartın altına koy, ok yukarı baksın
       return {
-        cardStyle: { top: 280, left: 20 },
-        showArrowDown: true,
+        cardStyle: {
+          top: rect.y - overlayOrigin.y + rect.height + TUTORIAL_GAP,
+          left,
+        },
+        showArrowDown: false as const,
       };
-    }
-    if (currentTarget === 'tabbar') {
-      return {
-        cardStyle: { bottom: 110, left: 20 },
-        showArrowDown: false,
-      };
-    }
-    return {
-      cardStyle: { top: Math.max(320, h * 0.52), left: 20 },
-      showArrowDown: true,
     };
-  }, [tutorialStep, homeTutorialSteps]);
+
+    if (currentTarget === 'verse') {
+      if (verseRect) return placeAbove(verseRect);
+      return { cardStyle: { top: 200, left }, showArrowDown: true as const };
+    }
+
+    if (currentTarget === 'tabbar') {
+      // Sahne tab bar'ın üstünde biter; bottom inset + tab yüksekliği eski "110" yerine
+      return {
+        cardStyle: {
+          bottom: insets.bottom + TAB_BAR_HEIGHT,
+          left,
+        },
+        showArrowDown: true as const,
+      };
+    }
+
+    // mood
+    if (moodRect) return placeAbove(moodRect);
+    return { cardStyle: { top: 320, left }, showArrowDown: true as const };
+  }, [
+    tutorialStep,
+    homeTutorialSteps,
+    verseRect,
+    moodRect,
+    overlayOrigin.y,
+    tooltipHeight,
+    insets.bottom,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -2250,6 +2432,25 @@ export default function HomeScreen() {
                 accessibilityLabel={t('search')}
               >
                 <Ionicons name="search-outline" size={20} color={colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.ikonBtn}
+                onPress={() => {
+                  router.push('/friends');
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={t('friends')}
+              >
+                <Ionicons name="people-outline" size={20} color={colors.text} />
+                {notificationsCount > 0 ? (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>
+                      {notificationsCount > 9 ? '9+' : notificationsCount}
+                    </Text>
+                  </View>
+                ) : null}
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.ikonBtn}
@@ -2360,7 +2561,13 @@ export default function HomeScreen() {
             <SkeletonCard />
           </View>
         ) : (
-        <View style={styles.verseCard}>
+        <View
+          ref={verseCardRef}
+          style={styles.verseCard}
+          onLayout={() => {
+            if (showTutorial) measureTutorialTarget(verseCardRef, setVerseRect);
+          }}
+        >
           {isHeroVerseCard ? (
             <ImageBackground
               source={todayVerseBg}
@@ -2721,15 +2928,53 @@ export default function HomeScreen() {
           ) : null}
         </TouchableOpacity>
 
+        {onThisDayFavorite ? (
+          <View style={styles.onThisDayCard}>
+            <Text style={styles.onThisDayLabel}>{t('onThisDayLabel')}</Text>
+            <Text style={styles.onThisDayTitle}>
+              {t('onThisDayTitle', { n: yearsSinceFavorite(onThisDayFavorite.addedAt) })}
+            </Text>
+            <Text style={styles.onThisDayVerse} numberOfLines={3}>
+              {onThisDayFavorite.text}
+            </Text>
+            <Text style={styles.onThisDayRef}>{onThisDayFavorite.ref}</Text>
+            <TouchableOpacity
+              style={styles.onThisDayCta}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={t('onThisDayReadAgain')}
+              onPress={() => {
+                const bookId = getBookIdByBookName(onThisDayFavorite.book);
+                if (!bookId) return;
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push({
+                  pathname: '/(tabs)/read',
+                  params: {
+                    bookId,
+                    chapter: String(onThisDayFavorite.chapter),
+                    highlightVerse: String(onThisDayFavorite.verse),
+                  },
+                });
+              }}
+            >
+              <Text style={styles.onThisDayCtaText}>{t('onThisDayReadAgain')}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {isHomeLoading ? (
           <View style={{ paddingHorizontal: 16 }}>
             <SkeletonCard />
           </View>
         ) : (
         <TouchableOpacity
+          ref={moodCardRef}
           style={styles.moodCard}
           onPress={() => router.push('/mood')}
           activeOpacity={0.88}
+          onLayout={() => {
+            if (showTutorial) measureTutorialTarget(moodCardRef, setMoodRect);
+          }}
         >
           <LinearGradient
             colors={[colors.surfaceAlt, colors.card]}
@@ -3004,7 +3249,7 @@ export default function HomeScreen() {
                                   text
                                 );
                               } catch (e) {
-                                console.log('Offline mode:', e);
+                                console.warn('Offline mode:', e);
                               }
                             })();
                           }}
@@ -3046,7 +3291,7 @@ export default function HomeScreen() {
                               'true'
                             );
                           } catch (e) {
-                            console.log('Offline mode:', e);
+                            console.warn('Offline mode:', e);
                           }
                           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                           closeReflection();
@@ -3078,13 +3323,21 @@ export default function HomeScreen() {
               style={[
                 styles.tooltip,
                 {
+                  // FAB (52) ile balonu dikey ortala
+                  bottom: Math.max(0, (52 - fabTooltipH) / 2),
                   opacity: tooltipOpacity,
                   transform: [{ scale: tooltipScale }],
                 },
               ]}
             >
               <TouchableOpacity onPress={dismissTooltip} activeOpacity={0.9}>
-                <View style={styles.tooltipInner}>
+                <View
+                  style={styles.tooltipInner}
+                  onLayout={(e) => {
+                    const h = Math.round(e.nativeEvent.layout.height);
+                    if (h > 0 && Math.abs(h - fabTooltipH) > 0.5) setFabTooltipH(h);
+                  }}
+                >
                   <View style={styles.tooltipHeader}>
                     <View style={styles.tooltipIconWrap}>
                       <Svg width={12} height={12} viewBox="0 0 40 40" fill="none">
@@ -3094,12 +3347,25 @@ export default function HomeScreen() {
                         <Circle cx="20" cy="20" r="2.5" fill={ACCENT} />
                       </Svg>
                     </View>
-                    <Text style={styles.tooltipTitle}>{t('askSoz')}</Text>
+                    <Text style={styles.tooltipTitle} numberOfLines={1}>
+                      {t('askSoz')}
+                    </Text>
                   </View>
                 </View>
               </TouchableOpacity>
-              <View style={styles.tooltipArrowBorder} />
-              <View style={styles.tooltipArrowFill} />
+              {/* Ok: balon yüksekliğinin ortası (border 12px / fill 10px) */}
+              <View
+                style={[
+                  styles.tooltipArrowBorder,
+                  { bottom: Math.max(0, (fabTooltipH - 12) / 2) },
+                ]}
+              />
+              <View
+                style={[
+                  styles.tooltipArrowFill,
+                  { bottom: Math.max(0, (fabTooltipH - 10) / 2) },
+                ]}
+              />
             </Animated.View>
           )}
           <Animated.View
@@ -3272,12 +3538,23 @@ export default function HomeScreen() {
       </Modal>
 
       {showTutorial ? (
-        <View style={styles.tutorialOverlay} pointerEvents="box-none">
+        <View
+          ref={tutorialOverlayRef}
+          style={styles.tutorialOverlay}
+          pointerEvents="box-none"
+          onLayout={measureTutorialOverlay}
+        >
           <View
             style={[
               styles.tutorialTooltip,
               tutorialPosition.cardStyle,
             ]}
+            onLayout={(e) => {
+              const h = e.nativeEvent.layout.height;
+              if (h > 0 && Math.abs(h - tooltipHeight) > 1) {
+                setTooltipHeight(h);
+              }
+            }}
           >
             {!tutorialPosition.showArrowDown ? (
               <View

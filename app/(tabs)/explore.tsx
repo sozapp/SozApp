@@ -29,16 +29,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect, usePathname, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
 import { fonts as appFonts } from '@/constants/theme';
 import { readGameCompletedToday, readGameStreak } from '@/constants/game-storage'
+import { locations } from '@/constants/map-locations'
+import { getVisitedLocationIds } from '@/constants/map-visits'
+import { plans } from '@/constants/plans'
+import { getPlanProgress } from '@/constants/storage'
 import { pickRandomVerseForShare } from '@/constants/bibleVersions'
 import { getBookIdByVerseBookName, searchVerseText } from '@/constants/verse-search'
 import ShareVerseModal from '@/components/ShareVerseModal'
+import { GameLeaderboardModal } from '@/components/GameLeaderboardModal'
 import { SozAlert } from '@/components/SozAlert'
 import { useSozAlert } from '@/hooks/useSozAlert'
+import { useHaptics } from '@/hooks/useHaptics'
 import { useDenomination } from '@/hooks/useDenomination'
 import { useTheme, type ThemeColors } from '../../hooks/useTheme'
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import { useTranslation } from '@/context/LanguageContext'
 import { useRegisterTabScrollToTop } from '@/context/ScrollToTopContext'
 import type { TranslationKey } from '@/constants/i18n'
@@ -79,6 +85,14 @@ function getGames(t: Tx) {
       title: t('missingWord'),
       desc: t('missingWordDesc'),
       cardIcon: 'text-outline' as keyof typeof Ionicons.glyphMap,
+      badgeKind: 'daily' as const,
+    },
+    {
+      id: 'verse-order',
+      route: '/games/verse-order',
+      title: t('verseOrder'),
+      desc: t('verseOrderDesc'),
+      cardIcon: 'swap-horizontal-outline' as keyof typeof Ionicons.glyphMap,
       badgeKind: 'new' as const,
     },
   ] as const;
@@ -87,8 +101,12 @@ function getGames(t: Tx) {
 function getToolsGrid(t: Tx) {
   return [
     { key: 'plans', icon: 'calendar-outline', title: t('readingPlansTitle'), desc: t('readingPlans30DaysDesc'), route: '/plans' },
+    { key: 'map', icon: 'map-outline', title: t('map'), desc: t('anatoliaMapCardDesc'), route: '/map' },
     { key: 'ask', icon: 'chatbubble-ellipses-outline', title: t('askSoz'), desc: t('askSozToolDesc'), route: '/ask' },
     { key: 'memorize', icon: 'school-outline', title: t('memorizeTitle'), desc: t('memorizeToolDesc'), route: '/memorize' },
+    { key: 'topics', icon: 'bookmarks-outline', title: t('verseTopicsTitle'), desc: t('verseTopicsToolDesc'), route: '/verse-topics' },
+    { key: 'prayerWall', icon: 'heart-outline', title: t('prayerWallTitle'), desc: t('prayerWallToolDesc'), route: '/prayer-wall' },
+    { key: 'kids', icon: 'happy-outline', title: t('kidsTitle'), desc: t('kidsToolDesc'), route: '/kids' },
     { key: 'church', icon: 'people-outline', title: t('churchGroup'), desc: t('churchGroupToolDesc'), route: '/church' },
     { key: 'multilang', icon: 'language-outline', title: t('multiLangTitle'), desc: t('multiLangToolDesc'), route: '/(tabs)/read' },
     { key: 'stats', icon: 'bar-chart-outline', title: t('statistics'), desc: t('statisticsToolDesc'), route: '/stats' },
@@ -98,8 +116,12 @@ function getToolsGrid(t: Tx) {
 
 const toolColors = {
   plans: '#C4956A',
+  map: '#7CB87C',
   ask: '#7C9A8A',
   memorize: '#9A7C8A',
+  topics: '#A67C8A',
+  prayerWall: '#BE6B7C',
+  kids: '#D4A843',
   church: '#8A8A9A',
   multilang: '#7C8A9A',
   stats: '#8A9A7C',
@@ -185,8 +207,10 @@ const watchCardPosterStyles = StyleSheet.create({
 });
 
 export default function ExploreScreen() {
+  useAnalyticsScreen('explore');
   const router = useRouter();
   const { colors, fonts } = useTheme();
+  const haptics = useHaptics();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { refreshDenomination } = useDenomination();
@@ -215,12 +239,23 @@ export default function ExploreScreen() {
     'who-said': 0,
     'true-false': 0,
     'missing-word': 0,
+    'verse-order': 0,
   });
   const [gameCompletedToday, setGameCompletedToday] = useState<Record<string, boolean>>({
     'who-said': false,
     'true-false': false,
     'missing-word': false,
+    'verse-order': false,
   });
+  const [leaderboardTarget, setLeaderboardTarget] = useState<{
+    gameId: string;
+    title: string;
+  } | null>(null);
+  const [toolProgress, setToolProgress] = useState<{
+    plans: { current: number; total: number } | null;
+    map: { current: number; total: number } | null;
+    memorize: number | null;
+  }>({ plans: null, map: null, memorize: null });
   const [refreshing, setRefreshing] = useState(false);
   const gamesScrollRef = useRef<ScrollView | null>(null);
   const exploreScrollRef = useRegisterTabScrollToTop<ScrollView>('explore');
@@ -234,7 +269,42 @@ export default function ExploreScreen() {
       done[g.id] = await readGameCompletedToday(g.id);
     }
     const ids = await getWatchFavoriteIds();
-    return { streaks, done, ids };
+
+    let plansProgress: { current: number; total: number } | null = null;
+    let bestCompleted = -1;
+    for (const plan of plans) {
+      const progress = await getPlanProgress(plan.id);
+      const completed = progress?.completedDays?.length ?? 0;
+      if (progress != null && completed > 0 && completed > bestCompleted) {
+        bestCompleted = completed;
+        plansProgress = { current: completed, total: plan.totalDays };
+      }
+    }
+
+    const visited = await getVisitedLocationIds();
+    const mapProgress =
+      visited.length > 0
+        ? { current: Math.min(visited.length, locations.length), total: locations.length }
+        : null;
+
+    let memorizeCount: number | null = null;
+    try {
+      const raw = await AsyncStorage.getItem('@soz/memorizeProgress');
+      if (raw) {
+        const prog = JSON.parse(raw) as Record<string, { level?: number }>;
+        const n = Object.values(prog).filter((v) => (v?.level ?? 0) >= 4).length;
+        if (n > 0) memorizeCount = n;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    return {
+      streaks,
+      done,
+      ids,
+      toolProgress: { plans: plansProgress, map: mapProgress, memorize: memorizeCount },
+    };
   }, [refreshDenomination, GAMES]);
 
   useFocusEffect(
@@ -246,13 +316,20 @@ export default function ExploreScreen() {
           setGameStreaks(snap.streaks);
           setGameCompletedToday(snap.done);
           setWatchFavoriteIds(snap.ids);
+          setToolProgress(snap.toolProgress);
         })
         .catch((e) => {
           console.warn('Explore load:', e);
           if (!mounted) return;
-          setGameStreaks({ 'who-said': 0, 'true-false': 0, 'missing-word': 0 });
-          setGameCompletedToday({ 'who-said': false, 'true-false': false, 'missing-word': false });
+          setGameStreaks({ 'who-said': 0, 'true-false': 0, 'missing-word': 0, 'verse-order': 0 });
+          setGameCompletedToday({
+            'who-said': false,
+            'true-false': false,
+            'missing-word': false,
+            'verse-order': false,
+          });
           setWatchFavoriteIds([]);
+          setToolProgress({ plans: null, map: null, memorize: null });
         });
       return () => {
         mounted = false;
@@ -267,6 +344,7 @@ export default function ExploreScreen() {
       setGameStreaks(snap.streaks);
       setGameCompletedToday(snap.done);
       setWatchFavoriteIds(snap.ids);
+      setToolProgress(snap.toolProgress);
     } catch (e) {
       console.warn('Explore refresh:', e);
     } finally {
@@ -321,7 +399,7 @@ export default function ExploreScreen() {
 
   const onVerseResultPress = useCallback(
     (item: { book: string; chapter: number; verse: number }) => {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      haptics.light();
       const bookId = getBookIdByVerseBookName(item.book);
       if (!bookId) return;
       router.push({
@@ -590,6 +668,8 @@ export default function ExploreScreen() {
               <TouchableOpacity
                 key={`${item.type}-${item.title}-${i}`}
                 style={styles.searchResultItem}
+                accessibilityRole="button"
+                accessibilityLabel={item.title}
                 onPress={() => {
                   if (item.type === 'watch') {
                     setSelectedWatch(item.item);
@@ -625,6 +705,8 @@ export default function ExploreScreen() {
                   style={styles.verseSearchItem}
                   onPress={() => onVerseResultPress(item)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.book} ${item.chapter}:${item.verse}`}
                 >
                   <View style={styles.verseSearchBar} />
                   <View style={styles.verseSearchContent}>
@@ -652,8 +734,11 @@ export default function ExploreScreen() {
                   style={styles.quickItem}
                   onPress={() => {
                     router.push(item.route as never);
-                    void Haptics.selectionAsync();
+                    haptics.selection();
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  accessibilityState={{ selected: active }}
                 >
                   <View style={[styles.quickIcon, active && styles.quickIconActive]}>
                     <Ionicons name={item.icon as keyof typeof Ionicons.glyphMap} size={24} color={item.color} />
@@ -692,9 +777,11 @@ export default function ExploreScreen() {
                     style={styles.gameCard}
                     onPress={() => {
                       router.push(game.route as never);
-                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      haptics.selection();
                     }}
                     activeOpacity={0.88}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${game.title}${completed ? ', tamamlandı' : ''}`}
                   >
                     {completed ? (
                       <View style={styles.gameCardOverlay} pointerEvents="none">
@@ -702,6 +789,21 @@ export default function ExploreScreen() {
                         <Text style={styles.gameCardOverlayText}>{t('gameCompletedBadge')}</Text>
                       </View>
                     ) : null}
+
+                    <TouchableOpacity
+                      style={styles.gameLeaderboardBtn}
+                      onPress={(e) => {
+                        e.stopPropagation?.();
+                        setLeaderboardTarget({ gameId: game.id, title: game.title });
+                        haptics.light();
+                      }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${game.title} liderlik tablosu`}
+                    >
+                      <Ionicons name="trophy-outline" size={16} color={ACCENT} />
+                    </TouchableOpacity>
 
                     <View style={styles.gameCardInner}>
                       <View
@@ -772,8 +874,11 @@ export default function ExploreScreen() {
                       style={[styles.watchFilterBtn, watchFilter === f.key && styles.watchFilterBtnActive]}
                       onPress={() => {
                         setWatchFilter(f.key);
-                        void Haptics.selectionAsync();
+                        haptics.selection();
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel={f.label}
+                      accessibilityState={{ selected: watchFilter === f.key }}
                     >
                       <Text
                         style={[styles.watchFilterText, watchFilter === f.key && styles.watchFilterTextActive]}
@@ -805,9 +910,11 @@ export default function ExploreScreen() {
                     onPress={() => {
                       setSelectedWatch(item);
                       setShowWatchModal(true);
-                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      haptics.light();
                     }}
                     activeOpacity={0.88}
+                    accessibilityRole="button"
+                    accessibilityLabel={item.title}
                   >
                     <View style={styles.watchCardPoster}>
                       <WatchCardPoster
@@ -847,6 +954,8 @@ export default function ExploreScreen() {
                 style={styles.featuredCard}
                 onPress={() => router.push('/map' as never)}
                 activeOpacity={0.9}
+                accessibilityRole="button"
+                accessibilityLabel={t('anatoliaMapCardTitle')}
               >
                 <View style={styles.featuredBg}>
                   <Text style={styles.featuredEmoji}>🗺️</Text>
@@ -855,6 +964,30 @@ export default function ExploreScreen() {
                   <Text style={styles.featuredLabel}>{t('anatoliaMapBadge')}</Text>
                   <Text style={styles.featuredTitle}>{t('anatoliaMapCardTitle')}</Text>
                   <Text style={styles.featuredDesc}>{t('anatoliaMapCardDesc')}</Text>
+                  {toolProgress.map ? (
+                    <View style={styles.toolProgressBlock}>
+                      <View style={styles.toolProgressBg}>
+                        <View
+                          style={[
+                            styles.toolProgressFill,
+                            {
+                              width: `${Math.min(
+                                100,
+                                (toolProgress.map.current / toolProgress.map.total) * 100,
+                              )}%`,
+                              backgroundColor: '#7CB87C',
+                            },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.toolProgressLabel}>
+                        {t('toolProgressPlaces', {
+                          current: toolProgress.map.current,
+                          total: toolProgress.map.total,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
                   <View style={styles.featuredBtn}>
                     <Text style={styles.featuredBtnText}>{t('exploreHeaderTitle')}</Text>
                     <Ionicons name="arrow-forward" size={12} color={ACCENT} />
@@ -870,6 +1003,8 @@ export default function ExploreScreen() {
                     style={[styles.learnTwinCard, styles.learnTwinCardCal]}
                     onPress={() => router.push('/(tabs)/calendar' as never)}
                     activeOpacity={0.88}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('holyDaysCardTitle')}
                   >
                     <View style={styles.learnTwinInner}>
                       <Ionicons name="calendar-outline" size={28} color={ACCENT} />
@@ -886,8 +1021,10 @@ export default function ExploreScreen() {
                 {randVisible ? (
                   <TouchableOpacity
                     style={[styles.learnTwinCard, styles.learnTwinCardRand]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('randomVerseCardTitle')}
                     onPress={() => {
-                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      haptics.light();
                       const r = pickRandomVerseForShare();
                       if (r) {
                         setShareRandomText(r.verseText);
@@ -922,33 +1059,76 @@ export default function ExploreScreen() {
           <View style={styles.exploreSection}>
             <SectionHeader title={t('toolsTitle')} subtitle={t('toolsSubtitle')} styles={styles} />
             <View style={styles.toolsGrid}>
-              {toolsFiltered.map((tool, i) => (
-                <TouchableOpacity
-                  key={`${tool.title}-${i}`}
-                  style={[
-                    styles.toolCard,
-                    {
-                      borderTopWidth: 3,
-                      borderTopColor: toolColors[tool.key],
-                    },
-                  ]}
-                  onPress={() => {
-                    router.push(tool.route as never);
-                    void Haptics.selectionAsync();
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <View style={[styles.toolIcon, { borderColor: `${toolColors[tool.key]}35` }]}>
-                    <Ionicons
-                      name={tool.icon as keyof typeof Ionicons.glyphMap}
-                      size={20}
-                      color={toolColors[tool.key]}
-                    />
-                  </View>
-                  <Text style={styles.toolTitle}>{tool.title}</Text>
-                  <Text style={styles.toolDesc}>{tool.desc}</Text>
-                </TouchableOpacity>
-              ))}
+              {toolsFiltered.map((tool, i) => {
+                const accent = toolColors[tool.key];
+                let progressLabel: string | null = null;
+                let progressRatio: number | null = null;
+                if (tool.key === 'plans' && toolProgress.plans) {
+                  progressLabel = t('toolProgressDays', {
+                    current: toolProgress.plans.current,
+                    total: toolProgress.plans.total,
+                  });
+                  progressRatio = toolProgress.plans.current / toolProgress.plans.total;
+                } else if (tool.key === 'map' && toolProgress.map) {
+                  progressLabel = t('toolProgressPlaces', {
+                    current: toolProgress.map.current,
+                    total: toolProgress.map.total,
+                  });
+                  progressRatio = toolProgress.map.current / toolProgress.map.total;
+                } else if (tool.key === 'memorize' && toolProgress.memorize != null) {
+                  progressLabel = t('toolProgressMemorized', { n: toolProgress.memorize });
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={`${tool.title}-${i}`}
+                    style={[
+                      styles.toolCard,
+                      {
+                        borderTopWidth: 3,
+                        borderTopColor: accent,
+                      },
+                    ]}
+                    onPress={() => {
+                      router.push(tool.route as never);
+                      haptics.selection();
+                    }}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel={tool.title}
+                  >
+                    <View style={[styles.toolIcon, { borderColor: `${accent}35` }]}>
+                      <Ionicons
+                        name={tool.icon as keyof typeof Ionicons.glyphMap}
+                        size={20}
+                        color={accent}
+                      />
+                    </View>
+                    <Text style={styles.toolTitle}>{tool.title}</Text>
+                    <Text style={styles.toolDesc}>{tool.desc}</Text>
+                    {progressLabel ? (
+                      <View style={styles.toolProgressBlock}>
+                        {progressRatio != null ? (
+                          <View style={styles.toolProgressBg}>
+                            <View
+                              style={[
+                                styles.toolProgressFill,
+                                {
+                                  width: `${Math.min(100, progressRatio * 100)}%`,
+                                  backgroundColor: accent,
+                                },
+                              ]}
+                            />
+                          </View>
+                        ) : null}
+                        <Text style={[styles.toolProgressLabel, { color: accent }]}>
+                          {progressLabel}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
         )}
@@ -957,7 +1137,13 @@ export default function ExploreScreen() {
       {showWatchModal && selectedWatch && (
         <Modal visible={showWatchModal} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowWatchModal(false)}>
           <View style={styles.watchModalOverlay}>
-            <TouchableOpacity style={styles.watchModalBackdrop} onPress={() => setShowWatchModal(false)} activeOpacity={1} />
+            <TouchableOpacity
+              style={styles.watchModalBackdrop}
+              onPress={() => setShowWatchModal(false)}
+              activeOpacity={1}
+              accessibilityRole="button"
+              accessibilityLabel="İzleme detayını kapat"
+            />
             <View style={[styles.watchModalSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
               <View style={styles.watchModalHandle} />
               <ScrollView contentContainerStyle={styles.watchModalScrollContent} showsVerticalScrollIndicator={false}>
@@ -974,6 +1160,8 @@ export default function ExploreScreen() {
                       !selectedWatch.where[0]?.url && styles.watchModalBtnDisabled,
                     ]}
                     disabled={!selectedWatch.where[0]?.url}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('watchBtnPlay')}
                     onPress={() => {
                       const url = selectedWatch.where[0]?.url;
                       if (url) void Linking.openURL(url);
@@ -984,11 +1172,17 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.watchModalSecondaryBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      watchFavoriteIds.includes(selectedWatch.id)
+                        ? t('removeFromFavorites')
+                        : t('addToFavorites')
+                    }
                     onPress={async () => {
                       await toggleWatchFavoriteId(selectedWatch.id);
                       const ids = await getWatchFavoriteIds();
                       setWatchFavoriteIds(ids);
-                      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      haptics.light();
                     }}
                   >
                     <Ionicons
@@ -1004,7 +1198,12 @@ export default function ExploreScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity style={styles.watchCloseBtn} onPress={() => setShowWatchModal(false)}>
+                <TouchableOpacity
+                  style={styles.watchCloseBtn}
+                  onPress={() => setShowWatchModal(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('watchBtnClose')}
+                >
                   <Text style={styles.watchCloseBtnText}>{t('watchBtnClose')}</Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -1013,6 +1212,13 @@ export default function ExploreScreen() {
         </Modal>
       )}
       <SozAlert {...alertConfig} onDismiss={hideAlert} />
+
+      <GameLeaderboardModal
+        visible={leaderboardTarget != null}
+        onClose={() => setLeaderboardTarget(null)}
+        gameId={leaderboardTarget?.gameId ?? 'who-said'}
+        title={leaderboardTarget?.title ?? ''}
+      />
 
       <ShareVerseModal
         visible={shareRandomVisible}
@@ -1046,7 +1252,11 @@ const SectionHeader = ({
         <Text style={[styles.sectionSubtitle, subtitleNoGap && styles.sectionSubtitleNoGap]}>{subtitle}</Text>
       </View>
       {onMore ? (
-        <TouchableOpacity onPress={onMore}>
+        <TouchableOpacity
+          onPress={onMore}
+          accessibilityRole="button"
+          accessibilityLabel={t('moreLink')}
+        >
           <Text style={styles.sectionMore}>{t('moreLink')}</Text>
         </TouchableOpacity>
       ) : null}
@@ -1230,6 +1440,20 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       zIndex: 2,
     },
     gameCardOverlayText: { fontSize: 12, color: '#4CAF50', fontFamily: fonts.regular },
+    gameLeaderboardBtn: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      zIndex: 3,
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: `${A}18`,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: `${A}40`,
+    },
     gameCardInner: { flex: 1, padding: 12, justifyContent: 'space-between' },
     gameTopBadge: {
       alignSelf: 'flex-start',
@@ -1425,6 +1649,23 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       color: colors.textMuted,
       fontStyle: 'italic',
       fontFamily: fonts.italic ?? fonts.regular,
+    },
+    toolProgressBlock: { gap: 4, marginTop: 2 },
+    toolProgressBg: {
+      height: 3,
+      borderRadius: 2,
+      overflow: 'hidden',
+      backgroundColor: `${A}22`,
+    },
+    toolProgressFill: {
+      height: '100%',
+      borderRadius: 2,
+    },
+    toolProgressLabel: {
+      fontSize: 10,
+      color: A,
+      fontFamily: fonts.regular,
+      letterSpacing: 0.02,
     },
     watchModalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
     watchModalBackdrop: { flex: 1 },

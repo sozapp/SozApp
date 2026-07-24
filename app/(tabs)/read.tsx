@@ -24,6 +24,7 @@ import {
 import { newTestament } from '@/constants/new-testament';
 import { FREE_LIMITS } from '@/constants/premium';
 import { logFriendActivity } from '@/constants/friend-activity';
+import { trackEvent } from '@/constants/analytics';
 import { addToReadHistory, saveLastRead } from '@/constants/read-history';
 import { buildShareMessage } from '@/constants/share-verse';
 import { supabase } from '@/constants/supabase';
@@ -41,6 +42,7 @@ import { useTabPulse } from '@/context/TabPulseContext';
 import { useTranslation } from '@/context/LanguageContext';
 import AmbientMusicModal, { MiniWaveBar } from '@/components/AmbientMusicModal';
 import { useTheme } from '@/hooks/useTheme';
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
@@ -248,6 +250,7 @@ function ListeningDot() {
 }
 
 export default function ReadScreen() {
+  useAnalyticsScreen('read');
   const { theme } = useTheme();
   const { t: tx } = useTranslation();
   const [bookIndex, setBookIndex] = useState(0);
@@ -749,6 +752,7 @@ export default function ReadScreen() {
       if (!wasFav) {
         animateFavorite();
         pulseNotesTab();
+        trackEvent('favorite_added', { book: chapter.book });
         try {
           if (supabase) {
             const {
@@ -866,10 +870,10 @@ export default function ReadScreen() {
       timestamp: Date.now(),
     });
     void saveToHistory(chapter.book, chapter.chapterNumber);
+    trackEvent('chapter_read', { book: chapter.book, chapter: chapter.chapterNumber });
     (async () => {
       try {
         if (!supabase) {
-          console.log('Supabase not available, using local storage');
           return;
         }
         const {
@@ -1016,6 +1020,21 @@ export default function ReadScreen() {
     });
   }, [goNextChapter, hapticPageTurn, animatePageTurn]);
 
+  const showTopBannerTemporary = useCallback((prevName: string) => {
+    if (topBannerTimeoutRef.current) clearTimeout(topBannerTimeoutRef.current);
+    setBannerPrevChapterName(prevName);
+    setShowTopBanner(true);
+    topBannerOpacity.setValue(1);
+    topBannerTimeoutRef.current = setTimeout(() => {
+      topBannerTimeoutRef.current = null;
+      Animated.timing(topBannerOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: false,
+      }).start(() => setShowTopBanner(false));
+    }, 2000);
+  }, [topBannerOpacity]);
+
   const triggerNextChapter = useCallback(() => {
     const ntBook = currentBook as typeof newTestament[0];
     const movingToNextBook =
@@ -1082,21 +1101,6 @@ export default function ReadScreen() {
       }, 300);
     });
   }, [currentBook, chapter.book, chapter.chapterNumber, goPrevChapter, hapticPageTurn, animatePageTurn]);
-
-  const showTopBannerTemporary = useCallback((prevName: string) => {
-    if (topBannerTimeoutRef.current) clearTimeout(topBannerTimeoutRef.current);
-    setBannerPrevChapterName(prevName);
-    setShowTopBanner(true);
-    topBannerOpacity.setValue(1);
-    topBannerTimeoutRef.current = setTimeout(() => {
-      topBannerTimeoutRef.current = null;
-      Animated.timing(topBannerOpacity, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: false,
-      }).start(() => setShowTopBanner(false));
-    }, 2000);
-  }, [topBannerOpacity]);
 
   useEffect(() => {
     return () => {
@@ -1310,10 +1314,10 @@ export default function ReadScreen() {
     const next = { ...highlights, [id]: colorId };
     saveHighlights(next);
     pulseNotesTab();
+    trackEvent('highlight_added', { book: listChapter.book });
     (async () => {
       try {
         if (!supabase) {
-          console.log('Supabase not available, using local storage');
           return;
         }
         const {
@@ -1346,6 +1350,7 @@ export default function ReadScreen() {
     if (!trimmed) delete next[id];
     saveNotes(next);
     if (trimmed) {
+      if (isNewNote) trackEvent('note_added', { book: listChapter.book });
       (async () => {
         try {
           const raw = await AsyncStorage.getItem(STORAGE_NOTE_TIMESTAMPS);
@@ -1359,7 +1364,6 @@ export default function ReadScreen() {
       (async () => {
         try {
           if (!supabase) {
-            console.log('Supabase not available, using local storage');
             return;
           }
           const {
@@ -1647,7 +1651,7 @@ export default function ReadScreen() {
       <View style={styles.listHeaderWrap} collapsable={false}>
         {showTopBanner && bannerPrevChapterName ? (
           <Animated.View style={[styles.topBanner, { opacity: topBannerOpacity }]}>
-            <Ionicons name="chevron-up" size={14} color={colors.textMuted} />
+            <Ionicons name="chevron-up" size={14} color={theme.textMuted} />
             <Text style={styles.topBannerText}>
               ← {tx('backToTopName', { name: bannerPrevChapterName ?? '' })}
             </Text>
@@ -2558,7 +2562,6 @@ export default function ReadScreen() {
                             haptics.success();
                             try {
                               if (!supabase) {
-                                console.log('Supabase not available, using local storage');
                                 return;
                               }
                               const {
@@ -3273,7 +3276,7 @@ const styles = StyleSheet.create({
   },
   topBannerText: {
     fontSize: 13,
-    color: colors.textMuted,
+    color: 'rgba(232,224,208,0.55)',
     fontStyle: 'italic',
   },
   prevChapterWrap: {
@@ -3313,18 +3316,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 8,
     borderTopWidth: 0.5,
-    borderTopColor: colors.border,
+    borderTopColor: 'rgba(196,149,80,0.15)',
     width: '100%',
   },
   nextChapterLabel: {
     fontSize: 11,
     letterSpacing: 0.15,
-    color: colors.textMuted,
+    color: 'rgba(232,224,208,0.55)',
     textTransform: 'uppercase',
   },
   nextChapterName: {
     fontSize: 20,
-    color: colors.text,
+    color: '#E8E0D0',
     fontFamily: fonts.regular,
   },
   nextChapterButton: {

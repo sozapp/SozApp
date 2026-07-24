@@ -24,7 +24,6 @@ export default function Index() {
           return;
         }
         if (!supabase) {
-          console.log('Supabase not available, using local storage');
           if (!cancelled) setHasSession(false);
           return;
         }

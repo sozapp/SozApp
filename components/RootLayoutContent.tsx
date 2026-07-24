@@ -19,10 +19,12 @@ import { useQuickActionRouting } from 'expo-quick-actions/router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef } from 'react';
 import { Modal, Platform, Text, TouchableOpacity, View } from 'react-native';
+import { identifyAnalyticsUser, resetAnalyticsUser } from '@/constants/analytics';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
 import { initPurchases } from '@/constants/purchases';
 import { supabase } from '@/constants/supabase';
 import { syncRevenueCatWithSupabase } from '@/hooks/usePremium';
+import { registerPushTokenForUser } from '@/hooks/useNotifications';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
@@ -117,7 +119,6 @@ export function RootLayoutContent() {
       void isOnboardingCompleteInStorage().then((done) => {
         if (!done) return;
         if (!supabase) {
-          console.log('Supabase not available, using local storage');
           return;
         }
         try {
@@ -138,7 +139,6 @@ export function RootLayoutContent() {
       try {
         if (!(await isOnboardingCompleteInStorage()) || cancelled) return;
         if (!supabase) {
-          console.log('Supabase not available, using local storage');
           return;
         }
         const net = await NetInfo.fetch();
@@ -149,10 +149,16 @@ export function RootLayoutContent() {
             console.warn('Supabase session:', error.message);
             return;
           }
+          // Kalıcı oturum (AsyncStorage) varsa onu kullan.
+          // signInAnonymously yalnızca gerçekten oturum yoksa (ilk açılış / çıkış sonrası).
           if (!data.session && !cancelled) {
             const { error: signErr } = await supabase.auth.signInAnonymously();
             if (signErr) console.warn('Supabase anon sign-in:', signErr.message);
           }
+          const uid =
+            data.session?.user?.id ??
+            (await supabase.auth.getSession()).data.session?.user?.id;
+          if (uid && !cancelled) void registerPushTokenForUser(uid);
           initPurchases();
           await syncRevenueCatWithSupabase();
         } catch (e) {
@@ -176,7 +182,6 @@ export function RootLayoutContent() {
 
   useEffect(() => {
     if (!supabase) {
-      console.log('Supabase not available, using local storage');
       return;
     }
     const {
@@ -185,6 +190,7 @@ export function RootLayoutContent() {
       try {
         if (event === 'SIGNED_OUT') {
           AsyncStorage.multiRemove([...ACCOUNT_LOCAL_KEYS, LAST_AUTH_USER_KEY]).catch(() => {});
+          resetAnalyticsUser();
         }
         if (event === 'SIGNED_IN') {
           const uid = session?.user?.id ?? null;
@@ -196,8 +202,15 @@ export function RootLayoutContent() {
               if (uid) await AsyncStorage.setItem(LAST_AUTH_USER_KEY, uid);
             })
             .catch(() => {});
+          if (uid) {
+            void registerPushTokenForUser(uid);
+            identifyAnalyticsUser(uid);
+          }
         }
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          if (event === 'TOKEN_REFRESHED' && session?.user?.id) {
+            void registerPushTokenForUser(session.user.id);
+          }
           void syncRevenueCatWithSupabase();
           void isOnboardingCompleteInStorage().then((done) => {
             if (!done) return;
@@ -214,32 +227,53 @@ export function RootLayoutContent() {
           });
         }
       } catch (e) {
-        console.log('[Sync] onAuthStateChange error:', e);
+        console.warn('[Sync] onAuthStateChange error:', e);
       }
     });
     return () => subscription.unsubscribe();
   }, [syncAll]);
 
   useEffect(() => {
-    function redirectToRead() {
-      router.push('/(tabs)/read');
+    function handleNotificationResponse(response: Notifications.NotificationResponse) {
+      try {
+        const raw = response.notification.request.content.data as
+          | { type?: string; friendId?: string; url?: string }
+          | undefined;
+        const type = raw?.type;
+        if (type === 'message' && raw?.friendId) {
+          router.push({
+            pathname: '/chat/[friendId]',
+            params: { friendId: String(raw.friendId) },
+          });
+          return;
+        }
+        if (type === 'friend_request') {
+          router.push('/friends' as never);
+          return;
+        }
+        if (type === 'plan_invite') {
+          router.push('/(tabs)/plans' as never);
+          return;
+        }
+        // Yerel günlük hatırlatma vb. → Oku
+        if (response.notification) {
+          router.push('/(tabs)/read');
+        }
+      } catch (e: unknown) {
+        console.warn('Notification route:', e);
+      }
     }
+
     (async () => {
       try {
         const response = await Notifications.getLastNotificationResponseAsync();
-        if (response?.notification) redirectToRead();
+        if (response) handleNotificationResponse(response);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
         console.warn('Notification last response:', msg);
       }
     })();
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      try {
-        if (response.notification) redirectToRead();
-      } catch (e: unknown) {
-        console.warn('Notification listener:', e);
-      }
-    });
+    const sub = Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
     return () => {
       try {
         sub.remove();

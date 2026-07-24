@@ -1,3 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
+
+import { locations } from '@/constants/map-locations';
+
 export type UserStats = {
   streak: number;
   totalVersesRead: number;
@@ -7,13 +11,17 @@ export type UserStats = {
   daysActive: number;
   memorizeCount: number;
   reflectionsCompleted: number;
+  /** Anadolu haritasında ziyaret edilen konum sayısı (max = locations.length). */
+  mapLocationsVisited: number;
 };
+
+export type BadgeIconName = keyof typeof Ionicons.glyphMap;
 
 export type Badge = {
   id: string;
   name: string;
   description: string;
-  icon: string;
+  icon: BadgeIconName;
   color: string;
   /** Hangi istatistik takip ediliyor (ilerleme halkası için de kullanılır). */
   statKey: keyof UserStats;
@@ -261,6 +269,17 @@ export const ALL_BADGES: Badge[] = [
     color: '#6C8A6C',
     statKey: 'reflectionsCompleted',
     target: 30,
+  },
+
+  // mapLocationsVisited — Anadolu haritası
+  {
+    id: 'anatolia_explorer',
+    name: 'Anadolu Kaşifi',
+    description: `Haritadaki ${locations.length} kutsal yerin hepsini keşfettin`,
+    icon: 'map-outline',
+    color: '#7CB87C',
+    statKey: 'mapLocationsVisited',
+    target: locations.length,
   },
 ];
 

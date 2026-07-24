@@ -23,10 +23,12 @@ import SozSplashScreen from '@/components/SplashScreen';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
 import { setupNotificationHandler } from '@/constants/notifications';
 import { initSentry } from '@/constants/sentry';
+import { initAnalytics } from '@/constants/analytics';
 
 // Crash/error reporting en erken noktada başlamalı — splash screen'i bile
 // gizlemeden önce, ki uygulama açılışında olan crash'ler de yakalanabilsin.
 initSentry();
+void initAnalytics();
 SplashScreen.preventAutoHideAsync();
 setupNotificationHandler();
 

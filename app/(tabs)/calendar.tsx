@@ -4,10 +4,12 @@ import {
 } from '@/constants/church-calendar';
 import { denominations } from '@/constants/denominations';
 import { colors, fonts, borderRadius } from '@/constants/theme';
+import { useTranslation } from '@/context/LanguageContext';
 import { useDenomination } from '@/hooks/useDenomination';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSwipeBack } from '@/hooks/useSwipeBack';
 import { useTheme } from '@/hooks/useTheme';
+import type { TranslationKey } from '@/constants/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -24,22 +26,14 @@ const GRID_W = Dimensions.get('window').width - 32;
 const CELL_W = GRID_W / 7;
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const MONTHS_TR = [
-  'Ocak',
-  'Şubat',
-  'Mart',
-  'Nisan',
-  'Mayıs',
-  'Haziran',
-  'Temmuz',
-  'Ağustos',
-  'Eylül',
-  'Ekim',
-  'Kasım',
-  'Aralık',
+const MONTH_KEYS: TranslationKey[] = [
+  'monthJan', 'monthFeb', 'monthMar', 'monthApr', 'monthMay', 'monthJun',
+  'monthJul', 'monthAug', 'monthSep', 'monthOct', 'monthNov', 'monthDec',
 ];
 
-const WEEKDAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
+const WEEKDAY_KEYS: TranslationKey[] = [
+  'weekdayMon', 'weekdayTue', 'weekdayWed', 'weekdayThu', 'weekdayFri', 'weekdaySat', 'weekdaySun',
+];
 
 const ACCENT = '#C4956A';
 
@@ -61,6 +55,7 @@ function firstWeekdayMonday0(year: number, monthIndex: number): number {
 
 export default function ChurchCalendarScreen() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
   const haptics = useHaptics();
   const {
@@ -70,6 +65,9 @@ export default function ChurchCalendarScreen() {
     getMonthEvents,
     getTodayEvents,
   } = useDenomination();
+
+  const months = useMemo(() => MONTH_KEYS.map((k) => t(k)), [t]);
+  const weekdays = useMemo(() => WEEKDAY_KEYS.map((k) => t(k)), [t]);
 
   const now = new Date();
   const [viewYear, setViewYear] = useState(now.getFullYear());
@@ -192,7 +190,7 @@ export default function ChurchCalendarScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: bg }]} edges={['top']}>
       <View style={styles.flex1} {...swipeBack}>
       <View style={[styles.header, { borderBottomColor: muted }]}>
-        <Text style={[styles.title, { color: text }]}>Kilise Takvimi</Text>
+        <Text style={[styles.title, { color: text }]}>{t('churchCalendarTitle')}</Text>
         <View
           style={[
             styles.denomBadge,
@@ -219,11 +217,11 @@ export default function ChurchCalendarScreen() {
             ]}
           >
             <Text style={[styles.todayHighlightLabel, { color: ACCENT }]}>
-              Bugün: {todayEvents[0].name}
+              {t('todayColon')} {todayEvents[0].name}
             </Text>
             {todayEvents.length > 1 && (
               <Text style={[styles.todayHighlightMore, { color: muted }]}>
-                +{todayEvents.length - 1} etkinlik daha
+                {t('moreEventsCount', { n: todayEvents.length - 1 })}
               </Text>
             )}
             <Text style={[styles.todayHighlightDesc, { color: text }]}>
@@ -238,26 +236,26 @@ export default function ChurchCalendarScreen() {
             style={styles.monthNavBtn}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel="Önceki ay"
+            accessibilityLabel={t('prevMonthA11y')}
           >
             <Ionicons name="chevron-back" size={24} color={ACCENT} />
           </Pressable>
           <Text style={[styles.monthNavTitle, { color: text }]}>
-            {MONTHS_TR[viewMonthIndex]} {viewYear}
+            {months[viewMonthIndex]} {viewYear}
           </Text>
           <Pressable
             onPress={goNextMonth}
             style={styles.monthNavBtn}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel="Sonraki ay"
+            accessibilityLabel={t('nextMonthA11y')}
           >
             <Ionicons name="chevron-forward" size={24} color={ACCENT} />
           </Pressable>
         </View>
 
         <View style={[styles.weekRow, { width: GRID_W }]}>
-          {WEEKDAYS.map((w) => (
+          {weekdays.map((w) => (
             <View key={w} style={{ width: CELL_W, alignItems: 'center' }}>
               <Text style={[styles.weekdayCell, { color: muted }]}>{w}</Text>
             </View>
@@ -314,15 +312,15 @@ export default function ChurchCalendarScreen() {
 
         <Text style={[styles.listTitle, { color: muted }]}>
           {selectedDay != null
-            ? `${selectedDay} ${MONTHS_TR[viewMonthIndex]} etkinlikleri`
-            : 'Bu ay'}
+            ? t('dayEventsTitle', { day: selectedDay, month: months[viewMonthIndex] })
+            : t('thisMonth')}
         </Text>
 
         {selectedEvents.length === 0 ? (
           <Text style={[styles.emptyMonth, { color: muted }]}>
             {monthEvents.length === 0
-              ? 'Bu ay etkinlik yok'
-              : 'Bu günde etkinlik yok'}
+              ? t('noEventsThisMonth')
+              : t('noEventsThisDay')}
           </Text>
         ) : (
           selectedEvents.map((ev) => (

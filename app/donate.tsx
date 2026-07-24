@@ -1,4 +1,5 @@
 import { fonts } from '@/constants/theme';
+import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import type { ThemeColors } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,7 @@ import { useSafeBack } from '@/hooks/useSafeBack';
 
 export default function DonateScreen() {
   const safeBack = useSafeBack();
+  const { t } = useTranslation();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
 
@@ -48,11 +50,11 @@ export default function DonateScreen() {
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
-          accessibilityLabel="Geri git"
+          accessibilityLabel={t('goBackA11y')}
         >
           <Ionicons name="arrow-back" size={22} color={colors.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Destek Ol</Text>
+        <Text style={styles.headerTitle}>{t('supportTitle')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -65,44 +67,39 @@ export default function DonateScreen() {
           </Animated.View>
 
           <Text style={styles.heroTitle}>
-            Bu uygulama bir ekip değil,{'\n'}
-            bir kişinin <Text style={styles.heroAccent}>inancının</Text> ürünü.
+            {t('donateHeroTitleBefore')}
+            <Text style={styles.heroAccent}>{t('donateHeroFaith')}</Text>
+            {t('donateHeroTitleAfter')}
           </Text>
 
-          <Text style={styles.heroDesc}>
-            Söz, Türkçe konuşan Hristiyanların İncil'e daha kolay ulaşabilmesi için gönüllü olarak
-            geliştirildi. Sunucu masrafları, geliştirme zamanı ve yapay zeka maliyetleri tamamen kendi
-            cebimizden karşılanıyor.
-          </Text>
+          <Text style={styles.heroDesc}>{t('donateHeroDesc1')}</Text>
 
           <Text style={styles.heroDesc}>
-            Şu an bu uygulamayı kullanan herkes, bu fedakarlığın meyvesini ücretsiz yiyor.{' '}
-            <Text style={styles.heroEmphasis}>
-              Eğer sana değer kattıysa, bir fincan kahve kadar destek bile fark yaratır.
-            </Text>
+            {t('donateHeroDesc2')}{' '}
+            <Text style={styles.heroEmphasis}>{t('donateHeroEmphasis')}</Text>
           </Text>
         </View>
 
         <View style={styles.divider} />
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>NEDEN ÖNEMLİ</Text>
+          <Text style={styles.sectionLabel}>{t('whyImportant')}</Text>
 
           {[
             {
               icon: 'server-outline' as const,
-              title: 'Uygulama ayakta kalıyor',
-              desc: 'Groq AI, Supabase ve App Store\nmasrafları her ay devam ediyor.\nBağışlar bu maliyetleri karşılıyor.',
+              title: t('donateReason1Title'),
+              desc: t('donateReason1Desc'),
             },
             {
               icon: 'globe-outline' as const,
-              title: 'Daha fazla kişiye ulaşıyor',
-              desc: 'Her bağış yeni özellikler,\ndaha iyi çeviriler ve daha geniş\nbir topluluğa kapı açıyor.',
+              title: t('donateReason2Title'),
+              desc: t('donateReason2Desc'),
             },
             {
               icon: 'time-outline' as const,
-              title: 'Geliştirme sürüyor',
-              desc: 'Yeni özellikler, hata düzeltmeleri\nve 7 dil desteğinin korunması\niçin zaman ve kaynak gerekiyor.',
+              title: t('donateReason3Title'),
+              desc: t('donateReason3Desc'),
             },
           ].map((item, i) => (
             <View key={i} style={styles.reasonCard}>
@@ -120,7 +117,7 @@ export default function DonateScreen() {
         <View style={styles.divider} />
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>KUTSAL KİTAP NE DİYOR?</Text>
+          <Text style={styles.sectionLabel}>{t('bibleSaysTitle')}</Text>
 
           {[
             {
@@ -152,10 +149,7 @@ export default function DonateScreen() {
               color="rgba(196,149,80,0.6)"
               style={{ marginTop: 1 }}
             />
-            <Text style={styles.noteText}>
-              Bağış yapmak zorunlu değil. Söz her zaman ücretsiz kalacak. Ama eğer bu uygulama duanızda,
-              Söz okumada veya imanınızda sana bir şey kattıysa — o zaman verdiğin her kuruş anlam taşır.
-            </Text>
+            <Text style={styles.noteText}>{t('donateOptionalNote')}</Text>
           </View>
         </View>
 
@@ -166,15 +160,13 @@ export default function DonateScreen() {
             activeOpacity={0.85}
           >
             <Ionicons name="heart" size={18} color="#0A0A08" />
-            <Text style={styles.donateBtnText}>Bağış Yap</Text>
+            <Text style={styles.donateBtnText}>{t('donate')}</Text>
           </TouchableOpacity>
 
-          <Text style={styles.donateNote}>
-            Güvenli ödeme · İstediğin kadar ·{'\n'}Tek seferlik veya aylık
-          </Text>
+          <Text style={styles.donateNote}>{t('donatePaymentNote')}</Text>
 
           <TouchableOpacity style={styles.skipBtn} onPress={() => safeBack()}>
-            <Text style={styles.skipBtnText}>Şimdi değil</Text>
+            <Text style={styles.skipBtnText}>{t('notNow')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

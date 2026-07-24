@@ -1,8 +1,10 @@
 import { bookList } from '@/constants/bible-index';
 import type { TranslationKey } from '@/constants/i18n';
 import { locations, type MapLocation } from '@/constants/map-locations';
+import { getVisitedMapLocationCount, markLocationVisited } from '@/constants/map-visits';
 import { colors, fonts, borderRadius } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
+import { useBadges } from '@/hooks/useBadges';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useTheme } from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -106,11 +108,13 @@ export default function MapScreen() {
   const router = useRouter();
   const searchParams = useLocalSearchParams<{ focusId?: string | string[] }>();
   const haptics = useHaptics();
+  const { checkBadges } = useBadges();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<InstanceType<typeof MapView>>(null);
 
   const [filter, setFilter] = useState<FilterId>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [visitedCount, setVisitedCount] = useState(0);
 
   const panelH = useMemo(() => Math.round(SCREEN_H * 0.4), []);
   const slideAnim = useRef(new Animated.Value(panelH)).current;
@@ -125,6 +129,30 @@ export default function MapScreen() {
     useCallback(() => {
       AsyncStorage.setItem('@soz/mapOpened', 'true').catch(() => {});
     }, [])
+  );
+
+  const refreshVisitedProgress = useCallback(async () => {
+    try {
+      const count = await getVisitedMapLocationCount();
+      setVisitedCount(count);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshVisitedProgress();
+    }, [refreshVisitedProgress])
+  );
+
+  const recordVisit = useCallback(
+    async (locationId: string) => {
+      await markLocationVisited(locationId);
+      await refreshVisitedProgress();
+      void checkBadges();
+    },
+    [refreshVisitedProgress, checkBadges]
   );
 
   useEffect(() => {
@@ -203,6 +231,7 @@ export default function MapScreen() {
           setFilter('all');
           setSelectedId(loc.id);
           focusLocation(loc);
+          void recordVisit(loc.id);
         } catch {
           /* ignore */
         }
@@ -213,7 +242,7 @@ export default function MapScreen() {
         }
       }, 450);
       return () => clearTimeout(timer);
-    }, [searchParams.focusId, router, focusLocation])
+    }, [searchParams.focusId, router, focusLocation, recordVisit])
   );
 
   const onMarkerPress = useCallback(
@@ -225,8 +254,9 @@ export default function MapScreen() {
       }
       setSelectedId(loc.id);
       focusLocation(loc);
+      void recordVisit(loc.id);
     },
-    [haptics, focusLocation]
+    [haptics, focusLocation, recordVisit]
   );
 
   const onFilterPress = useCallback(
@@ -322,7 +352,12 @@ export default function MapScreen() {
                 <Text style={styles.calloutDesc} numberOfLines={2}>
                   {descPreview(loc.description)}
                 </Text>
-                <Pressable style={styles.calloutBtn} onPress={() => onMarkerPress(loc)}>
+                <Pressable
+                  style={styles.calloutBtn}
+                  onPress={() => onMarkerPress(loc)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${loc.name} detay`}
+                >
                   <View style={styles.calloutBtnContent}>
                 <Text style={styles.calloutBtnText}>Detay</Text>
                 <Ionicons name="arrow-forward" size={16} color="#C4956A" style={styles.calloutBtnArrow} />
@@ -344,6 +379,25 @@ export default function MapScreen() {
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: text }]}>{t('anatoliaMap')}</Text>
         <Text style={[styles.headerSubtitle, { color: muted }]}>{t('holyPlacesSubtitle')}</Text>
+        <View style={styles.mapProgressBlock}>
+          <View style={[styles.mapProgressBg, { backgroundColor: `${ACCENT}22` }]}>
+            <View
+              style={[
+                styles.mapProgressFill,
+                {
+                  width: `${Math.min(100, (visitedCount / Math.max(1, locations.length)) * 100)}%`,
+                  backgroundColor: '#7CB87C',
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.mapProgressLabel, { color: ACCENT }]}>
+            {t('mapExploreProgress', {
+              current: visitedCount,
+              total: locations.length,
+            })}
+          </Text>
+        </View>
       </View>
 
       <ScrollView
@@ -358,6 +412,9 @@ export default function MapScreen() {
             <Pressable
               key={f.id}
               onPress={() => onFilterPress(f.id)}
+              accessibilityRole="button"
+              accessibilityLabel={f.label}
+              accessibilityState={{ selected: active }}
               style={({ pressed }) => [
                 styles.filterBtn,
                 active ? styles.filterBtnActive : styles.filterBtnInactive,
@@ -458,6 +515,8 @@ export default function MapScreen() {
               <Pressable
                 style={[styles.readBtn, { backgroundColor: ACCENT }]}
                 onPress={onReadPress}
+                accessibilityRole="button"
+                accessibilityLabel={t('readChapter')}
               >
                 <Text style={styles.readBtnText}>{t('readChapter')}</Text>
               </Pressable>
@@ -465,6 +524,8 @@ export default function MapScreen() {
                 style={styles.closePanel}
                 onPress={() => setSelectedId(null)}
                 hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Detayı kapat"
               >
                 <Text style={[styles.closePanelText, { color: muted }]}>Kapat</Text>
               </Pressable>
@@ -493,6 +554,24 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontFamily: fonts.italic,
     fontSize: 14,
+  },
+  mapProgressBlock: {
+    gap: 4,
+    marginTop: 10,
+  },
+  mapProgressBg: {
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  mapProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  mapProgressLabel: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    letterSpacing: 0.02,
   },
   filtersScroll: {
     flexGrow: 0,

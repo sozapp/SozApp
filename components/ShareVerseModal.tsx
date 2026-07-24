@@ -50,7 +50,7 @@ export interface ShareVerseModalProps {
   onClose: () => void;
   verseText: string;
   verseRef: string;
-  /** Uygulama yüklüyse soz://read?... deep link için */
+  /** sozapp.com/read?... universal link için (uygulama yüklüyse doğrudan açılır) */
   deepLinkParams?: VerseDeepLinkParams | null;
 }
 
@@ -103,7 +103,7 @@ export default function ShareVerseModal({
       }
       onClose();
     } catch (e) {
-      console.log('Share error:', e);
+      console.warn('Share error:', e);
     }
   };
 

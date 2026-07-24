@@ -2,6 +2,7 @@ import { isRealAccount } from '@/constants/friend-activity';
 import { colors, fonts, borderRadius } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
 import { SozAlert } from '@/components/SozAlert';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeBack } from '@/hooks/useSafeBack';
@@ -12,7 +13,8 @@ import {
 } from '@/hooks/useNotificationsCenter';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const ACCENT = '#C4956A';
@@ -29,8 +31,19 @@ export default function NotificationsScreen() {
   const { t } = useTranslation();
   const safeBack = useSafeBack();
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
-  const { loading, user, pendingRequests, unreadThreads, acceptRequest, rejectRequest } =
-    useNotificationsCenter();
+  const haptics = useHaptics();
+  const {
+    loading,
+    user,
+    pendingRequests,
+    unreadThreads,
+    acceptRequest,
+    rejectRequest,
+    markAllThreadsRead,
+    reload,
+  } = useNotificationsCenter();
+  const [markingAll, setMarkingAll] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const goAuth = () => {
     try {
@@ -42,20 +55,59 @@ export default function NotificationsScreen() {
 
   const onAccept = async (row: PendingFriendRequest) => {
     const ok = await acceptRequest(row.id);
-    if (!ok) showAlert('Söz', t('requestAcceptFailed'));
+    if (ok) {
+      haptics.success();
+    } else {
+      haptics.error();
+      showAlert('Söz', t('requestAcceptFailed'));
+    }
   };
 
   const onReject = async (row: PendingFriendRequest) => {
     const ok = await rejectRequest(row.id);
-    if (!ok) showAlert('Söz', t('requestRejectFailed'));
+    if (ok) {
+      haptics.light();
+    } else {
+      haptics.error();
+      showAlert('Söz', t('requestRejectFailed'));
+    }
   };
 
   const goToChat = (row: UnreadChatThread) => {
     router.push({ pathname: '/chat/[friendId]', params: { friendId: row.friendId, friendName: row.name } });
   };
 
+  const onMarkAllRead = async () => {
+    if (markingAll || unreadThreads.length === 0) return;
+    setMarkingAll(true);
+    try {
+      haptics.selection();
+      await markAllThreadsRead();
+    } finally {
+      setMarkingAll(false);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await reload();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reload]);
+
   const isGuest = !loading && !isRealAccount(user);
   const isEmpty = !loading && !isGuest && pendingRequests.length === 0 && unreadThreads.length === 0;
+
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      tintColor={ACCENT}
+      colors={[ACCENT]}
+    />
+  );
 
   return (
     <>
@@ -70,7 +122,26 @@ export default function NotificationsScreen() {
             <Ionicons name="chevron-back" size={28} color={theme.text} />
           </Pressable>
           <Text style={[styles.title, { color: theme.text }]}>{t('notificationsTitle')}</Text>
-          <View style={{ width: 28 }} />
+          {unreadThreads.length > 0 ? (
+            <Pressable
+              onPress={() => void onMarkAllRead()}
+              disabled={markingAll}
+              hitSlop={8}
+              style={styles.markAllHeaderBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('markAllThreadsRead')}
+            >
+              {markingAll ? (
+                <ActivityIndicator size="small" color={ACCENT} />
+              ) : (
+                <Text style={styles.markAllHeaderText} numberOfLines={2}>
+                  {t('markAllThreadsRead')}
+                </Text>
+              )}
+            </Pressable>
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
         </View>
 
         {loading ? (
@@ -87,17 +158,23 @@ export default function NotificationsScreen() {
             </Pressable>
           </View>
         ) : isEmpty ? (
-          <View style={styles.centered}>
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={[styles.scrollContent, styles.centeredGrow]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={refreshControl}
+          >
             <Ionicons name="notifications-outline" size={40} color={theme.textMuted} />
             <Text style={[styles.empty, { color: theme.textMuted, marginTop: 12 }]}>
               {t('noNotificationsMsg')}
             </Text>
-          </View>
+          </ScrollView>
         ) : (
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            refreshControl={refreshControl}
           >
             <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
               {pendingRequests.length > 0
@@ -169,14 +246,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    gap: 8,
   },
   title: {
     fontFamily: fonts.thin,
     fontSize: 28,
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: { width: 72 },
+  markAllHeaderBtn: {
+    maxWidth: 96,
+    minWidth: 72,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  markAllHeaderText: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    color: ACCENT,
+    textAlign: 'right',
+    lineHeight: 15,
   },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  centeredGrow: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
   guestBox: { padding: 24, alignItems: 'center' },
   guestText: {
     fontFamily: fonts.regular,

@@ -5,6 +5,8 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 
 import { useTheme } from '@/hooks/useTheme';
 import { markGameCompletedToday } from '@/constants/game-storage';
+import { trackEvent } from '@/constants/analytics';
+import { pickDailyItems } from '@/constants/seeded-random';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { GameShell } from '@/components/games/GameShell';
 
@@ -46,7 +48,7 @@ const ALL_STATEMENTS: Statement[] = [
 ];
 
 function pickStatements(): Statement[] {
-  return [...ALL_STATEMENTS].sort(() => Math.random() - 0.5).slice(0, 10);
+  return pickDailyItems(ALL_STATEMENTS, 10, GAME_ID);
 }
 
 export default function TrueFalse() {
@@ -98,6 +100,7 @@ export default function TrueFalse() {
       }
       setStreak(nextStreak);
       await markGameCompletedToday(GAME_ID);
+      trackEvent('game_completed', { game_id: GAME_ID });
       void submitScore(finalScore);
       setGameOver(true);
       return;

@@ -356,7 +356,6 @@ function TabsLayoutInner() {
       <Animated.View style={[styles.content, { transform: [{ translateX: swipeTranslateX }] }]}>
         <Tabs
           screenOptions={{
-            swipeEnabled: false,
             headerShown: false,
             tabBarButton: ({ ref, ...rest }) => (
               <BouncingTabBarButton ref={ref as Ref<View>} {...rest} />

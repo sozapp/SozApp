@@ -6,7 +6,9 @@ import { newTestament } from '@/constants/new-testament';
 import { supabase } from '@/constants/supabase';
 import { colors, fonts, borderRadius } from '@/constants/theme';
 import { useChurch } from '@/hooks/useChurch';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useTheme } from '@/hooks/useTheme';
+import { useAnalyticsScreen } from '@/hooks/useAnalyticsScreen';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTranslation } from '@/context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,7 +17,9 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -35,6 +39,7 @@ function initialsFromName(name: string): string {
 }
 
 export default function ChurchScreen() {
+  useAnalyticsScreen('church');
   const { theme } = useTheme();
   const { t } = useTranslation();
   const { isOffline } = useNetwork();
@@ -47,6 +52,7 @@ export default function ChurchScreen() {
     joinGroup,
     createGroup,
     leaveGroup,
+    removeMember,
     setWeeklyPlan,
     sendPrayer,
     toggleMyCompletion,
@@ -65,6 +71,7 @@ export default function ChurchScreen() {
   const [planChEnd, setPlanChEnd] = useState(7);
   const [busy, setBusy] = useState(false);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
+  const haptics = useHaptics();
 
   useEffect(() => {
     if (!supabase) return;
@@ -73,6 +80,7 @@ export default function ChurchScreen() {
 
   const handleJoin = useCallback(async () => {
     if (isOffline) {
+      haptics.error();
       showAlert(t('internetRequired'), t('churchConnectionRequiredMsg'));
       return;
     }
@@ -82,15 +90,18 @@ export default function ChurchScreen() {
     const result = await joinGroup(code);
     setBusy(false);
     if (result.ok) {
+      haptics.success();
       setJoinModalVisible(false);
       setJoinCode('');
     } else {
+      haptics.error();
       showAlert(t('couldNotJoinTitle'), result.error ?? t('genericErrorOccurred'));
     }
-  }, [joinCode, joinGroup, isOffline, showAlert, t]);
+  }, [joinCode, joinGroup, isOffline, showAlert, t, haptics]);
 
   const handleCreate = useCallback(async () => {
     if (isOffline) {
+      haptics.error();
       showAlert(t('internetRequired'), t('churchConnectionRequiredMsg'));
       return;
     }
@@ -101,20 +112,23 @@ export default function ChurchScreen() {
     const result = await createGroup(name, churchNameTrimmed);
     setBusy(false);
     if (result.ok) {
+      haptics.success();
       setCreateModalVisible(false);
       setGroupName('');
       setChurchName('');
     } else {
+      haptics.error();
       showAlert(t('couldNotCreateTitle'), result.error ?? t('genericErrorOccurred'));
     }
-  }, [groupName, churchName, createGroup, isOffline, showAlert, t]);
+  }, [groupName, churchName, createGroup, isOffline, showAlert, t, haptics]);
 
   const handleCopyCode = useCallback(async () => {
     if (!church) return;
     await Clipboard.setStringAsync(church.code);
+    haptics.light();
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [church]);
+  }, [church, haptics]);
 
   const handleSendPrayer = useCallback(async () => {
     const text = prayerInput.trim();
@@ -147,11 +161,37 @@ export default function ChurchScreen() {
         text: t('leaveShort'),
         style: 'destructive',
         onPress: async () => {
+          haptics.medium();
           await leaveGroup();
         },
       },
     ]);
-  }, [leaveGroup, showAlert, t]);
+  }, [leaveGroup, showAlert, t, haptics]);
+
+  const handleRemoveMember = useCallback(
+    (member: { userId: string; displayName: string }) => {
+      showAlert(
+        t('removeMemberConfirmTitle'),
+        t('removeMemberConfirmMsg', { name: member.displayName }),
+        [
+          { text: t('cancel'), style: 'cancel' },
+          {
+            text: t('removeMemberAction'),
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                haptics.medium();
+                await removeMember(member.userId);
+              } catch {
+                showAlert(t('error'), t('removeMemberFailed'));
+              }
+            },
+          },
+        ]
+      );
+    },
+    [removeMember, showAlert, t, haptics]
+  );
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
@@ -226,9 +266,15 @@ export default function ChurchScreen() {
           </View>
         </View>
       ) : (
+        <KeyboardAvoidingView
+          style={styles.keyboard}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        >
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           <View style={[styles.statsStrip, { backgroundColor: 'rgba(196,149,80,0.06)' }]}>
@@ -357,6 +403,17 @@ export default function ChurchScreen() {
                     <Text style={[styles.memberWaiting, { color: theme.textMuted }]}>{t('waitingStatus')}</Text>
                   )
                 ) : null}
+                {church.role === 'admin' && m.userId !== myUserId ? (
+                  <Pressable
+                    onPress={() => handleRemoveMember(m)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('removeMemberA11y')}
+                    style={styles.memberRemoveBtn}
+                  >
+                    <Ionicons name="trash-outline" size={18} color="#E57373" />
+                  </Pressable>
+                ) : null}
               </View>
             ))}
 
@@ -365,6 +422,7 @@ export default function ChurchScreen() {
             </Pressable>
           </View>
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
 
       <Modal
@@ -373,38 +431,44 @@ export default function ChurchScreen() {
         animationType="fade"
         onRequestClose={() => setJoinModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setJoinModalVisible(false)}
+        <KeyboardAvoidingView
+          style={styles.keyboard}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
         >
           <Pressable
-            style={[styles.modalContent, { backgroundColor: theme.surface }]}
-            onPress={(e) => e.stopPropagation()}
+            style={styles.modalOverlay}
+            onPress={() => setJoinModalVisible(false)}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>{t('enterGroupCodeTitle')}</Text>
-            <TextInput
-              style={[styles.codeInput, { backgroundColor: theme.background, color: theme.text }]}
-              value={joinCode}
-              onChangeText={(txt) => setJoinCode(txt.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-              placeholder="ABC123"
-              placeholderTextColor={theme.textMuted}
-              maxLength={6}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
             <Pressable
-              style={[styles.modalBtn, { backgroundColor: ACCENT, opacity: busy ? 0.6 : 1 }]}
-              onPress={handleJoin}
-              disabled={busy}
+              style={[styles.modalContent, { backgroundColor: theme.surface }]}
+              onPress={(e) => e.stopPropagation()}
             >
-              {busy ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.modalBtnText}>{t('joinShort')}</Text>
-              )}
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{t('enterGroupCodeTitle')}</Text>
+              <TextInput
+                style={[styles.codeInput, { backgroundColor: theme.background, color: theme.text }]}
+                value={joinCode}
+                onChangeText={(txt) => setJoinCode(txt.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+                placeholder="ABC123"
+                placeholderTextColor={theme.textMuted}
+                maxLength={6}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+              <Pressable
+                style={[styles.modalBtn, { backgroundColor: ACCENT, opacity: busy ? 0.6 : 1 }]}
+                onPress={handleJoin}
+                disabled={busy}
+              >
+                {busy ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.modalBtnText}>{t('joinShort')}</Text>
+                )}
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -413,44 +477,50 @@ export default function ChurchScreen() {
         animationType="fade"
         onRequestClose={() => setCreateModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setCreateModalVisible(false)}
+        <KeyboardAvoidingView
+          style={styles.keyboard}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
         >
           <Pressable
-            style={[styles.modalContent, { backgroundColor: theme.surface }]}
-            onPress={(e) => e.stopPropagation()}
+            style={styles.modalOverlay}
+            onPress={() => setCreateModalVisible(false)}
           >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>{t('createGroup')}</Text>
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('groupNameLabel')}</Text>
-            <TextInput
-              style={[styles.textInput, { backgroundColor: theme.background, color: theme.text }]}
-              value={groupName}
-              onChangeText={setGroupName}
-              placeholder={t('groupNameExample')}
-              placeholderTextColor={theme.textMuted}
-            />
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('churchNameLabel')}</Text>
-            <TextInput
-              style={[styles.textInput, { backgroundColor: theme.background, color: theme.text }]}
-              value={churchName}
-              onChangeText={setChurchName}
-              placeholder={t('churchNameExample')}
-              placeholderTextColor={theme.textMuted}
-            />
             <Pressable
-              style={[styles.modalBtn, { backgroundColor: ACCENT, opacity: busy ? 0.6 : 1 }]}
-              onPress={handleCreate}
-              disabled={busy}
+              style={[styles.modalContent, { backgroundColor: theme.surface }]}
+              onPress={(e) => e.stopPropagation()}
             >
-              {busy ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.modalBtnText}>{t('createShort')}</Text>
-              )}
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{t('createGroup')}</Text>
+              <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('groupNameLabel')}</Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: theme.background, color: theme.text }]}
+                value={groupName}
+                onChangeText={setGroupName}
+                placeholder={t('groupNameExample')}
+                placeholderTextColor={theme.textMuted}
+              />
+              <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('churchNameLabel')}</Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: theme.background, color: theme.text }]}
+                value={churchName}
+                onChangeText={setChurchName}
+                placeholder={t('churchNameExample')}
+                placeholderTextColor={theme.textMuted}
+              />
+              <Pressable
+                style={[styles.modalBtn, { backgroundColor: ACCENT, opacity: busy ? 0.6 : 1 }]}
+                onPress={handleCreate}
+                disabled={busy}
+              >
+                {busy ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.modalBtnText}>{t('createShort')}</Text>
+                )}
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -459,62 +529,68 @@ export default function ChurchScreen() {
         animationType="fade"
         onRequestClose={() => setPlanModalVisible(false)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setPlanModalVisible(false)}>
-          <Pressable
-            style={[styles.modalContent, { backgroundColor: theme.surface }]}
-            onPress={(e) => e.stopPropagation()}
-          >
-            <Text style={[styles.modalTitle, { color: theme.text }]}>{t('weeklyPlanModalTitle')}</Text>
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('book')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planBookScroll}>
-              {newTestament.map((b) => (
-                <Pressable
-                  key={b.id}
-                  style={[
-                    styles.planBookChip,
-                    { backgroundColor: planBookId === b.id ? ACCENT : theme.background },
-                  ]}
-                  onPress={() => setPlanBookId(b.id)}
-                >
-                  <Text
-                    style={[
-                      styles.planBookChipText,
-                      { color: planBookId === b.id ? colors.white : theme.text },
-                    ]}
-                  >
-                    {b.shortName}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('chapterRangeLabel')}</Text>
-            <View style={styles.planChRow}>
-              <TextInput
-                style={[styles.planChInput, { backgroundColor: theme.background, color: theme.text }]}
-                value={String(planChStart)}
-                onChangeText={(txt) => setPlanChStart(Math.max(1, parseInt(txt, 10) || 1))}
-                keyboardType="number-pad"
-                placeholder={t('startRangeLabel')}
-                placeholderTextColor={theme.textMuted}
-              />
-              <Text style={[styles.planChDash, { color: theme.textMuted }]}>–</Text>
-              <TextInput
-                style={[styles.planChInput, { backgroundColor: theme.background, color: theme.text }]}
-                value={String(planChEnd)}
-                onChangeText={(txt) => setPlanChEnd(Math.max(1, parseInt(txt, 10) || 1))}
-                keyboardType="number-pad"
-                placeholder={t('endRangeLabel')}
-                placeholderTextColor={theme.textMuted}
-              />
-            </View>
+        <KeyboardAvoidingView
+          style={styles.keyboard}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setPlanModalVisible(false)}>
             <Pressable
-              style={[styles.modalBtn, { backgroundColor: ACCENT }]}
-              onPress={setPlanAndNotify}
+              style={[styles.modalContent, { backgroundColor: theme.surface }]}
+              onPress={(e) => e.stopPropagation()}
             >
-              <Text style={styles.modalBtnText}>{t('saveAndNotifyCta')}</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{t('weeklyPlanModalTitle')}</Text>
+              <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('book')}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.planBookScroll} keyboardShouldPersistTaps="handled">
+                {newTestament.map((b) => (
+                  <Pressable
+                    key={b.id}
+                    style={[
+                      styles.planBookChip,
+                      { backgroundColor: planBookId === b.id ? ACCENT : theme.background },
+                    ]}
+                    onPress={() => setPlanBookId(b.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.planBookChipText,
+                        { color: planBookId === b.id ? colors.white : theme.text },
+                      ]}
+                    >
+                      {b.shortName}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Text style={[styles.inputLabel, { color: theme.textMuted }]}>{t('chapterRangeLabel')}</Text>
+              <View style={styles.planChRow}>
+                <TextInput
+                  style={[styles.planChInput, { backgroundColor: theme.background, color: theme.text }]}
+                  value={String(planChStart)}
+                  onChangeText={(txt) => setPlanChStart(Math.max(1, parseInt(txt, 10) || 1))}
+                  keyboardType="number-pad"
+                  placeholder={t('startRangeLabel')}
+                  placeholderTextColor={theme.textMuted}
+                />
+                <Text style={[styles.planChDash, { color: theme.textMuted }]}>–</Text>
+                <TextInput
+                  style={[styles.planChInput, { backgroundColor: theme.background, color: theme.text }]}
+                  value={String(planChEnd)}
+                  onChangeText={(txt) => setPlanChEnd(Math.max(1, parseInt(txt, 10) || 1))}
+                  keyboardType="number-pad"
+                  placeholder={t('endRangeLabel')}
+                  placeholderTextColor={theme.textMuted}
+                />
+              </View>
+              <Pressable
+                style={[styles.modalBtn, { backgroundColor: ACCENT }]}
+                onPress={setPlanAndNotify}
+              >
+                <Text style={styles.modalBtnText}>{t('saveAndNotifyCta')}</Text>
+              </Pressable>
             </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
       <SozAlert {...alertConfig} onDismiss={hideAlert} />
     </SafeAreaView>
@@ -523,6 +599,9 @@ export default function ChurchScreen() {
 
 const styles = StyleSheet.create({
   safe: {
+    flex: 1,
+  },
+  keyboard: {
     flex: 1,
   },
   header: {
@@ -753,6 +832,9 @@ const styles = StyleSheet.create({
   memberWaiting: {
     fontFamily: fonts.regular,
     fontSize: 12,
+  },
+  memberRemoveBtn: {
+    padding: 4,
   },
   leaveBtn: {
     marginTop: 24,

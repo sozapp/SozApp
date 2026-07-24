@@ -21,6 +21,8 @@ import { addMoodVerseToFavorites, useFavorites } from '@/hooks/useFavorites';
 import { useTheme, type ThemeColors } from '@/hooks/useTheme';
 import { fonts as appFonts } from '@/constants/theme';
 import { groqChat } from '@/constants/groq';
+import type { TranslationKey } from '@/constants/i18n';
+import { useTranslation } from '@/context/LanguageContext';
 import { useNetwork } from '@/context/NetworkContext';
 import { useSafeBack } from '@/hooks/useSafeBack';
 
@@ -50,54 +52,20 @@ type MoodAnalysis = {
 type Phase = 'input' | 'result';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const MOOD_SUGGESTIONS: { icon: IoniconName; label: string }[] = [
-  { icon: 'heart-dislike-outline', label: 'Üzgün' },
-  { icon: 'alert-circle-outline', label: 'Endişeli' },
-  { icon: 'thunderstorm-outline', label: 'Kızgın' },
-  { icon: 'moon-outline', label: 'Yorgun' },
-  { icon: 'sunny-outline', label: 'Mutlu' },
-  { icon: 'leaf-outline', label: 'Minnettarım' },
-  { icon: 'cloudy-outline', label: 'Karamsarım' },
-  { icon: 'flash-outline', label: 'Güçlü' },
-  { icon: 'water-outline', label: 'Ağlamak istiyorum' },
-  { icon: 'help-circle-outline', label: 'Kararsızım' },
-  { icon: 'partly-sunny-outline', label: 'Huzurluyum' },
-  { icon: 'person-outline', label: 'Yalnız hissediyorum' },
+const MOOD_SUGGESTIONS: { icon: IoniconName; labelKey: TranslationKey }[] = [
+  { icon: 'heart-dislike-outline', labelKey: 'moodLabelSad' },
+  { icon: 'alert-circle-outline', labelKey: 'moodLabelAnxious' },
+  { icon: 'thunderstorm-outline', labelKey: 'moodLabelAngry' },
+  { icon: 'moon-outline', labelKey: 'moodLabelTired' },
+  { icon: 'sunny-outline', labelKey: 'moodLabelHappy' },
+  { icon: 'leaf-outline', labelKey: 'moodLabelGrateful' },
+  { icon: 'cloudy-outline', labelKey: 'moodLabelPessimistic' },
+  { icon: 'flash-outline', labelKey: 'moodLabelStrong' },
+  { icon: 'water-outline', labelKey: 'moodLabelWantToCry' },
+  { icon: 'help-circle-outline', labelKey: 'moodLabelUnsure' },
+  { icon: 'partly-sunny-outline', labelKey: 'moodLabelPeaceful' },
+  { icon: 'person-outline', labelKey: 'moodLabelLonely' },
 ];
-
-const FALLBACK_ANALYSIS: MoodAnalysis = {
-  emotion: 'Belirsiz',
-  intensity: 'Orta',
-  need: 'Teselli ve yön',
-  encouragement:
-    'Tanrı her duygunla ilgilenir. Bu ayetler sana özel seçildi.',
-  verses: [
-    {
-      ref: 'Yuhanna 14:27',
-      book: 'Yuhanna',
-      chapter: 14,
-      verseNum: 27,
-      text: 'Size esenlik bırakıyorum, size kendi esenliğimi veriyorum.',
-      reason: 'İç huzur için en güçlü vaatlerden biri.',
-    },
-    {
-      ref: 'Filipililere 4:13',
-      book: 'Filipililere',
-      chapter: 4,
-      verseNum: 13,
-      text: 'Her şeye gücüm yeter, beni güçlendiren Mesih sayesinde.',
-      reason: 'Her durumda güç ve dayanma kapasitesi veren ayet.',
-    },
-    {
-      ref: 'Romalılar 8:28',
-      book: 'Romalılar',
-      chapter: 8,
-      verseNum: 28,
-      text: "Tanrı'yı sevenlere her şeyin yararlı olduğunu biliriz.",
-      reason: 'Zorluklarda anlam ve umut bulmak için.',
-    },
-  ],
-};
 
 // ─── Loading Animation ────────────────────────────────────────────────────────
 function LoadingAnimation() {
@@ -195,6 +163,7 @@ function VerseCard({
   isFavorite: (verseId: string) => boolean;
   refreshFavorites: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   const vid = `${verse.book}-${verse.chapter}-${verse.verseNum}`;
   const fav = isFavorite(vid);
 
@@ -245,13 +214,13 @@ function VerseCard({
             color={fav ? ACCENT : colors.textMuted}
           />
           <Text style={[styles.verseActionText, fav && { color: ACCENT }]}>
-            {fav ? 'Favoride' : 'Favorile'}
+            {fav ? t('moodInFavorites') : t('moodAddFavorite')}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.verseAction} onPress={handleRead}>
           <Ionicons name="book-outline" size={15} color={colors.textMuted} />
-          <Text style={styles.verseActionText}>Bölümü Oku</Text>
+          <Text style={styles.verseActionText}>{t('readSection')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -274,6 +243,7 @@ function ResultView({
   isFavorite: (verseId: string) => boolean;
   refreshFavorites: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
   return (
     <ScrollView
       contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 40 }}
@@ -290,7 +260,7 @@ function ResultView({
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionLabel}>SENİN İÇİN 3 AYET</Text>
+        <Text style={styles.sectionLabel}>{t('moodForYouVerses')}</Text>
         <Text style={styles.sectionDesc}>{analysis.need}</Text>
       </View>
 
@@ -308,7 +278,7 @@ function ResultView({
 
       <TouchableOpacity style={styles.resetBtn} onPress={onReset}>
         <Ionicons name="refresh-outline" size={16} color={ACCENT} />
-        <Text style={styles.resetBtnText}>Yeniden Yaz</Text>
+        <Text style={styles.resetBtnText}>{t('moodRewrite')}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -348,6 +318,7 @@ async function readLastMoodResult(): Promise<MoodAnalysis | null> {
 
 export default function MoodScreen() {
   const safeBack = useSafeBack();
+  const { t } = useTranslation();
   const { colors, fonts } = useTheme();
   const { isOnline } = useNetwork();
   const { isFavorite, refreshFavorites } = useFavorites();
@@ -355,7 +326,7 @@ export default function MoodScreen() {
   const params = useLocalSearchParams<{ prefill?: string | string[] }>();
 
   const [moodText, setMoodText] = useState('');
-  const [selectedMoods, setSelectedMoods] = useState<string[]>([]);
+  const [selectedMoods, setSelectedMoods] = useState<TranslationKey[]>([]);
   const [phase, setPhase] = useState<Phase>('input');
   const [analysis, setAnalysis] = useState<MoodAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
@@ -387,14 +358,17 @@ export default function MoodScreen() {
           ? (raw[0] ?? '').trim()
           : '';
     if (!p) return;
-    const valid = MOOD_SUGGESTIONS.some((s) => s.label === p);
-    if (!valid) return;
+    const match = MOOD_SUGGESTIONS.find(
+      (s) => s.labelKey === p || t(s.labelKey) === p,
+    );
+    if (!match) return;
+    const key = match.labelKey;
     setSelectedMoods((prev) => {
-      if (prev.includes(p)) return prev;
+      if (prev.includes(key)) return prev;
       if (prev.length >= 3) return prev;
-      return [...prev, p];
+      return [...prev, key];
     });
-  }, [params.prefill]);
+  }, [params.prefill, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -418,16 +392,16 @@ export default function MoodScreen() {
   const mapMoodError = useCallback((raw: string): string => {
     const msg = raw.toLowerCase();
     if (msg.includes('network error') || msg.includes('network request failed')) {
-      return 'İnternet bağlantısı yok';
+      return t('moodNoInternet');
     }
     if (msg.includes('parse error') || msg.includes('parse')) {
-      return 'Sunucu yanıt vermedi, tekrar dene';
+      return t('moodParseError');
     }
     if (msg.includes('timeout') || msg.includes('zaman aşımı')) {
-      return 'İstek zaman aşımına uğradı';
+      return t('moodTimeoutError');
     }
-    return 'Bağlantı kurulamadı, tekrar dene';
-  }, []);
+    return t('moodConnectionError');
+  }, [t]);
 
   const analyzeAndSuggest = useCallback(async () => {
     const extra = moodText.trim();
@@ -435,7 +409,7 @@ export default function MoodScreen() {
     setError(null);
 
     if (!isOnline) {
-      setError('İnternet bağlantısı yok');
+      setError(t('moodNoInternet'));
       return;
     }
 
@@ -444,7 +418,7 @@ export default function MoodScreen() {
 
     const moodBlock =
       selectedMoods.length > 0
-        ? `Kullanıcı şu duyguları hissediyor: ${selectedMoods.join(', ')}`
+        ? `Kullanıcı şu duyguları hissediyor: ${selectedMoods.map((k) => t(k)).join(', ')}`
         : '';
     const textBlock =
       extra.length >= 3
@@ -510,7 +484,7 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
     if (groqOk) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [moodText, selectedMoods, userProfile, userChurch, isOnline, mapMoodError]);
+  }, [moodText, selectedMoods, userProfile, userChurch, isOnline, mapMoodError, t]);
 
   const retryRequest = useCallback(() => {
     void analyzeAndSuggest();
@@ -540,13 +514,13 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
           style={styles.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           accessibilityRole="button"
-          accessibilityLabel="Geri git"
+          accessibilityLabel={t('goBackA11y')}
         >
           <Ionicons name="arrow-back" size={22} color={colors.textMuted} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Nasılsın?</Text>
-          <Text style={styles.headerSub}>Ruh haline göre ayet</Text>
+          <Text style={styles.headerTitle}>{t('moodTitle')}</Text>
+          <Text style={styles.headerSub}>{t('moodSubtitle')}</Text>
         </View>
         <View style={{ width: 36 }} />
       </View>
@@ -565,7 +539,7 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
             {!isOnline ? (
               <View style={styles.offlineInfo}>
                 <Ionicons name="wifi-outline" size={14} color={colors.textSecondary} />
-                <Text style={styles.offlineInfoText}>İnternet bağlantısı yok. Bağlandığında tekrar dene.</Text>
+                <Text style={styles.offlineInfoText}>{t('moodOfflineBanner')}</Text>
               </View>
             ) : null}
             <View style={styles.greetingWrap}>
@@ -575,11 +549,8 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
                 color={ACCENT}
                 style={styles.greetingHeartIcon}
               />
-              <Text style={styles.greetingTitle}>Bugün nasıl hissediyorsun?</Text>
-              <Text style={styles.greetingDesc}>
-                Aklından geçenleri yaz.{'\n'}
-                {"Tanrı'nın Sözü sana özel bir şey söylesin."}
-              </Text>
+              <Text style={styles.greetingTitle}>{t('moodGreetingTitle')}</Text>
+              <Text style={styles.greetingDesc}>{t('moodGreetingDesc')}</Text>
             </View>
 
             {/* Hızlı seçim chip'leri + limit notu */}
@@ -591,16 +562,16 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
                 ]}
               >
                 {MOOD_SUGGESTIONS.map((mood) => {
-                  const selected = selectedMoods.includes(mood.label);
+                  const selected = selectedMoods.includes(mood.labelKey);
                   return (
                     <TouchableOpacity
-                      key={mood.label}
+                      key={mood.labelKey}
                       style={[styles.moodChip, selected && styles.moodChipSelected]}
                       onPress={() => {
                         setSelectedMoods((prev) => {
-                          if (prev.includes(mood.label)) {
+                          if (prev.includes(mood.labelKey)) {
                             Haptics.selectionAsync();
-                            return prev.filter((l) => l !== mood.label);
+                            return prev.filter((l) => l !== mood.labelKey);
                           }
                           if (prev.length >= 3) {
                             runChipsShake();
@@ -608,7 +579,7 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
                             return prev;
                           }
                           Haptics.selectionAsync();
-                          return [...prev, mood.label];
+                          return [...prev, mood.labelKey];
                         });
                       }}
                     >
@@ -620,13 +591,13 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
                       <Text
                         style={[styles.moodChipText, selected && styles.moodChipTextSelected]}
                       >
-                        {mood.label}
+                        {t(mood.labelKey)}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
               </Animated.View>
-              <Text style={styles.moodLimitHint}>En fazla 3 duygu seçebilirsin</Text>
+              <Text style={styles.moodLimitHint}>{t('moodLimitHint')}</Text>
             </View>
 
             {/* Metin girişi */}
@@ -635,10 +606,10 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
                 <TextInput
                   ref={inputRef}
                   style={[styles.moodInput, moodInputFocused && styles.moodInputFocused]}
-                  placeholder="Bugün nasıl hissediyorsun? Ne düşünüyorsun?"
+                  placeholder={t('moodPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   value={moodText}
-                  onChangeText={(t) => setMoodText(t.slice(0, 300))}
+                  onChangeText={(v) => setMoodText(v.slice(0, 300))}
                   onFocus={() => setMoodInputFocused(true)}
                   onBlur={() => setMoodInputFocused(false)}
                   multiline
@@ -663,7 +634,7 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
               ) : (
                 <>
                   <Ionicons name="sparkles-outline" size={18} color={ACCENT_LIGHT} />
-                  <Text style={styles.submitBtnText}>✦ Ayet Bul</Text>
+                  <Text style={styles.submitBtnText}>{t('moodFindVerse')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -671,16 +642,14 @@ Bu metni analiz et ve şu JSON formatında yanıt ver (başka hiçbir şey yazma
               <View style={styles.errorBox}>
                 <Text style={styles.errorBoxText}>{error}</Text>
                 <TouchableOpacity onPress={retryRequest} style={{ marginTop: 8 }}>
-                  <Text style={styles.errorRetryText}>Tekrar Dene →</Text>
+                  <Text style={styles.errorRetryText}>{t('moodRetry')}</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
 
             <View style={styles.privacyNoteRow}>
               <Ionicons name="lock-closed-outline" size={14} color={colors.textSecondary} />
-              <Text style={styles.privacyNote}>
-                Yazdıkların sadece ayet önerisi için kullanılır ve saklanmaz.
-              </Text>
+              <Text style={styles.privacyNote}>{t('moodPrivacyNote')}</Text>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>

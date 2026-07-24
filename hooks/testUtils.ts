@@ -86,32 +86,92 @@ function multipleRowsError() {
   return { message: 'JSON object requested, multiple (or no) rows returned', code: 'PGRST116' };
 }
 
-function makeBuilder(rows: MockRow[]): ThenableBuilder {
+function makeBuilder(table: string): ThenableBuilder {
+  const filters: Array<(row: MockRow) => boolean> = [];
+  let pendingUpdate: MockRow | null = null;
+  let pendingDelete = false;
+  let limitN: number | null = null;
+
+  const matching = (row: MockRow) => filters.every((f) => f(row));
+
+  const currentRows = (): MockRow[] => {
+    let rows = [...(tableData[table] ?? [])];
+    rows = rows.filter(matching);
+    if (limitN != null) rows = rows.slice(0, limitN);
+    return rows;
+  };
+
+  const applyMutation = () => {
+    if (pendingUpdate) {
+      const rows = tableData[table] ?? [];
+      for (let i = 0; i < rows.length; i++) {
+        if (matching(rows[i]!)) {
+          rows[i] = { ...rows[i], ...pendingUpdate };
+        }
+      }
+      pendingUpdate = null;
+    }
+    if (pendingDelete) {
+      const rows = tableData[table] ?? [];
+      tableData[table] = rows.filter((r) => !matching(r));
+      pendingDelete = false;
+    }
+  };
+
   const builder: ThenableBuilder = {
     select: () => builder,
-    eq: () => builder,
-    neq: () => builder,
+    eq: (col, val) => {
+      filters.push((r) => r[String(col)] === val);
+      return builder;
+    },
+    neq: (col, val) => {
+      filters.push((r) => r[String(col)] !== val);
+      return builder;
+    },
     or: () => builder,
-    in: () => builder,
-    is: () => builder,
+    in: (col, vals) => {
+      const arr = Array.isArray(vals) ? vals : [];
+      filters.push((r) => arr.includes(r[String(col)]));
+      return builder;
+    },
+    is: (col, val) => {
+      filters.push((r) => (val === null ? r[String(col)] == null : r[String(col)] === val));
+      return builder;
+    },
     order: () => builder,
-    limit: (n: number) => makeBuilder(rows.slice(0, n)),
+    limit: (n: number) => {
+      limitN = n;
+      return builder;
+    },
     insert: () => builder,
-    update: () => builder,
-    delete: () => builder,
+    update: (patch) => {
+      pendingUpdate = (patch ?? {}) as MockRow;
+      return builder;
+    },
+    delete: () => {
+      pendingDelete = true;
+      return builder;
+    },
     single: () => {
+      applyMutation();
+      const rows = currentRows();
       if (rows.length !== 1) {
         return Promise.resolve({ data: null, error: multipleRowsError() });
       }
       return Promise.resolve({ data: rows[0], error: null });
     },
     maybeSingle: () => {
+      applyMutation();
+      const rows = currentRows();
       if (rows.length > 1) {
         return Promise.resolve({ data: null, error: multipleRowsError() });
       }
       return Promise.resolve({ data: rows[0] ?? null, error: null });
     },
-    then: (resolve, reject) => Promise.resolve({ data: rows, error: null }).then(resolve, reject),
+    then: (resolve, reject) => {
+      applyMutation();
+      return Promise.resolve({ data: currentRows(), error: null }).then(resolve, reject);
+    },
   };
   return builder;
 }
@@ -120,7 +180,7 @@ export const mockSupabaseClient = {
   auth: {
     getUser: async () => ({ data: { user: authState.user } }),
   },
-  from: (table: string) => makeBuilder(tableData[table] ?? []),
+  from: (table: string) => makeBuilder(table),
   // hooks/useMessages.ts realtime abonelik açıyor — gerçek bağlantı kurmadan
   // no-op bir kanal döndürüyoruz ki `.channel(...).on(...).subscribe()` patlamasın.
   channel: (_name: string, _opts?: unknown) => {

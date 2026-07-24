@@ -12,13 +12,25 @@ import {
 } from 'react-native';
 
 import { SozAlert } from '@/components/SozAlert';
+import type { Language } from '@/constants/i18n';
 import { newTestament } from '@/constants/new-testament';
+import { useTranslation } from '@/context/LanguageContext';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
 import { useSafeBack } from '@/hooks/useSafeBack';
 
 const ACCENT = '#C4956A';
 const STORAGE_KEY = '@soz/readingHistory';
+
+const LOCALE_MAP: Record<Language, string> = {
+  tr: 'tr-TR',
+  en: 'en-US',
+  de: 'de-DE',
+  ku: 'ku',
+  hy: 'hy-AM',
+  el: 'el-GR',
+  ar: 'ar',
+};
 
 type ReadingHistoryItem = {
   id: string;
@@ -29,11 +41,15 @@ type ReadingHistoryItem = {
   duration?: number;
 };
 
+type SectionKey = 'today' | 'yesterday' | 'thisWeek' | 'earlier';
+
 type FlatRow =
-  | { type: 'header'; id: string; title: string }
+  | { type: 'header'; id: string; section: SectionKey }
   | { type: 'item'; id: string; item: ReadingHistoryItem };
 
-function sectionLabel(date: Date): string {
+const SECTION_ORDER: SectionKey[] = ['today', 'yesterday', 'thisWeek', 'earlier'];
+
+function sectionKeyForDate(date: Date): SectionKey {
   const now = new Date();
   const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startYesterday = new Date(startToday);
@@ -41,16 +57,16 @@ function sectionLabel(date: Date): string {
   const startWeek = new Date(startToday);
   startWeek.setDate(startWeek.getDate() - 7);
 
-  if (date >= startToday) return 'Bugün';
-  if (date >= startYesterday) return 'Dün';
-  if (date >= startWeek) return 'Bu Hafta';
-  return 'Daha Önce';
+  if (date >= startToday) return 'today';
+  if (date >= startYesterday) return 'yesterday';
+  if (date >= startWeek) return 'thisWeek';
+  return 'earlier';
 }
 
-function formatReadTime(iso: string): string {
+function formatReadTime(iso: string, locale: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString('tr-TR', {
+  return d.toLocaleString(locale, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
@@ -65,10 +81,12 @@ function getBookChapterTotal(bookName: string): number {
 export default function ReadingHistoryScreen() {
   const router = useRouter();
   const safeBack = useSafeBack();
+  const { t, language } = useTranslation();
   const { colors, fonts } = useTheme();
   const textSecondary = colors.textSecondary ?? colors.textMuted ?? '#999';
   const [history, setHistory] = useState<ReadingHistoryItem[]>([]);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
+  const dateLocale = LOCALE_MAP[language] ?? 'tr-TR';
 
   const loadHistory = useCallback(async () => {
     try {
@@ -103,18 +121,22 @@ export default function ReadingHistoryScreen() {
   }, [history]);
 
   const rows = useMemo<FlatRow[]>(() => {
-    const grouped: Record<string, ReadingHistoryItem[]> = {};
+    const grouped: Record<SectionKey, ReadingHistoryItem[]> = {
+      today: [],
+      yesterday: [],
+      thisWeek: [],
+      earlier: [],
+    };
     for (const item of history) {
-      const key = sectionLabel(new Date(item.readAt));
-      grouped[key] = grouped[key] ? [...grouped[key], item] : [item];
+      const key = sectionKeyForDate(new Date(item.readAt));
+      grouped[key].push(item);
     }
 
-    const order = ['Bugün', 'Dün', 'Bu Hafta', 'Daha Önce'];
     const result: FlatRow[] = [];
-    for (const key of order) {
+    for (const key of SECTION_ORDER) {
       const items = grouped[key];
-      if (!items?.length) continue;
-      result.push({ type: 'header', id: `header-${key}`, title: key });
+      if (!items.length) continue;
+      result.push({ type: 'header', id: `header-${key}`, section: key });
       for (const item of items) {
         result.push({ type: 'item', id: item.id, item });
       }
@@ -123,10 +145,10 @@ export default function ReadingHistoryScreen() {
   }, [history]);
 
   const clearHistory = useCallback(() => {
-    showAlert('Geçmiş temizlensin mi?', 'Okuma geçmişi silinecek.', [
-      { text: 'İptal', style: 'cancel' },
+    showAlert(t('clearHistoryConfirmTitle'), t('clearHistoryConfirmMsg'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Temizle',
+        text: t('clearShort'),
         style: 'destructive',
         onPress: async () => {
           await AsyncStorage.removeItem(STORAGE_KEY);
@@ -134,7 +156,7 @@ export default function ReadingHistoryScreen() {
         },
       },
     ]);
-  }, [showAlert]);
+  }, [showAlert, t]);
 
   const styles = useMemo(
     () =>
@@ -221,14 +243,14 @@ export default function ReadingHistoryScreen() {
             onPress={() => safeBack()}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="Geri git"
+            accessibilityLabel={t('goBackA11y')}
           >
             <Ionicons name="chevron-back" size={24} color={colors.text} />
           </Pressable>
-          <Text style={styles.title}>Okuma Geçmişi</Text>
+          <Text style={styles.title}>{t('readingHistoryTitle')}</Text>
         </View>
         <Pressable onPress={clearHistory} hitSlop={10}>
-          <Text style={styles.clearBtn}>Temizle</Text>
+          <Text style={styles.clearBtn}>{t('clearShort')}</Text>
         </Pressable>
       </View>
 
@@ -236,25 +258,25 @@ export default function ReadingHistoryScreen() {
         <View style={styles.summaryCard}>
           <Ionicons name="book-outline" size={18} color={ACCENT} />
           <Text style={styles.summaryValue}>{summary.totalRead}</Text>
-          <Text style={styles.summaryLabel}>Toplam bölüm</Text>
+          <Text style={styles.summaryLabel}>{t('totalChaptersLabel')}</Text>
         </View>
         <View style={styles.summaryCard}>
           <Ionicons name="calendar-outline" size={18} color={ACCENT} />
           <Text style={styles.summaryValue}>{summary.thisWeek}</Text>
-          <Text style={styles.summaryLabel}>Bu hafta</Text>
+          <Text style={styles.summaryLabel}>{t('thisWeekLabel')}</Text>
         </View>
         <View style={styles.summaryCard}>
           <Ionicons name="star-outline" size={18} color={ACCENT} />
           <Text style={styles.summaryValue} numberOfLines={1}>
             {summary.topBook}
           </Text>
-          <Text style={styles.summaryLabel}>En çok okunan</Text>
+          <Text style={styles.summaryLabel}>{t('mostReadLabel')}</Text>
         </View>
       </View>
 
       <View style={styles.listHeader}>
-        <Text style={styles.listTitle}>Son Okunanlar</Text>
-        <Text style={styles.listCount}>{history.length} kayıt</Text>
+        <Text style={styles.listTitle}>{t('recentlyRead')}</Text>
+        <Text style={styles.listCount}>{t('recordsCount', { n: history.length })}</Text>
       </View>
 
       <FlatList
@@ -263,7 +285,7 @@ export default function ReadingHistoryScreen() {
         contentContainerStyle={{ paddingBottom: 24 }}
         renderItem={({ item }) => {
           if (item.type === 'header') {
-            return <Text style={styles.sectionHeader}>{item.title}</Text>;
+            return <Text style={styles.sectionHeader}>{t(item.section)}</Text>;
           }
 
           const row = item.item;
@@ -286,9 +308,11 @@ export default function ReadingHistoryScreen() {
               <View style={styles.itemBody}>
                 <Text style={styles.itemBook}>{row.book}</Text>
                 <Text style={styles.itemChapter}>
-                  {row.chapter}. Bölüm{left != null ? ` · ${left} bölüm kaldı` : ''}
+                  {left != null
+                    ? t('chapterWithLeft', { chapter: row.chapter, left })
+                    : t('chapterOrdinalLabel', { n: row.chapter })}
                 </Text>
-                <Text style={styles.itemDate}>{formatReadTime(row.readAt)}</Text>
+                <Text style={styles.itemDate}>{formatReadTime(row.readAt, dateLocale)}</Text>
               </View>
               <Ionicons name="chevron-forward-outline" size={18} color={colors.border} />
             </Pressable>
@@ -297,8 +321,8 @@ export default function ReadingHistoryScreen() {
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Ionicons name="time-outline" size={56} color={colors.border} />
-            <Text style={styles.emptyTitle}>Henüz okuma geçmişi yok</Text>
-            <Text style={styles.emptySub}>Okumaya başladıkça burada görünecek</Text>
+            <Text style={styles.emptyTitle}>{t('noReadingHistoryYet')}</Text>
+            <Text style={styles.emptySub}>{t('noReadingHistoryDesc')}</Text>
           </View>
         }
       />

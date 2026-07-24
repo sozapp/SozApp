@@ -1,13 +1,16 @@
+import { SozAlert } from '@/components/SozAlert';
 import { colorForUserId } from '@/constants/avatar-colors';
 import { useTheme } from '@/hooks/useTheme';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSafeBack } from '@/hooks/useSafeBack';
 import { useChatThread, type ChatMessage } from '@/hooks/useMessages';
+import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTranslation } from '@/context/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Animated,
   Easing,
@@ -77,8 +80,8 @@ function buildChatListItems(
         id: `sep-${key}`,
         label: formatDayLabel(message.createdAt, todayLabel, yesterdayLabel),
       });
-      prevDay = key;
     }
+    prevDay = key;
     items.push({ kind: 'message', id: message.id, message });
   }
   return items;
@@ -121,20 +124,36 @@ export default function ChatThreadScreen() {
   const haptics = useHaptics();
   const safeBack = useSafeBack();
   const { t } = useTranslation();
+  const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const { friendId, friendName } = useLocalSearchParams<{ friendId: string; friendName?: string }>();
-  const { messages, loading, myId, theirTyping, notifyTyping, sendMessage, markRead } = useChatThread(
-    friendId ?? ''
-  );
+  const {
+    messages,
+    loading,
+    myId,
+    theirTyping,
+    notifyTyping,
+    sendMessage,
+    deleteMessage,
+    reportMessage,
+    blockUser,
+    markRead,
+  } = useChatThread(friendId ?? '');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList<ChatListItem>>(null);
+  const inputRef = useRef<TextInput>(null);
   const name = friendName?.trim() || t('defaultFriendName');
+  const avatarColor = colorForUserId(friendId ?? '');
 
   useFocusEffect(
     useCallback(() => {
       void markRead();
     }, [markRead])
   );
+
+  const focusComposer = useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const handleChangeText = useCallback(
     (text: string) => {
@@ -161,6 +180,102 @@ export default function ChatThreadScreen() {
       listRef.current?.scrollToEnd({ animated: true });
     });
   }, [input, sending, sendMessage, haptics]);
+
+  const confirmBlock = useCallback(() => {
+    if (!friendId) return;
+    showAlert(t('blockUserConfirmTitle'), t('blockUserConfirmMsg', { name }), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('blockUserAction'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            haptics.medium();
+            await blockUser(friendId);
+            haptics.success();
+            safeBack();
+          } catch {
+            haptics.error();
+            showAlert(t('error'), t('blockUserFailed'));
+          }
+        },
+      },
+    ]);
+  }, [friendId, name, showAlert, t, haptics, blockUser, safeBack]);
+
+  const openChatMenu = useCallback(() => {
+    const applyBlock = (index: number) => {
+      if (index === 0) confirmBlock();
+    };
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [t('blockUser'), t('cancel')],
+          cancelButtonIndex: 1,
+          destructiveButtonIndex: 0,
+        },
+        applyBlock
+      );
+    } else {
+      // SozAlert onPress sonrası onDismiss çalışır — iç içe confirm'u ertele.
+      showAlert(t('chatMenuTitle'), undefined, [
+        {
+          text: t('blockUser'),
+          style: 'destructive',
+          onPress: () => {
+            setTimeout(() => confirmBlock(), 50);
+          },
+        },
+        { text: t('cancel'), style: 'cancel' },
+      ]);
+    }
+  }, [confirmBlock, showAlert, t]);
+
+  const handleDeleteMessage = useCallback(
+    (messageId: string) => {
+      showAlert(t('deleteMessageConfirmTitle'), t('deleteMessageConfirmMsg'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('deleteMessageAction'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              haptics.medium();
+              await deleteMessage(messageId);
+            } catch {
+              haptics.error();
+              showAlert(t('error'), t('deleteMessageFailed'));
+            }
+          },
+        },
+      ]);
+    },
+    [deleteMessage, showAlert, t, haptics]
+  );
+
+  const handleReportMessage = useCallback(
+    (messageId: string) => {
+      showAlert(t('reportMessageConfirmTitle'), t('reportMessageConfirmMsg'), [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('reportMessageAction'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              haptics.medium();
+              await reportMessage(messageId);
+              haptics.success();
+              showAlert('Söz', t('reportMessageThanks'));
+            } catch {
+              haptics.error();
+              showAlert(t('error'), t('reportMessageFailed'));
+            }
+          },
+        },
+      ]);
+    },
+    [reportMessage, showAlert, t, haptics]
+  );
 
   const styles = useMemo(() => makeStyles(colors, fonts), [colors, fonts]);
 
@@ -189,6 +304,7 @@ export default function ChatThreadScreen() {
   ) : null;
 
   return (
+    <>
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Pressable
@@ -204,7 +320,7 @@ export default function ChatThreadScreen() {
           <View
             style={[
               styles.headerAvatar,
-              { backgroundColor: colorForUserId(friendId ?? '') },
+              { backgroundColor: avatarColor },
             ]}
           >
             <Text style={styles.headerAvatarText}>{initials(name)}</Text>
@@ -213,7 +329,15 @@ export default function ChatThreadScreen() {
             {name}
           </Text>
         </View>
-        <View style={styles.iconBtn} />
+        <Pressable
+          onPress={openChatMenu}
+          style={styles.iconBtn}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={t('chatMenuA11y')}
+        >
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
+        </Pressable>
       </View>
 
       <KeyboardAvoidingView
@@ -234,9 +358,19 @@ export default function ChatThreadScreen() {
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             ListEmptyComponent={
               theirTyping ? null : (
-                <View style={styles.centerBox}>
-                  <Ionicons name="chatbubbles-outline" size={36} color={colors.textMuted} />
-                  <Text style={styles.emptyText}>{t('noMessagesYet')}</Text>
+                <View style={styles.emptyState}>
+                  <View style={[styles.emptyAvatar, { backgroundColor: avatarColor }]}>
+                    <Text style={styles.emptyAvatarText}>{initials(name)}</Text>
+                  </View>
+                  <Text style={styles.emptyTitle}>{t('chatEmptyTitle', { name })}</Text>
+                  <Pressable
+                    onPress={focusComposer}
+                    hitSlop={12}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('chatEmptyHint')}
+                  >
+                    <Text style={styles.emptyHint}>{t('chatEmptyHint')}</Text>
+                  </Pressable>
                 </View>
               )
             }
@@ -255,13 +389,24 @@ export default function ChatThreadScreen() {
               const mine = msg.senderId === myId;
               const showSeen = mine && msg.id === lastMineMessageId && !!msg.readAt;
               return (
-                <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-                  <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                    <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{msg.text}</Text>
+                <Pressable
+                  onLongPress={
+                    mine
+                      ? () => handleDeleteMessage(msg.id)
+                      : () => handleReportMessage(msg.id)
+                  }
+                  delayLongPress={350}
+                  accessibilityRole="button"
+                  accessibilityHint={mine ? t('deleteMessageHint') : t('reportMessageHint')}
+                >
+                  <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
+                    <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                      <Text style={[styles.bubbleText, mine && styles.bubbleTextMine]}>{msg.text}</Text>
+                    </View>
+                    <Text style={styles.bubbleTime}>{timeOfDay(msg.createdAt)}</Text>
+                    {showSeen ? <Text style={styles.readReceipt}>{t('messageSeen')}</Text> : null}
                   </View>
-                  <Text style={styles.bubbleTime}>{timeOfDay(msg.createdAt)}</Text>
-                  {showSeen ? <Text style={styles.readReceipt}>{t('messageSeen')}</Text> : null}
-                </View>
+                </Pressable>
               );
             }}
           />
@@ -269,6 +414,7 @@ export default function ChatThreadScreen() {
 
         <View style={styles.inputRow}>
           <TextInput
+            ref={inputRef}
             style={styles.input}
             value={input}
             onChangeText={handleChangeText}
@@ -289,6 +435,8 @@ export default function ChatThreadScreen() {
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
+    <SozAlert {...alertConfig} onDismiss={hideAlert} />
+    </>
   );
 }
 
@@ -318,6 +466,40 @@ function makeStyles(colors: { background: string; surface: string; text: string;
     headerName: { fontSize: 16, color: colors.text, fontFamily: fonts.medium },
     centerBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 40 },
     emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', fontFamily: fonts.regular },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 36,
+      gap: 12,
+    },
+    emptyAvatar: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 4,
+    },
+    emptyAvatarText: {
+      fontSize: 26,
+      color: '#FFF8EE',
+      fontFamily: fonts.medium,
+    },
+    emptyTitle: {
+      fontSize: 16,
+      color: colors.text,
+      fontFamily: fonts.medium,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    emptyHint: {
+      fontSize: 14,
+      color: ACCENT,
+      fontFamily: fonts.regular,
+      textAlign: 'center',
+      marginTop: 4,
+    },
     listContent: { padding: 16, gap: 10, flexGrow: 1 },
     listEmpty: { justifyContent: 'center' },
     dateSepWrap: {

@@ -18,6 +18,7 @@ export default {
       bundleIdentifier: 'com.soz.incil',
       supportsTablet: false,
       requiresFullScreen: false,
+      associatedDomains: ['applinks:sozapp.com'],
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false,
         NSFaceIDUsageDescription:
@@ -34,6 +35,20 @@ export default {
     android: {
       package: 'com.soz.incil',
       usesCleartextTraffic: true,
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: [
+            {
+              scheme: 'https',
+              host: 'sozapp.com',
+              pathPrefix: '/read',
+            },
+          ],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
     },
     plugins: [
       'expo-font',

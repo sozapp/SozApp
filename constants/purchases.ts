@@ -1,5 +1,6 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import Purchases from 'react-native-purchases';
+import { trackEvent } from '@/constants/analytics';
 
 let purchasesInitialized = false;
 
@@ -18,15 +19,10 @@ export const initPurchases = (): void => {
   if (purchasesInitialized) return;
   const apiKey = process.env.EXPO_PUBLIC_REVENUECAT_KEY;
   if (!apiKey) {
-    console.log('RevenueCat key missing; purchases disabled');
     return;
   }
   const isTestStoreKey = WEB_COMPATIBLE_KEY_PREFIXES.some((prefix) => apiKey.startsWith(prefix));
   if (isRunningInExpoGo() && !isTestStoreKey) {
-    console.log(
-      'RevenueCat: Expo Go içinde gerçek mağaza key kullanılamaz, satın almalar bu ortamda devre dışı. ' +
-        'Test etmek için bir Test Store key (test_...) kullanın ya da development build oluşturun.'
-    );
     return;
   }
   try {
@@ -91,7 +87,9 @@ export const purchasePremium = async (
     const pkg = findPackageByType(offerings, packageType);
     if (!pkg) throw new Error('Package not found');
     const { customerInfo } = await Purchases.purchasePackage(pkg);
-    return customerInfo.entitlements.active.premium !== undefined;
+    const isPremium = customerInfo.entitlements.active.premium !== undefined;
+    if (isPremium) trackEvent('purchase_completed', { package_type: packageType });
+    return isPremium;
   } catch (e) {
     console.error('Purchase error:', e);
     return false;

@@ -120,7 +120,6 @@ async function resolveUserId(uid?: string): Promise<string | null> {
 export function useSync() {
   const syncNotes = useCallback(async (userId?: string) => {
     if (!supabase) {
-      console.log('Supabase not available, using local storage');
       return;
     }
     const uid = await resolveUserId(userId);
@@ -155,7 +154,7 @@ export function useSync() {
           .eq('user_id', uid)
           .in('verse_id', plan.deleteRemote);
         if (delErr) {
-          console.log('[Sync] notes remote delete error:', delErr.message);
+          console.warn('[Sync] notes remote delete error:', delErr.message);
         } else {
           plan.deleteRemote.forEach((id) => delete newSnapshot[id]);
         }
@@ -170,7 +169,7 @@ export function useSync() {
         }));
         const { error: upErr } = await supabase.from('notes').upsert(rows, { onConflict: UPSERT_CONFLICT });
         if (upErr) {
-          console.log('[Sync] notes push error:', upErr.message);
+          console.warn('[Sync] notes push error:', upErr.message);
         } else {
           plan.push.forEach((id) => (newSnapshot[id] = localTs[id]));
         }
@@ -203,13 +202,12 @@ export function useSync() {
       await AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(localTs));
       await AsyncStorage.setItem(STORAGE_NOTES_SNAPSHOT, JSON.stringify(newSnapshot));
     } catch (e) {
-      console.log('[Sync] notes error:', e);
+      console.warn('[Sync] notes error:', e);
     }
   }, []);
 
   const syncHighlights = useCallback(async (userId?: string) => {
     if (!supabase) {
-      console.log('Supabase not available, using local storage');
       return;
     }
     const uid = await resolveUserId(userId);
@@ -245,7 +243,7 @@ export function useSync() {
           .eq('user_id', uid)
           .in('verse_id', plan.deleteRemote);
         if (delErr) {
-          console.log('[Sync] highlights remote delete error:', delErr.message);
+          console.warn('[Sync] highlights remote delete error:', delErr.message);
         } else {
           plan.deleteRemote.forEach((id) => delete newSnapshot[id]);
         }
@@ -262,7 +260,7 @@ export function useSync() {
           .from('highlights')
           .upsert(rows, { onConflict: UPSERT_CONFLICT });
         if (upErr) {
-          console.log('[Sync] highlights push error:', upErr.message);
+          console.warn('[Sync] highlights push error:', upErr.message);
         } else {
           plan.push.forEach((id) => (newSnapshot[id] = localTs[id]));
         }
@@ -292,13 +290,12 @@ export function useSync() {
       await AsyncStorage.setItem(STORAGE_HIGHLIGHT_TIMESTAMPS, JSON.stringify(localTs));
       await AsyncStorage.setItem(STORAGE_HIGHLIGHTS_SNAPSHOT, JSON.stringify(newSnapshot));
     } catch (e) {
-      console.log('[Sync] highlights error:', e);
+      console.warn('[Sync] highlights error:', e);
     }
   }, []);
 
   const syncFavorites = useCallback(async (userId?: string) => {
     if (!supabase) {
-      console.log('Supabase not available, using local storage');
       return;
     }
     const uid = await resolveUserId(userId);
@@ -333,7 +330,7 @@ export function useSync() {
           .eq('user_id', uid)
           .in('verse_id', plan.deleteRemote);
         if (delErr) {
-          console.log('[Sync] favorites remote delete error:', delErr.message);
+          console.warn('[Sync] favorites remote delete error:', delErr.message);
         } else {
           plan.deleteRemote.forEach((id) => delete newSnapshot[id]);
         }
@@ -349,7 +346,7 @@ export function useSync() {
           .from('favorites')
           .upsert(rows, { onConflict: UPSERT_CONFLICT });
         if (upErr) {
-          console.log('[Sync] favorites push error:', upErr.message);
+          console.warn('[Sync] favorites push error:', upErr.message);
         } else {
           plan.push.forEach((id) => (newSnapshot[id] = localTs[id]));
         }
@@ -381,14 +378,13 @@ export function useSync() {
       await AsyncStorage.setItem(STORAGE_FAVORITES, JSON.stringify(mergedItems));
       await AsyncStorage.setItem(STORAGE_FAVORITES_SNAPSHOT, JSON.stringify(newSnapshot));
     } catch (e) {
-      console.log('[Sync] favorites error:', e);
+      console.warn('[Sync] favorites error:', e);
     }
   }, []);
 
   const syncAll = useCallback(
     async (onComplete?: () => void) => {
       if (!supabase) {
-        console.log('Supabase not available, using local storage');
         onComplete?.();
         return;
       }
@@ -406,7 +402,7 @@ export function useSync() {
           syncFavorites(user.id),
         ]);
       } catch (e) {
-        console.log('[Sync] syncAll error:', e);
+        console.warn('[Sync] syncAll error:', e);
       } finally {
         onComplete?.();
       }

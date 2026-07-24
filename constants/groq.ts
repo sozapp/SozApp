@@ -2,6 +2,9 @@ import { supabase } from './supabase';
 
 export const FREE_AI_QUESTIONS_PER_DAY = 10;
 
+/** Söz'e Sor konuşma geçmişi — son N mesaj (maliyet / gecikme). Edge function da aynı sınırı uygular. */
+export const ASK_AI_MAX_HISTORY_MESSAGES = 12;
+
 export function isSupabaseConfigured(): boolean {
   const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
   const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -180,7 +183,8 @@ export async function askQuestion(
 ): Promise<{ answer: string; questionsUsed: number; questionsRemaining: number | null }> {
   const history = conversationHistory
     .filter((m) => m.role === 'user' || m.role === 'assistant')
-    .map((m) => ({ role: m.role, content: m.content }));
+    .map((m) => ({ role: m.role, content: m.content }))
+    .slice(-ASK_AI_MAX_HISTORY_MESSAGES);
 
   const result = await callAskAiEdge({
     question,

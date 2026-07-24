@@ -1,4 +1,5 @@
 import { ALL_BADGES, checkNewBadges, getBadgeProgress, isBadgeEarned, type UserStats } from '@/constants/badges';
+import { locations } from '@/constants/map-locations';
 
 const baseStats: UserStats = {
   streak: 0,
@@ -9,6 +10,7 @@ const baseStats: UserStats = {
   daysActive: 0,
   memorizeCount: 0,
   reflectionsCompleted: 0,
+  mapLocationsVisited: 0,
 };
 
 describe('getBadgeProgress / isBadgeEarned', () => {
@@ -56,5 +58,11 @@ describe('checkNewBadges', () => {
   it('returns an empty list when nothing new has been earned', () => {
     const stats: UserStats = { ...baseStats, daysActive: 1 };
     expect(checkNewBadges(stats, ['first_step'])).toEqual([]);
+  });
+
+  it('earns anatolia_explorer when all map locations are visited', () => {
+    const stats: UserStats = { ...baseStats, mapLocationsVisited: locations.length };
+    const newlyEarned = checkNewBadges(stats, []);
+    expect(newlyEarned.map((b) => b.id)).toContain('anatolia_explorer');
   });
 });

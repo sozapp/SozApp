@@ -5,6 +5,8 @@ import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'reac
 
 import { useTheme } from '@/hooks/useTheme';
 import { markGameCompletedToday } from '@/constants/game-storage';
+import { trackEvent } from '@/constants/analytics';
+import { pickDailyItems } from '@/constants/seeded-random';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { GameShell } from '@/components/games/GameShell';
 
@@ -121,7 +123,7 @@ const ALL_VERSES: VerseQuestion[] = [
 ];
 
 function pickQuestions(): VerseQuestion[] {
-  return [...ALL_VERSES].sort(() => Math.random() - 0.5).slice(0, 10);
+  return pickDailyItems(ALL_VERSES, 10, GAME_ID);
 }
 
 export default function MissingWord() {
@@ -186,6 +188,7 @@ export default function MissingWord() {
       const nextStreak = finalScore >= 8 ? streak + 1 : 0;
       await saveStreak(nextStreak);
       await markGameCompletedToday(GAME_ID);
+      trackEvent('game_completed', { game_id: GAME_ID });
       void submitScore(finalScore);
       setGameOver(true);
       return;

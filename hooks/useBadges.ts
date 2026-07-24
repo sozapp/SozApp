@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useState } from 'react';
 
 import { ALL_BADGES, checkNewBadges, type UserStats } from '@/constants/badges';
+import { getVisitedMapLocationCount } from '@/constants/map-visits';
 import { getDailyStats } from '@/constants/stats-storage';
 
 type BadgeItem = (typeof ALL_BADGES)[number];
@@ -15,6 +16,7 @@ const EMPTY_STATS: UserStats = {
   daysActive: 1,
   memorizeCount: 0,
   reflectionsCompleted: 0,
+  mapLocationsVisited: 0,
 };
 
 function parseMaybeArrayLength(raw: string | null): number {
@@ -48,6 +50,7 @@ export function useBadges() {
         ]);
       const dailyStats = await getDailyStats();
       const totalVersesRead = Object.values(dailyStats).reduce((sum, n) => sum + (n ?? 0), 0);
+      const mapLocationsVisited = await getVisitedMapLocationCount();
 
       return {
         streak: Number(streak[1] ?? 0),
@@ -58,6 +61,7 @@ export function useBadges() {
         daysActive: Number(days[1] ?? 1),
         memorizeCount: parseMaybeArrayLength(memorize[1]),
         reflectionsCompleted: Number(reflections[1] ?? 0),
+        mapLocationsVisited,
       };
     } catch {
       return EMPTY_STATS;

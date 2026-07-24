@@ -45,7 +45,7 @@ export function getEnglishChapterTexts(
       text: v.text ?? '—',
     }));
   } catch (e) {
-    if (__DEV__) console.log('getEnglishChapterTexts:', e);
+    console.warn('getEnglishChapterTexts:', e);
     return [];
   }
 }

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useRef } from 'react';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -18,7 +19,12 @@ import {
 } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { EmptyState } from '@/components/EmptyState';
+import { useTranslation } from '@/context/LanguageContext';
+import {
+  useLeaderboard,
+  type LeaderboardScope,
+} from '@/hooks/useLeaderboard';
 import { useTheme } from '@/hooks/useTheme';
 
 const ACCENT = '#C4956A';
@@ -43,14 +49,24 @@ export function GameLeaderboardModal({
   gameId: string;
   title: string;
 }) {
+  const router = useRouter();
+  const { t } = useTranslation();
   const { colors, fonts, resolvedTheme } = useTheme();
-  const { entries, loading, load } = useLeaderboard(gameId);
+  /** Varsayılan: arkadaşlar — tanıdıklarla rekabet daha motive edici. */
+  const [scope, setScope] = useState<LeaderboardScope>('friends');
+  const { entries, loading, friendCount, load } = useLeaderboard(gameId, scope);
   const isLightTheme = resolvedTheme === 'day' || resolvedTheme === 'sepia';
   const medalColors = isLightTheme ? MEDAL_COLORS_LIGHT : MEDAL_COLORS_DARK;
   const scoreColor = isLightTheme ? SCORE_COLOR_LIGHT : ACCENT;
 
   const translateY = useRef(new Animated.Value(0)).current;
   const closingRef = useRef(false);
+
+  useEffect(() => {
+    if (visible) {
+      setScope('friends');
+    }
+  }, [visible, gameId]);
 
   useEffect(() => {
     if (visible) void load();
@@ -110,6 +126,95 @@ export function GameLeaderboardModal({
     extrapolate: 'clamp',
   });
 
+  const renderBody = () => {
+    if (loading) {
+      return (
+        <View style={styles.centerBox}>
+          <ActivityIndicator color={ACCENT} />
+        </View>
+      );
+    }
+
+    if (scope === 'friends' && friendCount === 0) {
+      return (
+        <View style={styles.emptyWrap}>
+          <EmptyState
+            icon="people-outline"
+            title={t('noFriendsYet')}
+            description={t('leaderboardNoFriendsDesc')}
+            buttonText={t('inviteFriend')}
+            onButtonPress={() => {
+              finishClose();
+              router.push('/friends' as never);
+            }}
+          />
+          <Pressable
+            onPress={() => setScope('global')}
+            hitSlop={8}
+            accessibilityRole="button"
+            style={styles.switchScopeLink}
+          >
+            <Text style={[styles.switchScopeText, { color: ACCENT, fontFamily: fonts.regular }]}>
+              {t('leaderboardViewGlobal')}
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (entries.length === 0) {
+      return (
+        <View style={styles.centerBox}>
+          <Text
+            style={[styles.emptyText, { color: colors.textSecondary, fontFamily: fonts.regular }]}
+          >
+            {scope === 'friends' ? t('leaderboardNoFriendScores') : t('leaderboardNoScores')}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView style={styles.list} showsVerticalScrollIndicator={false} bounces>
+        {entries.map((entry, i) => (
+          <View
+            key={entry.userId}
+            style={[
+              styles.row,
+              { borderColor: colors.border },
+              entry.isMe && { backgroundColor: `${ACCENT}18`, borderColor: ACCENT },
+            ]}
+          >
+            <View style={styles.rankBox}>
+              {i < 3 ? (
+                <Ionicons name="medal" size={20} color={medalColors[i]} />
+              ) : (
+                <Text
+                  style={[
+                    styles.rankText,
+                    { color: colors.textSecondary, fontFamily: fonts.regular },
+                  ]}
+                >
+                  {i + 1}
+                </Text>
+              )}
+            </View>
+            <Text
+              style={[styles.nameText, { color: colors.text, fontFamily: fonts.regular }]}
+              numberOfLines={1}
+            >
+              {entry.displayName}
+              {entry.isMe ? ' (Sen)' : ''}
+            </Text>
+            <Text style={[styles.scoreText, { color: scoreColor, fontFamily: fonts.regular }]}>
+              {entry.score}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+    );
+  };
+
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={finishClose}>
       <View style={styles.backdropRoot}>
@@ -161,57 +266,43 @@ export function GameLeaderboardModal({
               </Animated.View>
             </PanGestureHandler>
 
-            {loading ? (
-              <View style={styles.centerBox}>
-                <ActivityIndicator color={ACCENT} />
-              </View>
-            ) : entries.length === 0 ? (
-              <View style={styles.centerBox}>
-                <Text
-                  style={[styles.emptyText, { color: colors.textSecondary, fontFamily: fonts.regular }]}
-                >
-                  Henüz skor yok. İlk sırayı sen al!
-                </Text>
-              </View>
-            ) : (
-              <ScrollView style={styles.list} showsVerticalScrollIndicator={false} bounces>
-                {entries.map((entry, i) => (
-                  <View
-                    key={entry.userId}
+            <View style={[styles.scopeRow, { backgroundColor: colors.background }]}>
+              {(
+                [
+                  { id: 'friends' as const, label: t('friends') },
+                  { id: 'global' as const, label: t('leaderboardGlobal') },
+                ] as const
+              ).map((tab) => {
+                const active = scope === tab.id;
+                return (
+                  <Pressable
+                    key={tab.id}
+                    onPress={() => setScope(tab.id)}
                     style={[
-                      styles.row,
-                      { borderColor: colors.border },
-                      entry.isMe && { backgroundColor: `${ACCENT}18`, borderColor: ACCENT },
+                      styles.scopeTab,
+                      active && { backgroundColor: `${ACCENT}22`, borderColor: ACCENT },
+                      !active && { borderColor: 'transparent' },
                     ]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
                   >
-                    <View style={styles.rankBox}>
-                      {i < 3 ? (
-                        <Ionicons name="medal" size={20} color={medalColors[i]} />
-                      ) : (
-                        <Text
-                          style={[
-                            styles.rankText,
-                            { color: colors.textSecondary, fontFamily: fonts.regular },
-                          ]}
-                        >
-                          {i + 1}
-                        </Text>
-                      )}
-                    </View>
                     <Text
-                      style={[styles.nameText, { color: colors.text, fontFamily: fonts.regular }]}
-                      numberOfLines={1}
+                      style={[
+                        styles.scopeTabText,
+                        {
+                          color: active ? ACCENT : colors.textSecondary,
+                          fontFamily: fonts.regular,
+                        },
+                      ]}
                     >
-                      {entry.displayName}
-                      {entry.isMe ? ' (Sen)' : ''}
+                      {tab.label}
                     </Text>
-                    <Text style={[styles.scoreText, { color: scoreColor, fontFamily: fonts.regular }]}>
-                      {entry.score}
-                    </Text>
-                  </View>
-                ))}
-              </ScrollView>
-            )}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {renderBody()}
           </SafeAreaView>
         </Animated.View>
       </View>
@@ -269,12 +360,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  scopeRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  scopeTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  scopeTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   centerBox: {
     paddingVertical: 48,
     alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  emptyWrap: {
+    paddingBottom: 16,
+  },
+  switchScopeLink: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: -4,
+  },
+  switchScopeText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyText: {
     fontSize: 14,
+    textAlign: 'center',
   },
   list: {
     paddingHorizontal: 16,

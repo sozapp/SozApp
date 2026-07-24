@@ -27,6 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from '@/context/LanguageContext';
 import { useTheme } from '@/hooks/useTheme';
 import { fonts } from '@/constants/theme';
 import {
@@ -244,14 +245,6 @@ function getPracticeStages(level: number): PracticeStage[] {
   if (level === 2) return ['see', 'type', 'heart'];
   return ['see', 'heart', 'speech'];
 }
-
-const STAGE_LABELS: Record<PracticeStage, string> = {
-  see: 'Gör & Öğren',
-  fill: 'Boşluk Doldur',
-  type: 'Serbest Yaz',
-  heart: 'Kalbinden Yaz',
-  speech: 'Dinle & Yaz',
-};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 function LevelIndicator({ level }: { level: number }) {
@@ -606,9 +599,21 @@ const makeStyles = (colors: {
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MemorizeScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
   const safeBack = useSafeBack();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  const stageLabels = useMemo(
+    (): Record<PracticeStage, string> => ({
+      see: t('seeAndLearn'),
+      fill: t('fillBlank'),
+      type: t('writeFreely'),
+      heart: t('fromHeart'),
+      speech: t('listenWrite'),
+    }),
+    [t]
+  );
 
   // App-level state
   const [view, setView] = useState<AppView>('list');
@@ -976,7 +981,7 @@ export default function MemorizeScreen() {
     async (book: string, chapter: number, verse: number, text: string) => {
       const id = makeId(book, chapter, verse);
       if (progress[id]) {
-        setAddFeedback('Bu ayet zaten listede.');
+        setAddFeedback(t('alreadyInList'));
       return;
     }
       const entry: MemorizeVerse = {
@@ -992,13 +997,13 @@ export default function MemorizeScreen() {
       try {
         await AsyncStorage.setItem(STORAGE_PROGRESS, JSON.stringify(next));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setAddFeedback('Eklendi ✓');
+        setAddFeedback(t('addedCheck'));
         setTimeout(() => setAddFeedback(''), 2000);
       } catch {
-        setAddFeedback('Hata oluştu.');
+        setAddFeedback(t('errorOccurred'));
       }
     },
-    [progress]
+    [progress, t]
   );
 
   // ── Open add modal
@@ -1050,14 +1055,14 @@ export default function MemorizeScreen() {
         <TouchableOpacity onPress={() => safeBack()} style={styles.backBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel="Geri git">
+          accessibilityLabel={t('goBackA11y')}>
           <Ionicons name="arrow-back" size={22} color={colors.textMuted} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Ezberleme</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('memorizeTitle')}</Text>
         <TouchableOpacity onPress={openAdd} style={styles.addBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel="Ayet ekle">
+          accessibilityLabel={t('addVerseA11y')}>
           <Ionicons name="add" size={24} color={ACCENT} />
         </TouchableOpacity>
         </View>
@@ -1067,12 +1072,12 @@ export default function MemorizeScreen() {
           <View style={styles.emptyIconCircle}>
             <Ionicons name="book-outline" size={40} color="rgba(196,149,80,0.4)" />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Henüz ayet eklemediniz</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('noMemorizeVersesYet')}</Text>
           <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-            Favorilerden veya okurken + ile ekleyin
+            {t('noMemorizeVersesDesc')}
           </Text>
           <TouchableOpacity style={styles.emptyBtn} onPress={openAdd}>
-            <Text style={styles.emptyBtnText}>İlk Ayetini Ekle</Text>
+            <Text style={styles.emptyBtnText}>{t('addFirstVerse')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -1081,15 +1086,15 @@ export default function MemorizeScreen() {
           <View style={styles.statsGrid}>
             <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.statNum}>{learning.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Öğreniliyor</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('learning')}</Text>
         </View>
             <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.statNum}>{almostDone.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Neredeyse</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('almostShort')}</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.statNum}>{memorized.length}</Text>
-              <Text style={[styles.statLabel, { color: colors.textMuted }]}>Ezberledim</Text>
+              <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('memorized')}</Text>
             </View>
           </View>
 
@@ -1097,7 +1102,7 @@ export default function MemorizeScreen() {
           {dueToday.length > 0 && (
             <>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionLabel}>BUGÜN TEKRARİ GEREKEN</Text>
+                <Text style={styles.sectionLabel}>{t('dueToday')}</Text>
                 <View style={styles.dueBadge}>
                   <Text style={styles.dueBadgeText}>{dueToday.length}</Text>
                 </View>
@@ -1119,7 +1124,7 @@ export default function MemorizeScreen() {
                     </Text>
                     <View style={styles.dueCardBottom}>
                       <LevelIndicator level={verse.level} />
-                      <Text style={styles.practiceBtn}>Tekrar Et →</Text>
+                      <Text style={styles.practiceBtn}>{t('practiceNow')}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -1130,19 +1135,19 @@ export default function MemorizeScreen() {
           {/* Groups */}
           {learning.length > 0 && (
             <>
-              <Text style={styles.groupLabel}>ÖĞRENİLİYOR</Text>
+              <Text style={styles.groupLabel}>{t('learningGroup')}</Text>
               {learning.map(renderVerseItem)}
             </>
           )}
           {almostDone.length > 0 && (
             <>
-              <Text style={styles.groupLabel}>NEREDEYSE BİTTİ</Text>
+              <Text style={styles.groupLabel}>{t('almostDoneGroup')}</Text>
               {almostDone.map(renderVerseItem)}
             </>
           )}
           {memorized.length > 0 && (
             <>
-              <Text style={styles.groupLabel}>EZBERLENDİ ✓</Text>
+              <Text style={styles.groupLabel}>{t('memorizedGroup')}</Text>
               {memorized.map(renderVerseItem)}
             </>
           )}
@@ -1155,7 +1160,7 @@ export default function MemorizeScreen() {
   const renderSee = () => (
     <ScrollView contentContainerStyle={styles.practiceContent} showsVerticalScrollIndicator={false}>
       <View style={styles.seeCard}>
-        <Text style={styles.seeCardLabel}>GÖR VE ÖĞREN</Text>
+        <Text style={styles.seeCardLabel}>{t('seeAndLearn')}</Text>
         <Text style={styles.seeQuote}>"</Text>
         <Text style={[styles.seeVerseText, { color: colors.text }]}>{practiceVerse?.text}</Text>
         <Text style={styles.seeVerseRef}>
@@ -1170,7 +1175,7 @@ export default function MemorizeScreen() {
         onPress={() => advanceStage(1)}
       >
         <Text style={[styles.primaryBtnText, countdown > 0 && { color: ACCENT }]}>
-          Hazırım →
+          {t('imReady')}
               </Text>
       </TouchableOpacity>
         </ScrollView>
@@ -1183,7 +1188,7 @@ export default function MemorizeScreen() {
       return (
         <View style={styles.fillEmptyState}>
           <Ionicons name="school-outline" size={40} color="rgba(196,149,80,0.3)" />
-          <Text style={[styles.fillEmptyText, { color: colors.textMuted }]}>Ayet yükleniyor...</Text>
+          <Text style={[styles.fillEmptyText, { color: colors.textMuted }]}>{t('verseLoading')}</Text>
         </View>
       );
     }
@@ -1197,7 +1202,7 @@ export default function MemorizeScreen() {
     if (puzzle.blanks.length === 0 || puzzle.options.length === 0) {
       return (
         <View style={styles.fillEmptyState}>
-          <Text style={[styles.fillEmptyText, { color: colors.textMuted }]}>Hazırlanıyor...</Text>
+          <Text style={[styles.fillEmptyText, { color: colors.textMuted }]}>{t('preparing')}</Text>
         </View>
       );
     }
@@ -1209,7 +1214,7 @@ export default function MemorizeScreen() {
 
     return (
       <ScrollView contentContainerStyle={styles.practiceContent} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.stageHint, { color: colors.textMuted }]}>Boş yerleri sırayla doldurun</Text>
+        <Text style={[styles.stageHint, { color: colors.textMuted }]}>{t('fillBlanksHint')}</Text>
 
         {/* Ayet kelime görünümü */}
         <View style={styles.verseWordWrap}>
@@ -1255,7 +1260,7 @@ export default function MemorizeScreen() {
 
         {/* İlerleme */}
         <Text style={[styles.fillProgress, { color: colors.textMuted }]}>
-          {completedBlanks.size} / {puzzle.blanks.length} dolduruldu
+          {t('filledProgress', { done: completedBlanks.size, total: puzzle.blanks.length })}
         </Text>
 
         {/* Seçenek butonları */}
@@ -1303,7 +1308,7 @@ export default function MemorizeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {!fromMemory && (
-          <Text style={[styles.stageHint, { color: colors.textMuted }]}>Ayeti yazın</Text>
+          <Text style={[styles.stageHint, { color: colors.textMuted }]}>{t('writeTheVerse')}</Text>
         )}
         <View style={[styles.refPill, { backgroundColor: 'rgba(196,149,80,0.08)' }]}>
           <Text style={styles.refPillText}>
@@ -1312,7 +1317,7 @@ export default function MemorizeScreen() {
         </View>
         {fromMemory && !checkResult && (
           <Text style={[styles.stageHint, { color: colors.textMuted, textAlign: 'center', marginBottom: 20 }]}>
-            Sadece referanstan ezberden yaz
+            {t('writeFromMemoryHint')}
           </Text>
         )}
         {!checkResult ? (
@@ -1323,7 +1328,7 @@ export default function MemorizeScreen() {
                 borderColor: 'rgba(196,149,80,0.2)',
                 color: colors.text,
               }]}
-              placeholder="Ayeti buraya yaz..."
+              placeholder={t('typeVersePlaceholder')}
               placeholderTextColor={colors.textMuted}
               value={typedText}
               onChangeText={setTypedText}
@@ -1332,7 +1337,7 @@ export default function MemorizeScreen() {
               autoCapitalize="sentences"
             />
             <TouchableOpacity style={styles.primaryBtn} onPress={handleCheck}>
-              <Text style={styles.primaryBtnText}>Kontrol Et</Text>
+              <Text style={styles.primaryBtnText}>{t('checkAnswer')}</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -1343,10 +1348,10 @@ export default function MemorizeScreen() {
               </Text>
               <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>
                 {checkResult.accuracy >= 0.8
-                  ? 'Harika!'
+                  ? t('feedbackGreat')
                   : checkResult.accuracy >= 0.6
-                  ? 'Çok yaklaştın!'
-                  : 'Tekrar dene'}
+                  ? t('feedbackAlmost')
+                  : t('feedbackTryAgain')}
         </Text>
       </View>
             <View style={styles.comparisonWrap}>
@@ -1363,12 +1368,12 @@ export default function MemorizeScreen() {
       </View>
             {checkResult.accuracy >= 0.6 ? (
               <TouchableOpacity style={styles.primaryBtn} onPress={() => advanceStage(checkResult.accuracy)}>
-                <Text style={styles.primaryBtnText}>Devam Et →</Text>
+                <Text style={styles.primaryBtnText}>{t('continueArrow')}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity style={[styles.primaryBtn, styles.primaryBtnOutline]}
                 onPress={() => { setTypedText(''); setCheckResult(null); }}>
-                <Text style={[styles.primaryBtnText, { color: ACCENT }]}>Tekrar Dene</Text>
+                <Text style={[styles.primaryBtnText, { color: ACCENT }]}>{t('tryAgainBtn')}</Text>
               </TouchableOpacity>
             )}
           </>
@@ -1388,13 +1393,13 @@ export default function MemorizeScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.stageHint, { color: colors.textMuted }]}>Dinle ve yaz</Text>
+        <Text style={[styles.stageHint, { color: colors.textMuted }]}>{t('listenWriteHint')}</Text>
         <TouchableOpacity style={styles.speakBtn} onPress={handleSpeak}>
           <Ionicons
             name={isSpeaking ? 'pause-circle-outline' : 'volume-high-outline'}
             size={28} color={ACCENT}
           />
-          <Text style={styles.speakBtnText}>{isSpeaking ? 'Okunuyor...' : 'Tekrar Dinle'}</Text>
+          <Text style={styles.speakBtnText}>{isSpeaking ? t('playingAudio') : t('listenAgain')}</Text>
         </TouchableOpacity>
         {!checkResult ? (
           <>
@@ -1404,7 +1409,7 @@ export default function MemorizeScreen() {
                 borderColor: 'rgba(196,149,80,0.2)',
                 color: colors.text,
               }]}
-              placeholder="Duyduklarını yaz..."
+              placeholder={t('heardPlaceholder')}
               placeholderTextColor={colors.textMuted}
         value={typedText}
         onChangeText={setTypedText}
@@ -1412,7 +1417,7 @@ export default function MemorizeScreen() {
               autoCorrect={false}
             />
             <TouchableOpacity style={styles.primaryBtn} onPress={handleCheck}>
-              <Text style={styles.primaryBtnText}>Kontrol Et</Text>
+              <Text style={styles.primaryBtnText}>{t('checkAnswer')}</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -1420,11 +1425,11 @@ export default function MemorizeScreen() {
             <View style={styles.resultBlock}>
               <Text style={styles.accuracyBig}>{Math.round(checkResult.accuracy * 100)}%</Text>
               <Text style={[styles.accuracyLabel, { color: colors.textMuted }]}>
-                {checkResult.accuracy >= 0.8 ? 'Harika!' : checkResult.accuracy >= 0.6 ? 'Çok yaklaştın!' : 'Tekrar dene'}
+                {checkResult.accuracy >= 0.8 ? t('feedbackGreat') : checkResult.accuracy >= 0.6 ? t('feedbackAlmost') : t('feedbackTryAgain')}
             </Text>
             </View>
             <TouchableOpacity style={styles.primaryBtn} onPress={() => advanceStage(checkResult.accuracy)}>
-              <Text style={styles.primaryBtnText}>Devam Et →</Text>
+              <Text style={styles.primaryBtnText}>{t('continueArrow')}</Text>
             </TouchableOpacity>
           </>
         )}
@@ -1446,13 +1451,13 @@ export default function MemorizeScreen() {
             style={styles.backBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel="Kapat"
+            accessibilityLabel={t('close')}
           >
             <Ionicons name="close" size={22} color={colors.textMuted} />
           </TouchableOpacity>
           <View style={styles.practiceHeaderCenter}>
             <Text style={[styles.practiceStageLabel, { color: colors.text }]}>
-              {currentStage ? STAGE_LABELS[currentStage] : ''}
+              {currentStage ? stageLabels[currentStage] : ''}
             </Text>
             <Text style={[styles.practiceStepCount, { color: 'rgba(196,149,80,0.5)' }]}>
               {stageIdx + 1}/{totalStages}
@@ -1518,34 +1523,34 @@ export default function MemorizeScreen() {
             </View>
           </Animated.View>
 
-          <Text style={[styles.resultTitle, { color: colors.text }]}>Harika iş!</Text>
+          <Text style={[styles.resultTitle, { color: colors.text }]}>{t('greatWork')}</Text>
 
           <View style={styles.resultStats}>
             <View style={[styles.resultStatCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.resultStatNum}>{Math.round(finalAccuracy * 100)}%</Text>
-              <Text style={[styles.resultStatLabel, { color: colors.textMuted }]}>Doğruluk</Text>
+              <Text style={[styles.resultStatLabel, { color: colors.textMuted }]}>{t('accuracy')}</Text>
             </View>
             <View style={[styles.resultStatCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.resultStatNum}>{durationMin < 1 ? '<1' : durationMin}</Text>
-              <Text style={[styles.resultStatLabel, { color: colors.textMuted }]}>Dakika</Text>
+              <Text style={[styles.resultStatLabel, { color: colors.textMuted }]}>{t('minutesLabel')}</Text>
             </View>
             <View style={[styles.resultStatCard, { backgroundColor: colors.surface }]}>
               <Text style={styles.resultStatNum}>{newLevel}/5</Text>
-              <Text style={[styles.resultStatLabel, { color: colors.textMuted }]}>Level</Text>
+              <Text style={[styles.resultStatLabel, { color: colors.textMuted }]}>{t('levelLabel')}</Text>
             </View>
           </View>
 
           <View style={[styles.nextReviewCard, { backgroundColor: 'rgba(196,149,80,0.06)', borderColor: 'rgba(196,149,80,0.2)' }]}>
             <Ionicons name="calendar-outline" size={16} color={ACCENT} />
             <Text style={[styles.nextReviewText, { color: colors.textMuted }]}>
-              Bu ayet {daysNext} gün sonra tekrar edilecek
+              {t('nextReviewDays', { days: daysNext })}
             </Text>
           </View>
 
           <View style={styles.resultBtns}>
             {nextDue && (
               <TouchableOpacity style={styles.primaryBtn} onPress={() => startPractice(nextDue)}>
-                <Text style={styles.primaryBtnText}>Başka Ayet Çalış</Text>
+                <Text style={styles.primaryBtnText}>{t('nextVerse')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -1553,7 +1558,7 @@ export default function MemorizeScreen() {
               onPress={() => { loadProgress(); setView('list'); }}
             >
               <Text style={[styles.primaryBtnText, nextDue && { color: ACCENT }]}>
-                Listeye Dön
+                {t('backToList')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1569,10 +1574,10 @@ export default function MemorizeScreen() {
         <TouchableOpacity onPress={() => setView('list')} style={styles.backBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel="Kapat">
+          accessibilityLabel={t('close')}>
           <Ionicons name="close" size={22} color={colors.textMuted} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Ayet Ekle</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('addVerse')}</Text>
         <View style={{ width: 36 }} />
       </View>
 
@@ -1580,9 +1585,9 @@ export default function MemorizeScreen() {
       <View style={[styles.addTabBar, { borderBottomColor: 'rgba(196,149,80,0.12)' }]}>
         {(
           [
-            ['suggestions', 'Öneriler'],
-            ['favorites', 'Favorilerim'],
-            ['manual', 'Manuel'],
+            ['suggestions', t('suggestions')],
+            ['favorites', t('myFavorites')],
+            ['manual', t('manualEntry')],
           ] as [AddTab, string][]
         ).map(([tab, label]) => (
           <TouchableOpacity
@@ -1631,7 +1636,7 @@ export default function MemorizeScreen() {
                 </View>
                 {added ? (
                   <View style={styles.addedBadge}>
-                    <Text style={styles.addedBadgeText}>Eklendi ✓</Text>
+                    <Text style={styles.addedBadgeText}>{t('addedCheck')}</Text>
                   </View>
                 ) : (
                   <Ionicons name="add-circle-outline" size={24} color={ACCENT} />
@@ -1645,7 +1650,7 @@ export default function MemorizeScreen() {
           (favorites.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-                Favori ayetiniz yok
+                {t('noFavoriteVerses')}
               </Text>
             </View>
           ) : (
@@ -1677,7 +1682,7 @@ export default function MemorizeScreen() {
       </View>
                   {added ? (
                     <View style={styles.addedBadge}>
-                      <Text style={styles.addedBadgeText}>Eklendi ✓</Text>
+                      <Text style={styles.addedBadgeText}>{t('addedCheck')}</Text>
                     </View>
                   ) : (
                     <Ionicons name="add-circle-outline" size={24} color={ACCENT} />
@@ -1690,40 +1695,40 @@ export default function MemorizeScreen() {
         {/* Manual tab */}
         {addTab === 'manual' && (
           <View style={styles.manualForm}>
-            <Text style={[styles.manualLabel, { color: colors.textMuted }]}>Kitap Adı</Text>
+            <Text style={[styles.manualLabel, { color: colors.textMuted }]}>{t('bookNameLabel')}</Text>
             <TextInput
               style={[styles.manualInput, {
                 backgroundColor: colors.surface,
                 color: colors.text,
                 borderColor: 'rgba(196,149,80,0.25)',
               }]}
-              placeholder="örn: Yuhanna"
+              placeholder={t('egBook')}
               placeholderTextColor={colors.textMuted}
               value={manualBook}
               onChangeText={setManualBook}
               autoCorrect={false}
             />
-            <Text style={[styles.manualLabel, { color: colors.textMuted }]}>Bölüm</Text>
+            <Text style={[styles.manualLabel, { color: colors.textMuted }]}>{t('chapter')}</Text>
             <TextInput
               style={[styles.manualInput, {
                 backgroundColor: colors.surface,
                 color: colors.text,
                 borderColor: 'rgba(196,149,80,0.25)',
               }]}
-              placeholder="örn: 3"
+              placeholder={t('egChapter')}
               placeholderTextColor={colors.textMuted}
               value={manualChapter}
               onChangeText={setManualChapter}
               keyboardType="numeric"
             />
-            <Text style={[styles.manualLabel, { color: colors.textMuted }]}>Ayet</Text>
+            <Text style={[styles.manualLabel, { color: colors.textMuted }]}>{t('verse')}</Text>
             <TextInput
               style={[styles.manualInput, {
                 backgroundColor: colors.surface,
                 color: colors.text,
                 borderColor: 'rgba(196,149,80,0.25)',
               }]}
-              placeholder="örn: 16"
+              placeholder={t('egVerse')}
               placeholderTextColor={colors.textMuted}
               value={manualVerse}
               onChangeText={setManualVerse}
@@ -1735,19 +1740,19 @@ export default function MemorizeScreen() {
                 const ch = parseInt(manualChapter, 10);
                 const v = parseInt(manualVerse, 10);
                 if (!manualBook.trim() || isNaN(ch) || isNaN(v)) {
-                  setAddFeedback('Lütfen tüm alanları doldurun.');
+                  setAddFeedback(t('fillAllFields'));
                   return;
                 }
                 const id = makeId(manualBook.trim(), ch, v);
                 const text = getVerseTextByVerseId(id);
                 if (!text) {
-                  setAddFeedback('Ayet bulunamadı. Kitap adını kontrol edin.');
+                  setAddFeedback(t('verseNotFoundCheck'));
                   return;
                 }
                 addVerse(manualBook.trim(), ch, v, text);
               }}
             >
-              <Text style={styles.primaryBtnText}>Ekle</Text>
+              <Text style={styles.primaryBtnText}>{t('add')}</Text>
             </TouchableOpacity>
           </View>
         )}

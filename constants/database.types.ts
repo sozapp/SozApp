@@ -24,6 +24,7 @@ export type Database = {
           premium_expires_at: string | null;
           revenuecat_app_user_id: string | null;
           avatar_url: string | null;
+          push_token: string | null;
         };
         Insert: {
           id: string;
@@ -34,6 +35,7 @@ export type Database = {
           premium_expires_at?: string | null;
           revenuecat_app_user_id?: string | null;
           avatar_url?: string | null;
+          push_token?: string | null;
         };
         Update: {
           id?: string;
@@ -44,6 +46,7 @@ export type Database = {
           premium_expires_at?: string | null;
           revenuecat_app_user_id?: string | null;
           avatar_url?: string | null;
+          push_token?: string | null;
         };
         Relationships: [];
       };
@@ -336,6 +339,94 @@ export type Database = {
           },
         ];
       };
+      prayer_requests: {
+        Row: {
+          id: string;
+          user_id: string;
+          display_name: string;
+          text: string;
+          is_anonymous: boolean;
+          created_at: string;
+          pray_count: number;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          display_name: string;
+          text: string;
+          is_anonymous?: boolean;
+          created_at?: string;
+          pray_count?: number;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          display_name?: string;
+          text?: string;
+          is_anonymous?: boolean;
+          created_at?: string;
+          pray_count?: number;
+        };
+        Relationships: [];
+      };
+      prayer_reactions: {
+        Row: {
+          id: string;
+          prayer_id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          prayer_id: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          prayer_id?: string;
+          user_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'prayer_reactions_prayer_id_fkey';
+            columns: ['prayer_id'];
+            isOneToOne: false;
+            referencedRelation: 'prayer_requests';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      prayer_reports: {
+        Row: {
+          id: string;
+          prayer_id: string;
+          reporter_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          prayer_id: string;
+          reporter_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          prayer_id?: string;
+          reporter_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'prayer_reports_prayer_id_fkey';
+            columns: ['prayer_id'];
+            isOneToOne: false;
+            referencedRelation: 'prayer_requests';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       church_plan_completions: {
         Row: {
           id: string;
@@ -425,6 +516,89 @@ export type Database = {
         };
         Relationships: [];
       };
+      blocked_users: {
+        Row: {
+          id: string;
+          blocker_id: string;
+          blocked_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          blocker_id: string;
+          blocked_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          blocker_id?: string;
+          blocked_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      message_reports: {
+        Row: {
+          id: string;
+          message_id: string;
+          reporter_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          message_id: string;
+          reporter_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          message_id?: string;
+          reporter_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'message_reports_message_id_fkey';
+            columns: ['message_id'];
+            isOneToOne: false;
+            referencedRelation: 'messages';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      plan_invites: {
+        Row: {
+          id: string;
+          inviter_id: string;
+          invitee_id: string;
+          plan_id: string;
+          status: 'pending' | 'accepted' | 'declined';
+          inviter_completed: number;
+          invitee_completed: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          inviter_id: string;
+          invitee_id: string;
+          plan_id: string;
+          status?: 'pending' | 'accepted' | 'declined';
+          inviter_completed?: number;
+          invitee_completed?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          inviter_id?: string;
+          invitee_id?: string;
+          plan_id?: string;
+          status?: 'pending' | 'accepted' | 'declined';
+          inviter_completed?: number;
+          invitee_completed?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -438,6 +612,14 @@ export type Database = {
       };
       submit_game_score: {
         Args: { p_game_id: string; p_score: number; p_display_name: string };
+        Returns: undefined;
+      };
+      increment_pray_count: {
+        Args: { p_prayer_id: string };
+        Returns: undefined;
+      };
+      remove_church_group_member: {
+        Args: { p_group_id: string; p_target_user_id: string };
         Returns: undefined;
       };
     };

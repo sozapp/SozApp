@@ -10,12 +10,11 @@ export type VerseDeepLinkParams = {
 };
 
 /**
- * Uygulama içi deep link (scheme: soz).
- * Örn. soz://read?bookId=joh&chapter=3&verse=16
- *
- * Not: Universal link (https://sozapp.com/read?...) + AASA / Play App Links
- * ayrı altyapı gerektirir — ileride eklenebilir. Şimdilik sadece yüklü
- * uygulamada çalışan custom scheme.
+ * Universal link (https://sozapp.com/read?...) — AASA (iOS) ve Play App Links
+ * (Android) ile yapılandırılmış (bkz. soz-website/.well-known/, app.config.js
+ * associatedDomains/intentFilters). Uygulama yüklüyse doğrudan açılır;
+ * yüklü değilse sozapp.com/read sayfasındaki mağaza linklerine düşer —
+ * bu yüzden ham "soz://" şemasından daha güvenilir bir paylaşım linki.
  */
 export function buildVerseDeepLink(params: VerseDeepLinkParams): string {
   const q = new URLSearchParams({
@@ -23,7 +22,7 @@ export function buildVerseDeepLink(params: VerseDeepLinkParams): string {
     chapter: String(params.chapter),
     verse: String(params.verse),
   });
-  return `soz://read?${q.toString()}`;
+  return `https://sozapp.com/read?${q.toString()}`;
 }
 
 export function resolveBookIdForShare(bookName: string): string | null {

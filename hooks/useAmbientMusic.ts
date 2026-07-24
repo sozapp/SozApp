@@ -151,9 +151,6 @@ export function useAmbientMusicInternal() {
 
         const track = AMBIENT_TRACKS.find((t) => t.id === trackId);
         if (!track || !track.source) {
-          if (__DEV__) {
-            console.log('Ambient: ses dosyası yok, track:', trackId);
-          }
           setActiveTrackId(trackId);
           setIsPlaying(false);
           await AsyncStorage.setItem(STORAGE_TRACK, trackId);
@@ -179,7 +176,7 @@ export function useAmbientMusicInternal() {
         setIsPlaying(true);
         await AsyncStorage.setItem(STORAGE_TRACK, trackId);
       } catch (e) {
-        if (__DEV__) console.log('Audio error:', e);
+        console.warn('Audio error:', e);
         setIsPlaying(false);
       }
     },
