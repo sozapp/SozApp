@@ -874,7 +874,17 @@ CREATE TRIGGER messages_rate_limit
   EXECUTE FUNCTION public.check_message_rate_limit();
 
 -- Postgres Changes ile anlık teslimat için tabloyu realtime yayınına ekle.
-ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+-- ALTER PUBLICATION ... ADD TABLE'ın IF NOT EXISTS'i yok (PG sürümüne göre
+-- değişken) — dosya tekrar çalıştırılabilsin diye DO bloğuyla kontrol ediyoruz.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+  END IF;
+END $$;
 
 -- Expo push token — cihaz bildirim izni verdiyse profiles'a yazılır;
 -- send-push edge function mesaj / arkadaşlık isteği için bu token'ı kullanır.
