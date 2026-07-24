@@ -948,3 +948,17 @@ CREATE POLICY "waitlist_insert" ON waitlist FOR INSERT
   WITH CHECK (auth.uid() IS NULL);
 -- Not: auth.uid() IS NULL → sadece anon (giriş yapmamış) istemciler yazabilir,
 -- bu tablo web sitesinden geliyor, uygulama içinden kullanılmıyor.
+
+-- Bekleme listesi sayacı — sadece toplam sayıyı döner, hiçbir e-posta/satır
+-- açığa çıkarmaz. Site anon key ile bu RPC'yi çağırıp sosyal kanıt sayacı
+-- gösteriyor (bkz. soz-website/index.html #waitlist-count).
+CREATE OR REPLACE FUNCTION public.get_waitlist_count()
+RETURNS INTEGER
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COUNT(*)::INTEGER FROM waitlist;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_waitlist_count() TO anon;
