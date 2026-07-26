@@ -76,8 +76,8 @@ const QUICK_FOLLOWUPS = [
   { label: 'Basitçe açıkla', send: 'Aynı konuyu daha basit kelimelerle ve kısaca açıkla.' },
 ];
 
-function parseVerseRefs(text: string): Array<{ type: 'text'; value: string } | { type: 'ref'; value: string }> {
-  const parts: Array<{ type: 'text'; value: string } | { type: 'ref'; value: string }> = [];
+function parseVerseRefs(text: string): ({ type: 'text'; value: string } | { type: 'ref'; value: string })[] {
+  const parts: ({ type: 'text'; value: string } | { type: 'ref'; value: string })[] = [];
   let lastIndex = 0;
   let m: RegExpExecArray | null;
   const re = new RegExp(VERSE_REGEX.source, 'g');

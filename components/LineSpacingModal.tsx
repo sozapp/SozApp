@@ -42,12 +42,12 @@ export function LineSpacingModal({
   const slideAnim = useRef(new Animated.Value(SHEET_MAX)).current;
   const closingRef = useRef(false);
 
-  const spacingOptions: Array<{
+  const spacingOptions: {
     id: LineSpacingId;
     name: string;
     lineHeight: number;
     description: string;
-  }> = useMemo(
+  }[] = useMemo(
     () => [
       { id: 'normal', name: t('spacingNormal'), lineHeight: SPACING_LINE_HEIGHTS.normal, description: t('spacingDescNormal') },
       { id: 'wide', name: t('spacingWide'), lineHeight: SPACING_LINE_HEIGHTS.wide, description: t('spacingDescWide') },

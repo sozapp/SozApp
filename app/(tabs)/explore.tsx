@@ -416,8 +416,7 @@ export default function ExploreScreen() {
   );
 
   const searchResults = useMemo(() => {
-    if (!isSearching) return [] as Array<
-      | {
+    if (!isSearching) return [] as (| {
           type: 'game';
           title: string;
           route: string;
@@ -434,8 +433,7 @@ export default function ExploreScreen() {
           title: string;
           icon: keyof typeof Ionicons.glyphMap;
           item: WatchItem;
-        }
-    >;
+        })[];
     const needle = searchText.toLowerCase();
     return [
       ...GAMES.filter((g) => g.title.toLowerCase().includes(needle)).map((g) => ({

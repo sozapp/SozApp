@@ -18,7 +18,7 @@ import type { RouterAction } from 'expo-quick-actions/router';
 import { useQuickActionRouting } from 'expo-quick-actions/router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef } from 'react';
-import { Modal, Platform, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, Text, TouchableOpacity, View , Animated, StyleSheet } from 'react-native';
 import { identifyAnalyticsUser, resetAnalyticsUser } from '@/constants/analytics';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
 import { initPurchases } from '@/constants/purchases';
@@ -28,7 +28,6 @@ import { registerPushTokenForUser } from '@/hooks/useNotifications';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
-import { Animated, StyleSheet } from 'react-native';
 
 const LAST_SYNC_KEY = '@soz/lastSyncTime';
 const LAST_AUTH_USER_KEY = '@soz/lastAuthUserId';

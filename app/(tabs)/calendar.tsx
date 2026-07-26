@@ -21,10 +21,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const GRID_W = Dimensions.get('window').width - 32;
 const CELL_W = GRID_W / 7;
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MONTH_KEYS: TranslationKey[] = [
   'monthJan', 'monthFeb', 'monthMar', 'monthApr', 'monthMay', 'monthJun',

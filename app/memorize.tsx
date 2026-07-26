@@ -123,7 +123,7 @@ function levenshtein(a: string, b: string): number {
 function compareWords(
   expected: string,
   actual: string
-): { accuracy: number; words: Array<{ word: string; status: WordStatus }> } {
+): { accuracy: number; words: { word: string; status: WordStatus }[] } {
   const expWords = normalizeText(expected).split(' ').filter(Boolean);
   const actWords = normalizeText(actual).split(' ').filter(Boolean);
   let score = 0;
@@ -164,7 +164,7 @@ function normalizeWord(text: string): string {
 
 type FillPuzzle = {
   words: string[];
-  blanks: Array<{ index: number; answer: string }>;
+  blanks: { index: number; answer: string }[];
   blankIndices: Set<number>;
   options: string[];
   filled: Record<number, string>;
@@ -647,7 +647,7 @@ export default function MemorizeScreen() {
   const [typedText, setTypedText] = useState('');
   const [checkResult, setCheckResult] = useState<{
     accuracy: number;
-    words: Array<{ word: string; status: WordStatus }>;
+    words: { word: string; status: WordStatus }[];
   } | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -721,7 +721,7 @@ export default function MemorizeScreen() {
       // Migrate from old memorize-storage format
       const oldRaw = await AsyncStorage.getItem('@soz/memorizeList');
       if (oldRaw) {
-        const old: Array<{ verseId: string; ref: string; text: string }> = JSON.parse(oldRaw);
+        const old: { verseId: string; ref: string; text: string }[] = JSON.parse(oldRaw);
         let changed = false;
         for (const item of old) {
           if (!prog[item.verseId]) {

@@ -164,7 +164,7 @@ function getVerseId(book: string, chapterNumber: number, verseNumber: number): s
 const saveToHistory = async (book: string, chapter: number) => {
   try {
     const raw = await AsyncStorage.getItem('@soz/readingHistory');
-    const history = raw ? (JSON.parse(raw) as Array<Record<string, unknown>>) : [];
+    const history = raw ? (JSON.parse(raw) as Record<string, unknown>[]) : [];
 
     const existing = history.findIndex(
       (h) => h.book === book && Number(h.chapter) === chapter
@@ -374,7 +374,7 @@ export default function ReadScreen() {
 
   const currentPsalm = isPsalmMode ? getPsalmByNumber(psalmNumbers[selectedPsalmIndex]) : null;
   const currentBook = isPsalmMode
-    ? { id: 'psalms', name: 'Mezmurlar', shortName: 'Mez', chapters: [] as Array<{ chapter: number; verses: Array<{ verse: number; text: string }> }> }
+    ? { id: 'psalms', name: 'Mezmurlar', shortName: 'Mez', chapters: [] as { chapter: number; verses: { verse: number; text: string }[] }[] }
     : newTestament[bookIndex] ?? newTestament[0];
   const safeBookChapters = useMemo(() => currentBook?.chapters ?? [], [currentBook]);
   const safeCurrentChapterInBook = useMemo(
@@ -391,7 +391,7 @@ export default function ReadScreen() {
           chapter: chapterIndexInBook + 1,
           verses: safeCurrentChapterInBook?.verses ?? [],
         }
-      : { chapter: 1, verses: [] as Array<{ verse: number; text: string }> };
+      : { chapter: 1, verses: [] as { verse: number; text: string }[] };
   const chapterVerses = currentChapterData?.verses ?? [];
 
   const chapter = useMemo(() => {
@@ -1572,7 +1572,7 @@ export default function ReadScreen() {
   }, []);
 
   const onViewableItemsChanged = useCallback(
-    (info: { viewableItems: Array<{ item: VerseItem; index: number | null }> }) => {
+    (info: { viewableItems: { item: VerseItem; index: number | null }[] }) => {
       const items = info.viewableItems;
       const verseIds = items.map((v) =>
         getVerseId(listChapter.book, listChapter.chapterNumber, v.item.number)

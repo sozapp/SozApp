@@ -38,14 +38,14 @@ type MoodAnalysis = {
   emotion: string;
   intensity: string;
   need: string;
-  verses: Array<{
+  verses: {
     ref: string;
     book: string;
     chapter: number;
     verseNum: number;
     text: string;
     reason: string;
-  }>;
+  }[];
   encouragement: string;
 };
 

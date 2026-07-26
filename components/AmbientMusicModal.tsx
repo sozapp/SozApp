@@ -315,7 +315,6 @@ export default function AmbientMusicModal({ visible, onClose }: AmbientMusicModa
                         ]}
                       >
                         <Ionicons
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           name={track.icon as any}
                           size={24}
                           color={active ? ACCENT : colors.textSecondary}
