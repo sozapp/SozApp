@@ -63,7 +63,6 @@ export default {
         },
       ],
       '@sentry/react-native/expo',
-      'expo-widgets',
       [
         './widgets/plugin',
         {
