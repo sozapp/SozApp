@@ -7,7 +7,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Svg, { Circle } from 'react-native-svg';
 import {
   Animated,
@@ -17,6 +17,7 @@ import {
   Image,
   Linking,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   RefreshControl,
@@ -645,6 +646,27 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
       textAlign: 'center',
       marginBottom: 16,
     },
+    sheetHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    guestNudge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 0.5,
+      borderColor: `${ACCENT}40`,
+      backgroundColor: `${ACCENT}10`,
+    },
+    guestNudgeText: {
+      flex: 1,
+      fontSize: 13,
+      color: colors.text,
+      fontFamily: fonts.regular,
+    },
     sheetRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -709,13 +731,20 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
       marginTop: 20,
     },
     saveBtnText: { fontSize: 16, color: '#fff', fontFamily: fonts.medium },
-    cancelBtn: { alignItems: 'center', paddingVertical: 16 },
     badgeTipBox: {
       marginHorizontal: 24,
       padding: 24,
+      paddingTop: 14,
       borderRadius: 16,
       backgroundColor: colors.surface,
       alignItems: 'center',
+    },
+    badgeTipHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border,
+      marginBottom: 14,
     },
     badgeTipName: { fontSize: 18, color: colors.text, fontFamily: fonts.medium, marginBottom: 8 },
     badgeTipDesc: { fontSize: 14, color: colors.textMuted, textAlign: 'center', fontFamily: fonts.regular },
@@ -777,6 +806,33 @@ export default function ProfileScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editNameDraft, setEditNameDraft] = useState('');
   const [badgeTip, setBadgeTip] = useState<Badge | null>(null);
+  const badgeTipTranslateY = useRef(new Animated.Value(0)).current;
+  const dismissBadgeTip = useCallback(() => {
+    Animated.timing(badgeTipTranslateY, {
+      toValue: 400,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      setBadgeTip(null);
+      badgeTipTranslateY.setValue(0);
+    });
+  }, [badgeTipTranslateY]);
+  const badgeTipPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderMove: (_, g) => {
+        if (g.dy > 0) badgeTipTranslateY.setValue(g.dy);
+      },
+      onPanResponderRelease: (_, g) => {
+        if (g.dy > 80 || g.vy > 0.8) {
+          dismissBadgeTip();
+        } else {
+          Animated.spring(badgeTipTranslateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+      },
+    })
+  ).current;
   const [savingProfile, setSavingProfile] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showSpacingPicker, setShowSpacingPicker] = useState(false);
@@ -1683,21 +1739,6 @@ export default function ProfileScreen() {
             </Pressable>
             <Pressable
               style={styles.row}
-              onPress={() => setDenomModalVisible(true)}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('denomination')}: ${denomName}`}
-            >
-              <View style={styles.rowIcon}>
-                <Ionicons name="triangle-outline" size={18} color={ACCENT} />
-              </View>
-              <View style={styles.rowBody}>
-                <Text style={styles.rowTitle}>{t('denomination')}</Text>
-                <Text style={styles.rowSub}>{denomName}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </Pressable>
-            <Pressable
-              style={styles.row}
               onPress={() => router.push('/church')}
               accessibilityRole="button"
               accessibilityLabel={`${t('churchGroupSetting')}: ${churchGroupName ?? t('noneLabel')}`}
@@ -1760,10 +1801,10 @@ export default function ProfileScreen() {
                 accessibilityLabel={t('dailyReminder')}
                 accessibilityState={{ checked: dailyReminder }}
                 trackColor={{
-                  false: colors.border,
-                  true: 'rgba(196,149,80,0.4)',
+                  false: colors.borderStrong,
+                  true: ACCENT,
                 }}
-                thumbColor={dailyReminder ? ACCENT : colors.surface}
+                thumbColor={dailyReminder ? "#FFF8EE" : "#FFFFFF"}
               />
             </View>
             {dailyReminder && (
@@ -1799,10 +1840,10 @@ export default function ProfileScreen() {
                 accessibilityLabel={t('streakNotif')}
                 accessibilityState={{ checked: streakNotif }}
                 trackColor={{
-                  false: colors.border,
-                  true: 'rgba(196,149,80,0.4)',
+                  false: colors.borderStrong,
+                  true: ACCENT,
                 }}
-                thumbColor={streakNotif ? ACCENT : colors.surface}
+                thumbColor={streakNotif ? "#FFF8EE" : "#FFFFFF"}
               />
             </View>
           </View>
@@ -1935,10 +1976,10 @@ export default function ProfileScreen() {
                 accessibilityLabel={t('appLockTitle')}
                 accessibilityState={{ checked: appLockEnabled }}
                 trackColor={{
-                  false: colors.border,
-                  true: 'rgba(196,149,80,0.4)',
+                  false: colors.borderStrong,
+                  true: ACCENT,
                 }}
-                thumbColor={appLockEnabled ? ACCENT : colors.surface}
+                thumbColor={appLockEnabled ? "#FFF8EE" : "#FFFFFF"}
               />
             </View>
 
@@ -1957,10 +1998,10 @@ export default function ProfileScreen() {
                 accessibilityLabel={t('analyticsTitle')}
                 accessibilityState={{ checked: analyticsEnabled }}
                 trackColor={{
-                  false: colors.border,
-                  true: 'rgba(196,149,80,0.4)',
+                  false: colors.borderStrong,
+                  true: ACCENT,
                 }}
-                thumbColor={analyticsEnabled ? ACCENT : colors.surface}
+                thumbColor={analyticsEnabled ? "#FFF8EE" : "#FFFFFF"}
               />
             </View>
 
@@ -2297,7 +2338,17 @@ export default function ProfileScreen() {
             accessibilityRole="summary"
             accessibilityLabel={t('editProfile')}
           >
-            <Text style={styles.sheetTitle}>{t('editProfile')}</Text>
+            <View style={styles.sheetHeaderRow}>
+              <Text style={[styles.sheetTitle, { flex: 1 }]}>{t('editProfile')}</Text>
+              <Pressable
+                onPress={() => setEditModalVisible(false)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('close')}
+              >
+                <Ionicons name="close" size={20} color={colors.textMuted} />
+              </Pressable>
+            </View>
             <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('nameLabel')}</Text>
             <TextInput
               style={[styles.input, { color: colors.text }]}
@@ -2306,12 +2357,33 @@ export default function ProfileScreen() {
               placeholder={t('yourNamePlaceholder')}
               placeholderTextColor={colors.textMuted}
             />
-            <Text style={[styles.inputLabel, { color: colors.textMuted, marginTop: 12 }]}>{t('emailLabel')}</Text>
-            <TextInput
-              style={[styles.input, styles.inputDisabled]}
-              value={userEmail ?? '—'}
-              editable={false}
-            />
+            {userEmail ? (
+              <>
+                <Text style={[styles.inputLabel, { color: colors.textMuted, marginTop: 12 }]}>
+                  {t('emailLabel')}
+                </Text>
+                <TextInput
+                  style={[styles.input, styles.inputDisabled]}
+                  value={userEmail}
+                  editable={false}
+                />
+              </>
+            ) : (
+              <Pressable
+                style={styles.guestNudge}
+                onPress={() => {
+                  setEditModalVisible(false);
+                  router.push('/auth');
+                }}
+                accessibilityRole="button"
+              >
+                <Ionicons name="person-add-outline" size={18} color={ACCENT} />
+                <Text style={styles.guestNudgeText}>
+                  Verilerini kaydetmek için giriş yap veya kayıt ol
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </Pressable>
+            )}
             <Pressable
               style={styles.saveBtn}
               onPress={saveEditProfile}
@@ -2321,14 +2393,6 @@ export default function ProfileScreen() {
             >
               <Text style={styles.saveBtnText}>{savingProfile ? t('savingEllipsis') : t('save')}</Text>
             </Pressable>
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={() => setEditModalVisible(false)}
-              accessibilityRole="button"
-              accessibilityLabel={t('cancel')}
-            >
-              <Text style={[styles.rowValue, { color: colors.textMuted }]}>{t('cancel')}</Text>
-            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -2336,16 +2400,15 @@ export default function ProfileScreen() {
       <Modal visible={badgeTip != null} transparent animationType="fade">
         <Pressable
           style={styles.overlay}
-          onPress={() => setBadgeTip(null)}
+          onPress={dismissBadgeTip}
           accessibilityRole="button"
           accessibilityLabel="Rozet bilgisini kapat"
         >
-          <Pressable
-            style={styles.badgeTipBox}
-            onPress={(e) => e.stopPropagation()}
-            accessibilityRole="summary"
-            accessibilityLabel={badgeTip ? badgeTip.name : 'Rozet bilgisi'}
+          <Animated.View
+            style={[styles.badgeTipBox, { transform: [{ translateY: badgeTipTranslateY }] }]}
+            {...badgeTipPanResponder.panHandlers}
           >
+            <View style={styles.badgeTipHandle} />
             {badgeTip ? (
               <>
                 <View style={{ marginBottom: 8 }}>
@@ -2355,7 +2418,7 @@ export default function ProfileScreen() {
                 <Text style={styles.badgeTipDesc}>{badgeTip.description}</Text>
               </>
             ) : null}
-          </Pressable>
+          </Animated.View>
         </Pressable>
       </Modal>
 

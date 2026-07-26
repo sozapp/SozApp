@@ -7,7 +7,7 @@ import { supabase } from '@/constants/supabase';
 import { trackEvent } from '@/constants/analytics';
 import { Ionicons } from '@expo/vector-icons';
 import { useHaptics } from '@/hooks/useHaptics';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -44,13 +44,14 @@ export default function AuthScreen() {
   const { t } = useTranslation();
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const router = useRouter();
+  const params = useLocalSearchParams<{ mode?: string }>();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup'>(params.mode === 'signup' ? 'signup' : 'signin');
 
   const handleSignUp = async () => {
     const n = name.trim();

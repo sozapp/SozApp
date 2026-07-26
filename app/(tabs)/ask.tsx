@@ -446,9 +446,10 @@ export default function AskScreen() {
             'Giriş gerekiyor',
             'Söz\'e Sor özelliğini kullanmak için giriş yapmanız gerekiyor.',
             [
-              { text: 'İptal', style: 'cancel' },
-              { text: 'Giriş Yap', onPress: () => router.push('/auth') },
-            ]
+              { text: 'Kayıt Ol', style: 'cancel', onPress: () => router.push('/auth?mode=signup') },
+              { text: 'Giriş Yap', onPress: () => router.push('/auth?mode=signin') },
+            ],
+            true
           );
         } else if (msg === 'DAILY_LIMIT_REACHED') {
           const used =
@@ -635,10 +636,15 @@ export default function AskScreen() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : '';
       if (msg === 'SUPABASE_NOT_CONFIGURED' || msg === 'AUTH_REQUIRED') {
-        showAlert('Giriş gerekiyor', 'Sesli soru için giriş yapmanız gerekiyor.', [
-          { text: 'İptal', style: 'cancel' },
-          { text: 'Giriş Yap', onPress: () => router.push('/auth') },
-        ]);
+        showAlert(
+          'Giriş gerekiyor',
+          'Sesli soru için giriş yapmanız gerekiyor.',
+          [
+            { text: 'Kayıt Ol', style: 'cancel', onPress: () => router.push('/auth?mode=signup') },
+            { text: 'Giriş Yap', onPress: () => router.push('/auth?mode=signin') },
+          ],
+          true
+        );
       } else {
         showAlert('Hata', 'Ses metne çevrilemedi, tekrar dener misin?');
       }
@@ -1031,6 +1037,9 @@ export default function AskScreen() {
                 </Svg>
               </View>
               <Text style={[styles.msgSheetTitle, { color: colors.text }]}>Söz Cevabı</Text>
+              <TouchableOpacity onPress={closeMsgActions} hitSlop={10} style={styles.msgSheetCloseBtn}>
+                <Ionicons name="close" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
             </View>
             <Text style={[styles.msgSheetPreview, { color: colors.textMuted }]} numberOfLines={3}>
               {selectedMsg}
@@ -1092,9 +1101,6 @@ export default function AskScreen() {
               </View>
               <Text style={[styles.msgSheetActionText, { color: colors.text }]}>Kaydet</Text>
               <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.msgSheetCancel} onPress={closeMsgActions} activeOpacity={0.8}>
-              <Text style={[styles.msgSheetCancelText, { color: colors.textMuted }]}>İptal</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -1500,9 +1506,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   msgSheetTitle: {
+    flex: 1,
     fontSize: 15,
     fontFamily: fonts.medium,
     letterSpacing: -0.01,
+  },
+  msgSheetCloseBtn: {
+    padding: 4,
   },
   msgSheetPreview: {
     fontSize: 13,
@@ -1539,20 +1549,6 @@ const styles = StyleSheet.create({
   },
   msgSheetActionText: {
     flex: 1,
-    fontSize: 15,
-    fontFamily: fonts.regular,
-  },
-  msgSheetCancel: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingVertical: 14,
-    backgroundColor: `${ACCENT}0F`,
-    borderRadius: 12,
-    borderWidth: 0.5,
-    borderColor: `${ACCENT}26`,
-    alignItems: 'center',
-  },
-  msgSheetCancelText: {
     fontSize: 15,
     fontFamily: fonts.regular,
   },

@@ -19,7 +19,6 @@ import {
   getTTSLanguage,
   STORAGE_BIBLE_VERSION,
   STORAGE_PARALLEL_EN,
-  VERSION_LABELS,
 } from '@/constants/bibleVersions';
 import { newTestament } from '@/constants/new-testament';
 import { FREE_LIMITS } from '@/constants/premium';
@@ -57,7 +56,6 @@ import {
   Modal,
   PanResponder,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -252,7 +250,7 @@ function ListeningDot() {
 export default function ReadScreen() {
   useAnalyticsScreen('read');
   const { theme } = useTheme();
-  const { t: tx } = useTranslation();
+  const { t: tx, language: appLanguage } = useTranslation();
   const [bookIndex, setBookIndex] = useState(0);
   const [chapterIndexInBook, setChapterIndexInBook] = useState(0);
   const [bookPickerVisible, setBookPickerVisible] = useState(false);
@@ -336,7 +334,6 @@ export default function ReadScreen() {
   const doubleTapHeartScale = useRef(new Animated.Value(0)).current;
   const doubleTapHeartOpacity = useRef(new Animated.Value(0)).current;
   const [doubleTapHeartVisible, setDoubleTapHeartVisible] = useState(false);
-  const [scrollProgress, setScrollProgress] = useState(0);
   const [visibleVerseIndex, setVisibleVerseIndex] = useState(1);
   const [loading, setLoading] = useState(true);
   const contentHeightRef = useRef(0);
@@ -352,6 +349,8 @@ export default function ReadScreen() {
   const lastProgressRef = useRef(0);
   const isScrollingDown = useRef(false);
   const isTransitioning = useRef(false);
+  /** Bölümler arası kaydırarak geçişte kaydedilmiş konumu yok sayıp her zaman en yukarıdan başlat. */
+  const forceTopOnChapterChangeRef = useRef(false);
 
   // Sayfa çevirme animasyonu
   const [isPageTurning, setIsPageTurning] = useState(false);
@@ -685,6 +684,18 @@ export default function ReadScreen() {
     }
   }, [isPsalmMode]);
 
+  // Uygulama Türkçe ise sadece Türkçe çeviriler, değilse sadece İngilizce çeviriler gösterilir.
+  const mainVersions = useMemo<BibleVersion[]>(
+    () => (appLanguage === 'tr' ? ['TR', 'TR_1878'] : ['WEB', 'KJV']),
+    [appLanguage]
+  );
+
+  useEffect(() => {
+    if (!mainVersions.includes(bibleVersion)) {
+      setBibleVersion(mainVersions[0]);
+    }
+  }, [mainVersions, bibleVersion]);
+
   const lineSpacingMult = LINE_SPACING_MULT[lineSpacing];
   const verseRowEstimate = Math.max(
     72,
@@ -790,6 +801,16 @@ export default function ReadScreen() {
     readProgressAnim.setValue(0);
     lastProgressRef.current = 0;
     setTappedVerseId(null);
+
+    // "Bir sonraki bölüme geç" akışından geldiysek her zaman en yukarıdan
+    // başla — kaydedilmiş konum (varsa) burada bilerek yok sayılıyor,
+    // aksi halde daha önce o bölümde durulmuş bir yerden devam ediyordu.
+    if (forceTopOnChapterChangeRef.current) {
+      forceTopOnChapterChangeRef.current = false;
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      return;
+    }
+
     const posKey = `@soz/readPosition/${currentBook.id}/${chapter.chapterNumber}`;
     let cancelled = false;
     AsyncStorage.getItem(posKey).then((raw) => {
@@ -1011,8 +1032,18 @@ export default function ReadScreen() {
     isTransitioning.current = true;
     hapticPageTurn();
     animatePageTurn('next', () => {
+      forceTopOnChapterChangeRef.current = true;
       goNextChapter();
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      // FlatList'in yeni bölümün verisiyle yeniden render olması bir sonraki
+      // frame'e kadar sürebiliyor — hemen scrollToOffset çağırmak eski
+      // (uzun) bölümün ölçümlerine göre çalışıp yanlış bir konuma
+      // (bazen en alta) kilitlenmesine yol açıyordu. Çift rAF ile commit'i
+      // bekleyip öyle sıfırlıyoruz.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        });
+      });
       setPullUpAmount(0);
       setTimeout(() => {
         isTransitioning.current = false;
@@ -1476,25 +1507,19 @@ export default function ReadScreen() {
       contentHeightRef.current = contentSize.height;
       layoutHeightRef.current = layoutMeasurement.height;
       const p = maxOffset > 0 ? Math.min(1, Math.max(0, currentOffset / maxOffset)) : 0;
-      setScrollProgress(p);
 
-      // Scroll-bazlı progress bar güncelleme (viewable items'dan daha kararlı)
+      // Scroll-bazlı progress bar güncelleme (viewable items'dan daha kararlı).
+      // Her scroll frame'inde zaten güncel bir değer geldiği için ayrıca animasyon
+      // kuyruklamak (Animated.timing) art arda gelen frame'lerde birbirini iptal
+      // edip kekemelik yaratıyordu — doğrudan setValue ile pürüzsüz takip ediyoruz.
       if (maxOffset > 0) {
-        if (Math.abs(p - lastProgressRef.current) > 0.005) {
+        if (Math.abs(p - lastProgressRef.current) > 0.002) {
           lastProgressRef.current = p;
-          Animated.timing(readProgressAnim, {
-            toValue: p,
-            duration: 100,
-            useNativeDriver: false,
-          }).start();
+          readProgressAnim.setValue(p);
         }
       } else if (contentSize.height > 0 && lastProgressRef.current !== 1) {
         lastProgressRef.current = 1;
-        Animated.timing(readProgressAnim, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: false,
-        }).start();
+        readProgressAnim.setValue(1);
       }
 
       const atBottom = currentOffset >= maxOffset - 50;
@@ -1565,8 +1590,11 @@ export default function ReadScreen() {
   const onContentSizeChange = useCallback((_w: number, h: number) => {
     contentHeightRef.current = h;
     const maxScroll = Math.max(0, h - layoutHeightRef.current);
-    if (maxScroll <= 0) setScrollProgress(0);
-  }, []);
+    if (maxScroll <= 0) {
+      lastProgressRef.current = 0;
+      readProgressAnim.setValue(0);
+    }
+  }, [readProgressAnim]);
   const onLayoutList = useCallback((e: { nativeEvent: { layout: { height: number } } }) => {
     layoutHeightRef.current = e.nativeEvent.layout.height;
   }, []);
@@ -2138,99 +2166,6 @@ export default function ReadScreen() {
           </View>
         </View>
 
-        {!isPsalmMode && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={[styles.versionBar, { borderBottomColor: theme.border, overflow: 'visible', flexGrow: 0 }]}
-            contentContainerStyle={styles.versionBarContent}
-          >
-            {(['TR', 'TR_1878', 'WEB', 'KJV'] as BibleVersion[]).map((v) => (
-              <TouchableOpacity
-                key={v}
-                style={[
-                  styles.versionBtn,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                  bibleVersion === v && styles.versionBtnActive,
-                ]}
-                onPress={() => {
-                  setBibleVersion(v);
-                  void Haptics.selectionAsync();
-                }}
-                activeOpacity={0.85}
-              >
-                <Text
-                  style={[
-                    styles.versionBtnText,
-                    { color: theme.textMuted },
-                    bibleVersion === v && styles.versionBtnTextActive,
-                  ]}
-                >
-                  {VERSION_LABELS[v]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={[
-                styles.versionBtn,
-                styles.parallelVersionBtn,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-                parallelRead && styles.versionBtnActive,
-              ]}
-              onPress={() => {
-                setParallelRead((p) => !p);
-                void Haptics.selectionAsync();
-              }}
-              activeOpacity={0.85}
-            >
-              <Text
-                style={[
-                  styles.versionBtnText,
-                  { color: theme.textMuted },
-                  parallelRead && styles.versionBtnTextActive,
-                ]}
-              >
-                Paralel
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
-        )}
-        {parallelRead && !isPsalmMode && (
-          <View
-            style={[
-              styles.parallelEnRow,
-              { backgroundColor: theme.surface, borderBottomColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.parallelEnLabel, { color: theme.textMuted }]}>EN</Text>
-            {(['WEB', 'KJV'] as const).map((v) => (
-              <TouchableOpacity
-                key={v}
-                style={[
-                  styles.versionBtn,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                  parallelEnVersion === v && styles.versionBtnActive,
-                ]}
-                onPress={() => {
-                  setParallelEnVersion(v);
-                  void Haptics.selectionAsync();
-                }}
-                activeOpacity={0.85}
-              >
-                <Text
-                  style={[
-                    styles.versionBtnText,
-                    { color: theme.textMuted },
-                    parallelEnVersion === v && styles.versionBtnTextActive,
-                  ]}
-                >
-                  {VERSION_LABELS[v]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
         <TouchableOpacity
           onPress={toggleToolbar}
           style={{
@@ -2708,9 +2643,19 @@ export default function ReadScreen() {
             style={[styles.bookPickerContent, { backgroundColor: theme.surface }]}
             onPress={(e) => e.stopPropagation()}
           >
-            <Text style={[styles.bookPickerTitle, { color: theme.text }]}>
-              {tx('chooseBookTitle')}
-            </Text>
+            <View style={styles.bookPickerHeaderRow}>
+              <Text style={[styles.bookPickerTitle, { color: theme.text, flex: 1 }]}>
+                {tx('chooseBookTitle')}
+              </Text>
+              <Pressable
+                onPress={() => setBookPickerVisible(false)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={tx('close')}
+              >
+                <Ionicons name="close" size={20} color={theme.textMuted} />
+              </Pressable>
+            </View>
             <FlatList
               data={[
                 { type: 'header' as const, label: tx('newTestamentProgress') },
@@ -3580,6 +3525,10 @@ const styles = StyleSheet.create({
     padding: 16,
     maxHeight: '80%',
     marginHorizontal: 24,
+  },
+  bookPickerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   bookPickerTitle: {
     fontFamily: fonts.medium,

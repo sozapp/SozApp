@@ -143,7 +143,12 @@ export default function ShareVerseModal({
 
             <View style={{ gap: 16, paddingBottom: 12 }}>
               {/* Başlık */}
-              <Text style={styles.sheetTitle}>AYET KARTINI PAYLAŞ</Text>
+              <View style={styles.sheetHeaderRow}>
+                <Text style={styles.sheetTitle}>AYET KARTINI PAYLAŞ</Text>
+                <TouchableOpacity onPress={onClose} hitSlop={10} style={styles.sheetCloseBtn}>
+                  <Ionicons name="close" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
 
               {/* Kart önizleme */}
               <View style={{ alignItems: 'center' }}>
@@ -241,11 +246,6 @@ export default function ShareVerseModal({
                   <Text style={styles.btnSecondaryText}>Metin</Text>
                 </TouchableOpacity>
               </View>
-
-              {/* İptal */}
-              <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
-                <Text style={[styles.cancelText, { color: colors.textMuted }]}>İptal</Text>
-              </TouchableOpacity>
             </View>
           </SafeAreaView>
         </Animated.View>
@@ -279,12 +279,20 @@ const makeStyles = (colors: { background: string; textMuted: string; border: str
       alignSelf: 'center',
       marginBottom: 20,
     },
+    sheetHeaderRow: {
+      justifyContent: 'center',
+    },
     sheetTitle: {
       fontSize: 11,
       letterSpacing: 0.2,
       color: '#C4956A',
       fontFamily: fonts.medium,
       textAlign: 'center',
+    },
+    sheetCloseBtn: {
+      position: 'absolute',
+      right: 0,
+      top: -4,
     },
     shotWrap: {
       borderRadius: 12,
@@ -399,15 +407,6 @@ const makeStyles = (colors: { background: string; textMuted: string; border: str
     btnSecondaryText: {
       fontSize: 14,
       color: '#C4956A',
-      fontFamily: fonts.regular,
-    },
-    cancelBtn: {
-      alignItems: 'center',
-      paddingVertical: 6,
-      marginBottom: 4,
-    },
-    cancelText: {
-      fontSize: 13,
       fontFamily: fonts.regular,
     },
   });

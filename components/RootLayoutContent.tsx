@@ -18,7 +18,7 @@ import type { RouterAction } from 'expo-quick-actions/router';
 import { useQuickActionRouting } from 'expo-quick-actions/router';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef } from 'react';
-import { Modal, Platform, Text, TouchableOpacity, View , Animated, StyleSheet } from 'react-native';
+import { Modal, Platform, Share, Text, TouchableOpacity, View , Animated, StyleSheet } from 'react-native';
 import { identifyAnalyticsUser, resetAnalyticsUser } from '@/constants/analytics';
 import { isOnboardingCompleteInStorage } from '@/constants/onboarding-storage';
 import { initPurchases } from '@/constants/purchases';
@@ -95,7 +95,7 @@ export function RootLayoutContent() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const modalOpacityAnim = useRef(new Animated.Value(0)).current;
   const modalScaleAnim = useRef(new Animated.Value(1)).current;
-  const confettiAnims = useRef(Array.from({ length: 10 }, () => new Animated.Value(0))).current;
+  const confettiAnims = useRef(Array.from({ length: 18 }, () => new Animated.Value(0))).current;
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
   const confettiLoopsRef = useRef<Animated.CompositeAnimation[]>([]);
 
@@ -454,8 +454,11 @@ export function RootLayoutContent() {
             <BlurView intensity={20} style={StyleSheet.absoluteFillObject} />
             {!reduceMotion
               ? confettiAnims.map((anim, idx) => {
-                  const startX = 12 + idx * 30;
-                  const drift = (idx % 2 === 0 ? 1 : -1) * (8 + (idx % 4) * 4);
+                  const startX = 12 + ((idx * 21) % 360);
+                  const drift = (idx % 2 === 0 ? 1 : -1) * (10 + (idx % 5) * 6);
+                  const size = 6 + (idx % 3) * 3;
+                  const isCircle = idx % 2 === 0;
+                  const spin = (idx % 2 === 0 ? 1 : -1) * (180 + (idx % 4) * 90);
                   return (
                     <Animated.View
                       key={`confetti-${idx}`}
@@ -463,21 +466,27 @@ export function RootLayoutContent() {
                         position: 'absolute',
                         top: -20,
                         left: startX,
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
+                        width: size,
+                        height: size,
+                        borderRadius: isCircle ? size / 2 : 2,
                         backgroundColor: CONFETTI_COLORS[idx % CONFETTI_COLORS.length],
                         transform: [
                           {
                             translateY: anim.interpolate({
                               inputRange: [0, 1],
-                              outputRange: [-40, 720],
+                              outputRange: [-40, 760],
                             }),
                           },
                           {
                             translateX: anim.interpolate({
                               inputRange: [0, 1],
                               outputRange: [0, drift],
+                            }),
+                          },
+                          {
+                            rotate: anim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0deg', `${spin}deg`],
                             }),
                           },
                         ],
@@ -521,30 +530,40 @@ export function RootLayoutContent() {
               >
                 <Ionicons name="close" size={16} color={colors.textSecondary} />
               </TouchableOpacity>
-              <View style={{ width: 130, height: 130, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 168, height: 168, alignItems: 'center', justifyContent: 'center' }}>
                 <View
                   style={{
                     position: 'absolute',
-                    width: 130,
-                    height: 130,
-                    borderRadius: 65,
-                    backgroundColor: `${ACCENT}15`,
+                    width: 168,
+                    height: 168,
+                    borderRadius: 84,
+                    backgroundColor: `${newBadge.color}12`,
+                  }}
+                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    width: 136,
+                    height: 136,
+                    borderRadius: 68,
+                    borderWidth: 1,
+                    borderColor: `${newBadge.color}35`,
                   }}
                 />
                 <Animated.View
                   style={{
-                    width: 100,
-                    height: 100,
-                    borderRadius: 50,
-                    backgroundColor: `${ACCENT}25`,
+                    width: 112,
+                    height: 112,
+                    borderRadius: 56,
+                    backgroundColor: `${newBadge.color}25`,
                     borderWidth: 3,
-                    borderColor: ACCENT,
+                    borderColor: newBadge.color,
                     alignItems: 'center',
                     justifyContent: 'center',
                     transform: [{ scale: pulseAnim }],
                   }}
                 >
-                  <Ionicons name={newBadge.icon as keyof typeof Ionicons.glyphMap} size={40} color={newBadge.color} />
+                  <Ionicons name={newBadge.icon as keyof typeof Ionicons.glyphMap} size={48} color={newBadge.color} />
                 </Animated.View>
               </View>
               <Text
@@ -573,29 +592,52 @@ export function RootLayoutContent() {
               >
                 {newBadge.description}
               </Text>
-              <TouchableOpacity
-                onPress={dismissBadgeModal}
-                activeOpacity={0.88}
-                style={{
-                  backgroundColor: ACCENT,
-                  borderRadius: 16,
-                  paddingVertical: 15,
-                  width: '100%',
-                  alignItems: 'center',
-                  marginTop: 4,
-                  shadowColor: ACCENT,
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.35,
-                  shadowRadius: 12,
-                  elevation: 6,
-                  borderWidth: 0.5,
-                  borderColor: 'rgba(255,220,160,0.4)',
-                }}
-              >
-                <Text style={{ color: '#FFF8EE', fontSize: 16, fontFamily: fonts.medium, letterSpacing: 0.02 }}>
-                  Harika!
-                </Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
+                <TouchableOpacity
+                  onPress={dismissBadgeModal}
+                  activeOpacity={0.88}
+                  style={{
+                    backgroundColor: ACCENT,
+                    borderRadius: 16,
+                    paddingVertical: 15,
+                    flex: 1,
+                    alignItems: 'center',
+                    marginTop: 4,
+                    shadowColor: ACCENT,
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 12,
+                    elevation: 6,
+                    borderWidth: 0.5,
+                    borderColor: 'rgba(255,220,160,0.4)',
+                  }}
+                >
+                  <Text style={{ color: '#FFF8EE', fontSize: 16, fontFamily: fonts.medium, letterSpacing: 0.02 }}>
+                    Harika!
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
+                    void Share.share({
+                      message: `🏅 Söz'de "${newBadge.name}" rozetini kazandım!\n${newBadge.description}`,
+                    })
+                  }
+                  activeOpacity={0.88}
+                  hitSlop={8}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 16,
+                    marginTop: 4,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
             </Animated.View>
           </Animated.View>
         </Modal>

@@ -28,6 +28,7 @@ import { useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import Svg, { Line, Path, Circle } from 'react-native-svg';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useNetwork } from '@/context/NetworkContext';
 import { useRegisterTabScrollToTop } from '@/context/ScrollToTopContext';
 import { bookList, getBookIdByBookName, oldTestamentBooks } from '@/constants/bible-index';
@@ -381,6 +382,15 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       padding: 16,
       overflow: 'hidden',
       position: 'relative',
+    },
+    streakZeroSwipeAction: {
+      width: 64,
+      marginBottom: 12,
+      marginRight: 16,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     streakZeroCloseBtn: {
       position: 'absolute',
@@ -2499,6 +2509,19 @@ export default function HomeScreen() {
         </View>
 
         {streak === 0 && !streakCardDismissed ? (
+          <Swipeable
+            renderRightActions={() => (
+              <TouchableOpacity
+                style={styles.streakZeroSwipeAction}
+                onPress={dismissStreakCard}
+                accessibilityRole="button"
+                accessibilityLabel={t('close')}
+              >
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+            onSwipeableOpen={dismissStreakCard}
+          >
           <View style={styles.streakZeroCard}>
             <LinearGradient
               colors={[`${ACCENT}22`, `${ACCENT}08`]}
@@ -2536,6 +2559,7 @@ export default function HomeScreen() {
               <Text style={styles.streakZeroBtnText}>{t('readFirstChapter')}</Text>
             </TouchableOpacity>
           </View>
+          </Swipeable>
         ) : null}
 
         <TouchableOpacity
@@ -3347,7 +3371,7 @@ export default function HomeScreen() {
                         <Circle cx="20" cy="20" r="2.5" fill={ACCENT} />
                       </Svg>
                     </View>
-                    <Text style={styles.tooltipTitle} numberOfLines={1}>
+                    <Text style={styles.tooltipTitle}>
                       {t('askSoz')}
                     </Text>
                   </View>

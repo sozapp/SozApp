@@ -232,6 +232,9 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
   const [showShareCard, setShowShareCard] = useState(false);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
 
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editNoteDraft, setEditNoteDraft] = useState('');
+
   const searchHeight = useSharedValue(0);
 
   const loadData = useCallback(async () => {
@@ -548,6 +551,34 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
     filteredFavorites.length === 0 &&
     filteredPrayers.length === 0;
 
+  const openEditNoteModal = useCallback(
+    (verseId: string) => {
+      setEditNoteDraft(notesRef.current[verseId] ?? '');
+      setEditingNoteId(verseId);
+    },
+    []
+  );
+
+  const saveEditedNote = useCallback(async () => {
+    if (!editingNoteId) return;
+    const trimmed = editNoteDraft.trim();
+    if (!trimmed) return;
+    const nextNotes = { ...notesRef.current, [editingNoteId]: trimmed };
+    const nextTs = { ...noteTimestampsRef.current, [editingNoteId]: new Date().toISOString() };
+    notesRef.current = nextNotes;
+    noteTimestampsRef.current = nextTs;
+    setNotes(nextNotes);
+    setNoteTimestamps(nextTs);
+    setEditingNoteId(null);
+    try {
+      await AsyncStorage.setItem(STORAGE_NOTES, JSON.stringify(nextNotes));
+      await AsyncStorage.setItem(STORAGE_NOTE_TIMESTAMPS, JSON.stringify(nextTs));
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {
+      /* ignore */
+    }
+  }, [editingNoteId, editNoteDraft]);
+
   const handleDeleteNote = useCallback(
     (verseId: string) => {
       const text = notesRef.current[verseId];
@@ -641,8 +672,27 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
   const handleAddNotePhoto = useCallback(
     async (verseId: string) => {
       try {
-        // Sadece çevrimiçi — çevrimdışı yükleme sessizce atlanır
-        if (!isOnline || !supabase) return;
+        if (!isOnline) {
+          showAlert('İnternet gerekli', 'Fotoğraf eklemek için bağlantı gerekir.');
+          return;
+        }
+        if (!supabase) return;
+
+        const {
+          data: { user: u },
+        } = await supabase.auth.getUser();
+        if (!u || !isRealAccount(u)) {
+          showAlert(
+            'Giriş gerekiyor',
+            'Notlarına fotoğraf eklemek için giriş yapmanız gerekiyor.',
+            [
+              { text: 'Kayıt Ol', style: 'cancel', onPress: () => router.push('/auth?mode=signup') },
+              { text: 'Giriş Yap', onPress: () => router.push('/auth?mode=signin') },
+            ],
+            true
+          );
+          return;
+        }
 
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!perm.granted) {
@@ -659,11 +709,6 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
 
         // Picker sırasında bağlantı düşmüş olabilir
         if (!isOnline) return;
-
-        const {
-          data: { user: u },
-        } = await supabase.auth.getUser();
-        if (!u || !isRealAccount(u)) return;
 
         try {
           const uri = result.assets[0].uri;
@@ -686,7 +731,7 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
         /* ignore */
       }
     },
-    [isOnline, persistNoteImages, showAlert, t]
+    [isOnline, persistNoteImages, showAlert, t, router]
   );
 
   const handleRemoveNotePhoto = useCallback(
@@ -998,7 +1043,6 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
               {activeTabStats.thisWeek > 0
                 ? `Bu hafta ${activeTabStats.thisWeek} ${activeTabStats.noun} ekledin`
                 : `Bu hafta henüz ${activeTabStats.noun} eklemedin`}
-              {` · ${activeTabStats.total} toplam`}
             </Text>
             {atNotesLimit && (
               <Text style={[styles.limitWarning, { color: colors.textMuted }]}>
@@ -1014,6 +1058,16 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel={t('addPrayer')}
+              >
+                <Ionicons name="add-outline" size={24} color={colors.text} />
+              </Pressable>
+            ) : activeTabStats.total === 0 ? (
+              <Pressable
+                onPress={() => router.push('/(tabs)/read')}
+                style={styles.headerIconBtn}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('read')}
               >
                 <Ionicons name="add-outline" size={24} color={colors.text} />
               </Pressable>
@@ -1077,7 +1131,7 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
           ))}
         </View>
 
-        {activeTab === 'notes' && noteEntries.length > 0 && (
+        {activeTab === 'notes' && noteEntries.length > 1 && (
           <View style={styles.toolbarRow}>
             <Pressable
               onPress={() => setShowFilterModal(true)}
@@ -1177,11 +1231,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                   <Text style={[styles.emptyDesc, { color: colors.textSecondary, textAlign: 'center' }]}>
                     Okurken ayetlere uzun bas{'\n'}not almaya başla
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => router.push('/(tabs)/read')}
-                    style={{ marginTop: 8, backgroundColor: ACCENT, borderRadius: 12, paddingHorizontal: 20, paddingVertical: 10 }}
-                  >
-                    <Text style={{ color: '#FFF8EE', fontSize: 14, fontFamily: fonts.regular }}>Okumaya Başla →</Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/read')} style={styles.emptyButton}>
+                    <Text style={styles.emptyButtonText}>Okumaya Başla →</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -1200,7 +1251,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                               fonts={fonts}
                               noteTimestamps={noteTimestamps}
                               onDelete={handleDeleteNote}
-                              onEditNote={openNoteInReader}
+                              onEditNote={openEditNoteModal}
+                              onOpenInReader={openNoteInReader}
                               onAddPhoto={handleAddNotePhoto}
                               onRemovePhoto={handleRemoveNotePhoto}
                               onOpenImage={setFullscreenImageUri}
@@ -1219,7 +1271,8 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                           fonts={fonts}
                           noteTimestamps={noteTimestamps}
                           onDelete={handleDeleteNote}
-                          onEditNote={openNoteInReader}
+                          onEditNote={openEditNoteModal}
+                              onOpenInReader={openNoteInReader}
                           onAddPhoto={handleAddNotePhoto}
                           onRemovePhoto={handleRemoveNotePhoto}
                           onOpenImage={setFullscreenImageUri}
@@ -1235,13 +1288,18 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
             <>
               {highlightEntries.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="brush-outline" size={48} color={colors.border} />
-                  <Text style={[styles.emptyTitle, { color: colors.text, marginTop: 16 }]}>
+                  <View style={styles.emptyIconCircle}>
+                    <Ionicons name="brush-outline" size={56} color={colors.border} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>
                     Henüz vurgulanmış ayet yok
                   </Text>
-                  <Text style={[styles.emptyDesc, { color: colors.textSecondary, marginTop: 8 }]}>
-                    Ayetlere uzun bas, vurgula
+                  <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
+                    Okurken ayetlere uzun bas{'\n'}vurgulamaya başla
                   </Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/read')} style={styles.emptyButton}>
+                    <Text style={styles.emptyButtonText}>Okumaya Başla →</Text>
+                  </TouchableOpacity>
                 </View>
               ) : filteredHighlightEntries.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -1261,8 +1319,12 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                     deepLinkParamsFromVerseId(verseId)
                   );
                   return (
-                    <View
+                    <Swipeable
                       key={verseId}
+                      renderRightActions={() => renderRightActions(() => void handleDeleteHighlight(verseId))}
+                      containerStyle={styles.swipeableContainer}
+                    >
+                    <View
                       style={[
                         styles.highlightCard,
                         {
@@ -1334,6 +1396,7 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                         </View>
                       </View>
                     </View>
+                    </Swipeable>
                   );
                 })
               )}
@@ -1343,12 +1406,17 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
           {activeTab === 'favorites' && !hasNoResults && (
             <>
               {filteredFavorites.length === 0 ? (
-                <View style={styles.favEmptyWrap}>
-                  <Ionicons name="heart-outline" size={56} color={colors.border} />
-                  <Text style={[styles.favEmptyTitle, { color: colors.text }]}>Henüz favori ayet yok</Text>
-                  <Text style={[styles.favEmptyDesc, { color: colors.textSecondary }]}>
-                    Okurken kalp ikonuna dokun
+                <View style={styles.emptyContainer}>
+                  <View style={styles.emptyIconCircle}>
+                    <Ionicons name="heart-outline" size={56} color={colors.border} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: colors.text }]}>Henüz favori ayet yok</Text>
+                  <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
+                    Okurken ayetlere kalp ikonuna dokun{'\n'}favorilemeye başla
                   </Text>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/read')} style={styles.emptyButton}>
+                    <Text style={styles.emptyButtonText}>Okumaya Başla →</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <FlatList
@@ -1357,7 +1425,17 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                   data={filteredFavorites}
                   keyExtractor={(item) => item.id}
                   contentContainerStyle={styles.favListContent}
-                  renderItem={({ item: fav }) => (
+                  renderItem={({ item: fav }) => {
+                    const favShareMsg = buildShareMessage(fav.text, fav.ref, {
+                      bookId: getBookIdByBookName(fav.book) ?? '',
+                      chapter: fav.chapter,
+                      verse: fav.verse,
+                    });
+                    return (
+                    <Swipeable
+                      renderRightActions={() => renderRightActions(() => void handleRemoveFavorite(fav.id))}
+                      containerStyle={styles.swipeableContainer}
+                    >
                     <TouchableOpacity
                       style={[styles.favCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                       onPress={() =>
@@ -1384,20 +1462,37 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
                               })
                             : ''}
                         </Text>
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            void handleRemoveFavorite(fav.id);
-                          }}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          accessibilityRole="button"
-                          accessibilityLabel={t('removeFavorite')}
-                        >
-                          <Ionicons name="heart" size={16} color="#C4956A" />
-                        </TouchableOpacity>
+                        <View style={styles.highlightInlineActions}>
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              void Share.share({ message: favShareMsg });
+                            }}
+                            style={styles.cardIconBtn}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('share')}
+                          >
+                            <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
+                          </Pressable>
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              void handleRemoveFavorite(fav.id);
+                            }}
+                            style={styles.cardIconBtn}
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('removeFavorite')}
+                          >
+                            <Ionicons name="heart" size={16} color="#C4956A" />
+                          </Pressable>
+                        </View>
                       </View>
                     </TouchableOpacity>
-                  )}
+                    </Swipeable>
+                    );
+                  }}
                 />
               )}
             </>
@@ -1578,9 +1673,6 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
             </View>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.shareCancelBtn} onPress={() => setShowShareOptions(false)}>
-            <Text style={[styles.shareCancelText, { color: colors.textMuted }]}>İptal</Text>
-          </TouchableOpacity>
         </View>
       </Modal>
 
@@ -1590,6 +1682,49 @@ export default function NotesScreenRoute({ asTab = false }: NotesScreenRouteProp
         verseText={shareVerse.text}
         verseRef={shareVerse.ref}
       />
+
+      <Modal
+        visible={editingNoteId != null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditingNoteId(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setEditingNoteId(null)}>
+          <Pressable
+            style={[styles.prayerFormContainer, { backgroundColor: colors.card }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text }]}>{t('editNote')}</Text>
+            {editingNoteId ? (
+              <Text style={[styles.noteCardRef, { color: ACCENT, marginBottom: 8 }]}>
+                {getVerseRefFromVerseId(editingNoteId)}
+              </Text>
+            ) : null}
+            <TextInput
+              style={[
+                styles.prayerFormBodyInput,
+                { color: colors.text, fontFamily: fonts.regular },
+              ]}
+              placeholder={t('notePlaceholder')}
+              placeholderTextColor={colors.textMuted}
+              value={editNoteDraft}
+              onChangeText={setEditNoteDraft}
+              multiline
+              autoFocus
+            />
+            <Pressable
+              disabled={!editNoteDraft.trim()}
+              onPress={saveEditedNote}
+              style={[
+                styles.modalSaveBtn,
+                { backgroundColor: ACCENT, opacity: editNoteDraft.trim() ? 1 : 0.45 },
+              ]}
+            >
+              <Text style={styles.modalSaveBtnText}>{t('save')}</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Sıralama / Filtre Modalı */}
       <Modal
@@ -1714,6 +1849,7 @@ function NoteCard({
   noteTimestamps,
   onDelete,
   onEditNote,
+  onOpenInReader,
   onAddPhoto,
   onRemovePhoto,
   onOpenImage,
@@ -1729,6 +1865,7 @@ function NoteCard({
   noteTimestamps: NoteTimestampsMap;
   onDelete: (id: string) => void;
   onEditNote: (verseId: string) => void;
+  onOpenInReader: (verseId: string) => void;
   onAddPhoto: (verseId: string) => void;
   onRemovePhoto: (verseId: string) => void;
   onOpenImage: (uri: string) => void;
@@ -1761,14 +1898,27 @@ function NoteCard({
           },
         ]}
       >
-        <View style={styles.noteCardTopRow}>
+        <Pressable
+          style={styles.noteCardTopRow}
+          onPress={() => onOpenInReader(verseId)}
+          accessibilityRole="button"
+          accessibilityLabel={`${refStr} — ${t('read')}`}
+        >
           <Text style={[styles.noteCardRef, { color: ACCENT, fontFamily: refFont }]} numberOfLines={1}>
             {refStr}
           </Text>
           <Text style={[styles.noteCardDate, { color: theme.textSecondary }]}>
             {formatDate(noteTimestamps[verseId])}
           </Text>
-        </View>
+        </Pressable>
+        {verseText ? (
+          <Text
+            style={[styles.noteCardVerse, { color: theme.textSecondary, fontFamily: refFont }]}
+            numberOfLines={3}
+          >
+            "{verseText}"
+          </Text>
+        ) : null}
         <Text
           style={[styles.noteCardBody, { color: theme.text, fontFamily: bodyFont }]}
           numberOfLines={4}
@@ -1876,6 +2026,15 @@ function PrayerCard({
   const leftAccent = prayer.answered ? '#4CAF50' : ACCENT;
 
   return (
+    <Swipeable
+      renderRightActions={() => (
+        <Pressable style={styles.swipeDeleteAction} onPress={() => onDelete(prayer.id)}>
+          <Ionicons name="trash-outline" size={22} color="#E57373" />
+          <Text style={styles.swipeDeleteText}>Sil</Text>
+        </Pressable>
+      )}
+      containerStyle={styles.swipeableContainer}
+    >
     <View style={styles.prayerCardWrapper}>
       {showConfetti && (
         <View style={styles.confettiWrap} pointerEvents="none">
@@ -1932,6 +2091,7 @@ function PrayerCard({
         </View>
       </View>
     </View>
+    </Swipeable>
   );
 }
 
@@ -2120,13 +2280,12 @@ const styles = StyleSheet.create({
   },
   emptyButton: {
     marginTop: 8,
+    backgroundColor: ACCENT,
+    borderRadius: 12,
+    paddingHorizontal: 20,
     paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    borderWidth: 0.5,
-    borderColor: ACCENT,
   },
-  emptyButtonText: { fontSize: 14, color: ACCENT, fontFamily: sheetFonts.regular },
+  emptyButtonText: { fontSize: 14, color: '#FFF8EE', fontFamily: sheetFonts.regular },
   groupHeader: {
     fontSize: 11,
     letterSpacing: 2,
@@ -2164,6 +2323,7 @@ const styles = StyleSheet.create({
   },
   noteCardRef: { fontSize: 12, flex: 1 },
   noteCardDate: { fontSize: 11 },
+  noteCardVerse: { fontSize: 13, lineHeight: 19, marginTop: 6, fontStyle: 'italic' },
   noteCardBody: { fontSize: 15, lineHeight: 22, marginTop: 8 },
   noteThumbWrap: {
     marginTop: 10,
@@ -2244,26 +2404,6 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   highlightInlineActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  favEmptyWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    paddingHorizontal: 40,
-    paddingTop: 80,
-  },
-  favEmptyTitle: {
-    fontSize: 18,
-    fontFamily: sheetFonts.regular,
-    textAlign: 'center',
-  },
-  favEmptyDesc: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    fontFamily: sheetFonts.italic,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
   favListContent: {
     padding: 16,
     gap: 12,

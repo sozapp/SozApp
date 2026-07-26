@@ -7,14 +7,21 @@ export function useSozAlert() {
     title: string;
     message?: string;
     buttons: SozAlertButton[];
+    showCloseIcon?: boolean;
   }>({ visible: false, title: '', buttons: [] });
 
-  const showAlert = (title: string, message?: string, buttons?: SozAlertButton[]) => {
+  const showAlert = (
+    title: string,
+    message?: string,
+    buttons?: SozAlertButton[],
+    showCloseIcon?: boolean
+  ) => {
     setAlertConfig({
       visible: true,
       title,
       message,
       buttons: buttons ?? [{ text: 'Tamam' }],
+      showCloseIcon,
     });
   };
 

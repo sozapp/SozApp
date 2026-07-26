@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Modal, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/hooks/useTheme';
 
 const ACCENT = '#C4956A';
@@ -16,9 +17,11 @@ interface SozAlertProps {
   message?: string;
   buttons: SozAlertButton[];
   onDismiss: () => void;
+  /** Sağ üstte çapraz kapatma ikonu göster (varsayılan kapalı — mevcut tüm alert'lerin görünümünü etkilemez). */
+  showCloseIcon?: boolean;
 }
 
-export function SozAlert({ visible, title, message, buttons, onDismiss }: SozAlertProps) {
+export function SozAlert({ visible, title, message, buttons, onDismiss, showCloseIcon }: SozAlertProps) {
   const { colors, fonts } = useTheme();
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
@@ -65,6 +68,28 @@ export function SozAlert({ visible, title, message, buttons, onDismiss }: SozAle
             transform: [{ scale: scaleAnim }],
           }}
         >
+          {showCloseIcon ? (
+            <TouchableOpacity
+              onPress={onDismiss}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Kapat"
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                zIndex: 1,
+                width: 26,
+                height: 26,
+                borderRadius: 13,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: colors.background,
+              }}
+            >
+              <Ionicons name="close" size={15} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
           <Text
             style={{
               fontSize: 18,
