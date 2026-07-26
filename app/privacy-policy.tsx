@@ -1,5 +1,4 @@
 import { colors, fonts } from '@/constants/theme';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,7 +12,6 @@ export default function PrivacyPolicyScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const theme = isDark ? colors.dark : colors.light;
-  const router = useRouter();
   const safeBack = useSafeBack();
 
   return (

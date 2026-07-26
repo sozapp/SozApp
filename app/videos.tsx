@@ -6,7 +6,7 @@ import {
   type Video,
   type VideoCategory,
 } from '@/constants/videos';
-import { colors, fonts } from '@/constants/theme';
+import { fonts } from '@/constants/theme';
 import { usePremium } from '@/hooks/usePremium';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';

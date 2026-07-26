@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, Dimensions, StyleSheet, AccessibilityInfo } from 'react-native';
+import { View, Animated, Dimensions, StyleSheet, AccessibilityInfo } from 'react-native';
 import Svg, { Line, Path, Circle } from 'react-native-svg';
 import { fonts } from '@/constants/theme';
 import { useReduceMotion } from '@/hooks/useReduceMotion';
