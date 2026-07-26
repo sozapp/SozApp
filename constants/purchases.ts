@@ -55,8 +55,8 @@ const findPackageByType = (
 };
 
 export type PremiumPricing = {
-  monthly: { priceString: string } | null;
-  yearly: { priceString: string } | null;
+  monthly: { priceString: string; price: number } | null;
+  yearly: { priceString: string; price: number } | null;
 };
 
 /** Mağazadan gerçek, yerelleştirilmiş fiyatları çeker (kullanıcının ülkesine göre App/Play Store belirler). */
@@ -69,8 +69,12 @@ export const getPremiumPricing = async (): Promise<PremiumPricing | null> => {
     const yearlyPkg = findPackageByType(offerings, 'yearly');
     if (!monthlyPkg && !yearlyPkg) return null;
     return {
-      monthly: monthlyPkg ? { priceString: monthlyPkg.product.priceString } : null,
-      yearly: yearlyPkg ? { priceString: yearlyPkg.product.priceString } : null,
+      monthly: monthlyPkg
+        ? { priceString: monthlyPkg.product.priceString, price: monthlyPkg.product.price }
+        : null,
+      yearly: yearlyPkg
+        ? { priceString: yearlyPkg.product.priceString, price: yearlyPkg.product.price }
+        : null,
     };
   } catch (e) {
     console.warn('getPremiumPricing error:', e);

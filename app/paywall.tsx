@@ -1,5 +1,6 @@
 import { useHaptics } from '@/hooks/useHaptics';
 import { usePremium } from '@/hooks/usePremium';
+import { useTheme } from '@/hooks/useTheme';
 import {
   getPremiumPricing,
   initPurchases,
@@ -7,15 +8,10 @@ import {
   restorePurchases,
   type PremiumPricing,
 } from '@/constants/purchases';
-import { fonts } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Dimensions,
   Linking,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -27,21 +23,8 @@ import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSafeBack } from '@/hooks/useSafeBack';
 
-const BG = '#0A0A08';
 const ACCENT = '#C4956A';
-const TEXT = '#E8E0D0';
-const MUTED = 'rgba(232,224,208,0.5)';
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const FEATURE_LINES = [
-  "Sınırsız AI sohbet (Söz'e Sor)",
-  'Tüm okuma planları',
-  'Gelişmiş ayet kartı temaları',
-  'Çeviri karşılaştırma',
-  'Kilise grup modu',
-  'Reklamsız deneyim',
-  'Cloud sync (tüm cihazlar)',
-];
+const ACCENT_DARK_TEXT = '#0A0A08';
 
 // Mağazadan gerçek fiyat çekilemediğinde (örn. Expo Go / geliştirme ortamı)
 // gösterilecek yaklaşık değerler — gerçek fiyat App/Play Store'dan gelir.
@@ -52,11 +35,31 @@ const DONATION_URL = 'https://sozapp.com/bagis';
 
 type BillingPeriod = 'monthly' | 'yearly';
 
+type Feature = {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  desc: string;
+};
+
+const FEATURES: Feature[] = [
+  {
+    icon: 'chatbubble-ellipses-outline',
+    title: "Sınırsız Söz'e Sor",
+    desc: 'Ayetler hakkında istediğin kadar soru sor',
+  },
+  { icon: 'book-outline', title: 'Tüm okuma planları', desc: 'Kısıtlama olmadan her plana eriş' },
+  { icon: 'color-palette-outline', title: 'Gelişmiş ayet kartı temaları', desc: 'Paylaşımların daha özgün görünsün' },
+  { icon: 'swap-horizontal-outline', title: 'Çeviri karşılaştırma', desc: 'Farklı çevirileri yan yana oku' },
+  { icon: 'people-outline', title: 'Kilise grup modu', desc: 'Topluluğunla birlikte okuyun' },
+  { icon: 'ban-outline', title: 'Reklamsız deneyim', desc: 'Kesintisiz, sakin bir okuma' },
+  { icon: 'cloud-done-outline', title: 'Cloud sync', desc: 'Notların tüm cihazlarında seninle' },
+];
+
 const TrialIcon = () => (
-  <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+  <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
     <Path
       d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-      stroke="#C4956A"
+      stroke={ACCENT}
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -65,11 +68,18 @@ const TrialIcon = () => (
   </Svg>
 );
 
-const PAGE_COUNT = 3;
+/** "%499/yıl" gibi yerelleştirilmiş bir fiyat string'inden sayıyı çıkarır (kaba fallback, price alanı yoksa). */
+function parseApproxNumber(priceString: string): number | null {
+  const match = priceString.match(/[\d.,]+/);
+  if (!match) return null;
+  const normalized = match[0].replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+  const num = parseFloat(normalized);
+  return Number.isNaN(num) ? null : num;
+}
 
 export default function PaywallScreen() {
-  const router = useRouter();
   const safeBack = useSafeBack();
+  const { colors, fonts } = useTheme();
   const { refreshPremium } = usePremium();
   const haptics = useHaptics();
   const insets = useSafeAreaInsets();
@@ -77,8 +87,6 @@ export default function PaywallScreen() {
   const [pricing, setPricing] = useState<PremiumPricing | null>(null);
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [pageIndex, setPageIndex] = useState(0);
-  const pagerRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     initPurchases();
@@ -87,6 +95,16 @@ export default function PaywallScreen() {
 
   const yearlyPrice = pricing?.yearly?.priceString ?? FALLBACK_YEARLY_PRICE;
   const monthlyPrice = pricing?.monthly?.priceString ?? FALLBACK_MONTHLY_PRICE;
+
+  const savingsPct = useMemo(() => {
+    const yearlyNum = pricing?.yearly?.price ?? parseApproxNumber(yearlyPrice);
+    const monthlyNum = pricing?.monthly?.price ?? parseApproxNumber(monthlyPrice);
+    if (!yearlyNum || !monthlyNum) return null;
+    const fullYearCost = monthlyNum * 12;
+    if (fullYearCost <= yearlyNum) return null;
+    const pct = Math.round((1 - yearlyNum / fullYearCost) * 100);
+    return pct > 0 ? pct : null;
+  }, [pricing, yearlyPrice, monthlyPrice]);
 
   const handleActivate = useCallback(async () => {
     if (isPurchasing) return;
@@ -106,7 +124,7 @@ export default function PaywallScreen() {
     } finally {
       setIsPurchasing(false);
     }
-  }, [refreshPremium, router, haptics, period, isPurchasing]);
+  }, [refreshPremium, haptics, period, isPurchasing, safeBack]);
 
   const handleRestore = useCallback(async () => {
     if (isRestoring) return;
@@ -121,7 +139,7 @@ export default function PaywallScreen() {
     } finally {
       setIsRestoring(false);
     }
-  }, [refreshPremium, isRestoring, router]);
+  }, [refreshPremium, isRestoring, safeBack]);
 
   const openDonation = useCallback(() => {
     try {
@@ -131,226 +149,242 @@ export default function PaywallScreen() {
     }
   }, []);
 
-  const handleSubscribe = handleActivate;
-
-  const onPagerScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-    setPageIndex(idx);
-  }, []);
-
-  const goToPage = useCallback((idx: number) => {
-    pagerRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: true });
-    setPageIndex(idx);
-  }, []);
-
   return (
-    <View style={styles.safe}>
-      <SafeAreaView style={styles.safeInner} edges={['top']}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerSpacer} />
-          <View style={styles.headerCenter}>
-            <Svg width={48} height={48} viewBox="0 0 40 40" fill="none">
-              <Path
-                d="M27 11 C27 11 13 11 13 20 C13 29 27 29 27 29"
-                stroke={ACCENT}
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-              <Line x1="13" y1="11" x2="27" y2="11" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" />
-              <Line x1="13" y1="29" x2="27" y2="29" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" />
-              <Circle cx="20" cy="20" r="2" fill={ACCENT} />
-            </Svg>
-            <Text style={styles.headTitle}>Premium&apos;a Geç</Text>
-            <Text style={styles.headSubtitle}>Tüm özelliklerin kilidini aç</Text>
-          </View>
-          <Pressable
-            onPress={() => safeBack()}
-            style={styles.closeBtn}
-            hitSlop={14}
-            accessibilityRole="button"
-            accessibilityLabel="Kapat"
-          >
-            <Ionicons name="close" size={28} color={TEXT} />
-          </Pressable>
-        </View>
-
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={onPagerScroll}
-          style={styles.pager}
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={styles.headerRow}>
+        <View style={styles.headerSpacer} />
+        <Svg width={40} height={40} viewBox="0 0 40 40" fill="none">
+          <Path
+            d="M27 11 C27 11 13 11 13 20 C13 29 27 29 27 29"
+            stroke={ACCENT}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+          <Line x1="13" y1="11" x2="27" y2="11" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" />
+          <Line x1="13" y1="29" x2="27" y2="29" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" />
+          <Circle cx="20" cy="20" r="2" fill={ACCENT} />
+        </Svg>
+        <Pressable
+          onPress={() => safeBack()}
+          style={styles.closeBtn}
+          hitSlop={14}
+          accessibilityRole="button"
+          accessibilityLabel="Kapat"
         >
-          <View style={[styles.page, { width: SCREEN_WIDTH }]}>
-            <Text style={styles.pageTitle}>Ne kazanıyorsun?</Text>
-            <View style={styles.featureList}>
-              {FEATURE_LINES.map((line) => (
-                <View key={line} style={styles.featureRow}>
-                  <Ionicons name="checkmark-circle" size={22} color={ACCENT} style={styles.featureCheck} />
-                  <Text style={styles.featureText}>{line}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
+          <Ionicons name="close" size={26} color={colors.textMuted} />
+        </Pressable>
+      </View>
 
-          <View style={[styles.page, { width: SCREEN_WIDTH }]}>
-            <Text style={styles.pageTitle}>Planını seç</Text>
-            <View style={styles.trialBanner}>
-              <View style={styles.trialIconWrap}>
-                <TrialIcon />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.headTitle, { color: colors.text, fontFamily: fonts.medium }]}>
+          Söz'le bağını derinleştir
+        </Text>
+        <Text style={[styles.headSubtitle, { color: colors.textMuted, fontFamily: fonts.italic }]}>
+          Premium ile hiçbir sınır yok
+        </Text>
+
+        <View style={styles.featureList}>
+          {FEATURES.map((f) => (
+            <View key={f.title} style={styles.featureRow}>
+              <View style={[styles.featureIconWrap, { backgroundColor: `${ACCENT}18`, borderColor: `${ACCENT}35` }]}>
+                <Ionicons name={f.icon} size={18} color={ACCENT} />
               </View>
-              <View style={styles.trialTextWrap}>
-                <Text style={styles.trialTitle}>7 Gün Tamamen Ücretsiz</Text>
-                <Text style={styles.trialDesc}>Kart bilgisi gerekli · İstediğinde iptal</Text>
-              </View>
-            </View>
-
-            <View style={styles.periodRow}>
-              <TouchableOpacity
-                onPress={() => {
-                  setPeriod('yearly');
-                  haptics.selection();
-                }}
-                style={[styles.priceCard, period === 'yearly' && styles.priceCardActive]}
-                activeOpacity={0.85}
-              >
-                {period === 'yearly' && (
-                  <View style={styles.planCheck}>
-                    <Ionicons name="checkmark-circle" size={20} color="#C4956A" />
-                  </View>
-                )}
-                <View style={styles.popularBadge}>
-                  <Text style={styles.popularText}>EN POPÜLER</Text>
-                </View>
-                <View style={styles.priceCardTop}>
-                  <Text style={styles.planName}>Yıllık</Text>
-                  <Text style={styles.priceAmount}>{yearlyPrice}</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setPeriod('monthly');
-                  haptics.selection();
-                }}
-                style={[styles.priceCard, period === 'monthly' && styles.priceCardActive]}
-                activeOpacity={0.85}
-              >
-                {period === 'monthly' && (
-                  <View style={styles.planCheck}>
-                    <Ionicons name="checkmark-circle" size={20} color="#C4956A" />
-                  </View>
-                )}
-                <View style={styles.priceCardTop}>
-                  <Text style={styles.planName}>Aylık</Text>
-                  <Text style={styles.priceAmount}>{monthlyPrice}</Text>
-                  <Text style={styles.priceMonthly}>İstediğin zaman iptal</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.priceHint}>
-              Fiyat, hesabının bağlı olduğu App Store/Play Store bölgesine göre gösterilir.
-            </Text>
-          </View>
-
-          <View style={[styles.page, { width: SCREEN_WIDTH }]}>
-            <Text style={styles.pageTitle}>Güven & alternatifler</Text>
-            <Pressable style={styles.donateBlock} onPress={openDonation}>
-              <Text style={styles.donateLine1}>Premium almak istemiyor musun?</Text>
-              <Text style={styles.donateLine2}>Bağış yaparak da destekleyebilirsin →</Text>
-            </Pressable>
-
-            <View style={styles.trustRow}>
-              <View style={styles.trustItemRow}>
-                <Ionicons name="lock-closed-outline" size={16} color={ACCENT} />
-                <Text style={styles.trustItem}>Güvenli ödeme</Text>
-              </View>
-              <Text style={styles.trustSep}> · </Text>
-              <View style={styles.trustItemRow}>
-                <Ionicons name="arrow-undo-outline" size={16} color={ACCENT} />
-                <Text style={styles.trustItem}>İptal istediğinde</Text>
-              </View>
-              <Text style={styles.trustSep}> · </Text>
-              <View style={styles.trustItemRow}>
-                <Ionicons name="star-outline" size={16} color={ACCENT} />
-                <Text style={styles.trustItem}>7 gün ücretsiz dene</Text>
+              <View style={styles.featureTextWrap}>
+                <Text style={[styles.featureTitle, { color: colors.text, fontFamily: fonts.medium }]}>
+                  {f.title}
+                </Text>
+                <Text style={[styles.featureDesc, { color: colors.textMuted, fontFamily: fonts.regular }]}>
+                  {f.desc}
+                </Text>
               </View>
             </View>
-
-            <Text style={styles.legal}>
-              Abonelik otomatik yenilenir.{'\n'}
-              İstediğiniz zaman iptal edebilirsiniz.
-            </Text>
-          </View>
-        </ScrollView>
-
-        <View style={styles.dotsRow}>
-          {Array.from({ length: PAGE_COUNT }, (_, i) => (
-            <Pressable key={i} onPress={() => goToPage(i)} hitSlop={8}>
-              <View style={[styles.dot, i === pageIndex && styles.dotActive]} />
-            </Pressable>
           ))}
         </View>
 
-        <View style={[styles.stickyBottom, { paddingBottom: Math.max(20, insets.bottom + 12) }]}>
+        <View
+          style={[
+            styles.trialBanner,
+            { backgroundColor: `${ACCENT}0F`, borderColor: `${ACCENT}30` },
+          ]}
+        >
+          <View style={[styles.trialIconWrap, { backgroundColor: `${ACCENT}14`, borderColor: `${ACCENT}30` }]}>
+            <TrialIcon />
+          </View>
+          <View style={styles.trialTextWrap}>
+            <Text style={[styles.trialTitle, { color: colors.text, fontFamily: fonts.medium }]}>
+              7 Gün Tamamen Ücretsiz
+            </Text>
+            <Text style={[styles.trialDesc, { color: colors.textMuted, fontFamily: fonts.italic }]}>
+              Kart bilgisi gerekli · İstediğinde iptal
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.periodRow}>
           <TouchableOpacity
-            style={styles.mainBtn}
-            onPress={handleSubscribe}
-            disabled={isPurchasing}
-            activeOpacity={0.88}
+            onPress={() => {
+              setPeriod('yearly');
+              haptics.selection();
+            }}
+            style={[
+              styles.priceCard,
+              { borderColor: `${ACCENT}30`, backgroundColor: colors.card },
+              period === 'yearly' && styles.priceCardActive,
+            ]}
+            activeOpacity={0.85}
           >
-            <View style={styles.mainBtnInner}>
-              <Text style={styles.mainBtnText}>
-                {isPurchasing ? 'Satın Alma İşleniyor...' : 'Satın Al'}
+            {period === 'yearly' && (
+              <View style={styles.planCheck}>
+                <Ionicons name="checkmark-circle" size={20} color={ACCENT} />
+              </View>
+            )}
+            <View style={styles.popularBadge}>
+              <Text style={styles.popularText}>EN POPÜLER</Text>
+            </View>
+            <View style={styles.priceCardTop}>
+              <Text style={[styles.planName, { color: colors.textMuted, fontFamily: fonts.regular }]}>
+                Yıllık
               </Text>
-              <Text style={styles.mainBtnSub}>
-                {period === 'monthly' ? 'Aylık plan' : 'Yıllık plan'}
+              <Text style={[styles.priceAmount, { color: colors.text, fontFamily: fonts.medium }]}>
+                {yearlyPrice}
+              </Text>
+              {savingsPct != null && (
+                <View style={styles.savingsBadge}>
+                  <Text style={styles.savingsBadgeText}>%{savingsPct} tasarruf</Text>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setPeriod('monthly');
+              haptics.selection();
+            }}
+            style={[
+              styles.priceCard,
+              { borderColor: colors.border, backgroundColor: colors.card },
+              period === 'monthly' && styles.priceCardActive,
+            ]}
+            activeOpacity={0.85}
+          >
+            {period === 'monthly' && (
+              <View style={styles.planCheck}>
+                <Ionicons name="checkmark-circle" size={20} color={ACCENT} />
+              </View>
+            )}
+            <View style={styles.priceCardTop}>
+              <Text style={[styles.planName, { color: colors.textMuted, fontFamily: fonts.regular }]}>
+                Aylık
+              </Text>
+              <Text style={[styles.priceAmount, { color: colors.text, fontFamily: fonts.medium }]}>
+                {monthlyPrice}
+              </Text>
+              <Text style={[styles.priceMonthly, { fontFamily: fonts.italic }]}>
+                İstediğin zaman iptal
               </Text>
             </View>
-            <Ionicons name="arrow-forward" size={18} color="#0A0A08" />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.restoreBtn}
-            onPress={handleRestore}
-            disabled={isRestoring}
-            activeOpacity={0.82}
-          >
-            <Text style={styles.restoreBtnText}>
-              {isRestoring ? 'Geri Yükleniyor...' : 'Satın Alımları Geri Yükle'}
-            </Text>
-          </TouchableOpacity>
-          <Text style={styles.stickyNote}>Kart bilgisi güvenle saklanır · Apple ile ödeme</Text>
         </View>
-      </SafeAreaView>
-    </View>
+        <Text style={[styles.priceHint, { color: colors.textFaint, fontFamily: fonts.italic }]}>
+          Fiyat, hesabının bağlı olduğu App Store/Play Store bölgesine göre gösterilir.
+        </Text>
+
+        <View style={styles.trustRow}>
+          <View style={styles.trustItemRow}>
+            <Ionicons name="lock-closed-outline" size={15} color={ACCENT} />
+            <Text style={[styles.trustItem, { color: colors.textMuted, fontFamily: fonts.regular }]}>
+              Güvenli ödeme
+            </Text>
+          </View>
+          <Text style={[styles.trustSep, { color: colors.textMuted }]}> · </Text>
+          <View style={styles.trustItemRow}>
+            <Ionicons name="arrow-undo-outline" size={15} color={ACCENT} />
+            <Text style={[styles.trustItem, { color: colors.textMuted, fontFamily: fonts.regular }]}>
+              İptal istediğinde
+            </Text>
+          </View>
+          <Text style={[styles.trustSep, { color: colors.textMuted }]}> · </Text>
+          <View style={styles.trustItemRow}>
+            <Ionicons name="star-outline" size={15} color={ACCENT} />
+            <Text style={[styles.trustItem, { color: colors.textMuted, fontFamily: fonts.regular }]}>
+              7 gün ücretsiz
+            </Text>
+          </View>
+        </View>
+
+        <Pressable style={styles.donateBlock} onPress={openDonation}>
+          <Text style={[styles.donateLine1, { color: colors.textMuted, fontFamily: fonts.italic }]}>
+            Premium almak istemiyor musun?
+          </Text>
+          <Text style={[styles.donateLine2, { color: colors.textMuted, fontFamily: fonts.italic }]}>
+            Bağış yaparak da destekleyebilirsin →
+          </Text>
+        </Pressable>
+
+        <Text style={[styles.legal, { color: colors.textFaint, fontFamily: fonts.regular }]}>
+          Abonelik otomatik yenilenir.{'\n'}
+          İstediğiniz zaman iptal edebilirsiniz.
+        </Text>
+      </ScrollView>
+
+      <View
+        style={[
+          styles.stickyBottom,
+          { borderTopColor: colors.border, paddingBottom: Math.max(20, insets.bottom + 12) },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.mainBtn}
+          onPress={handleActivate}
+          disabled={isPurchasing}
+          activeOpacity={0.88}
+        >
+          <View style={styles.mainBtnInner}>
+            <Text style={styles.mainBtnText}>
+              {isPurchasing ? 'İşleniyor...' : 'Ücretsiz Denemeyi Başlat'}
+            </Text>
+            <Text style={styles.mainBtnSub}>
+              {period === 'monthly' ? `Sonra ${monthlyPrice}` : `Sonra ${yearlyPrice}`}
+            </Text>
+          </View>
+          <Ionicons name="arrow-forward" size={18} color={ACCENT_DARK_TEXT} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.restoreBtn}
+          onPress={handleRestore}
+          disabled={isRestoring}
+          activeOpacity={0.82}
+        >
+          <Text style={[styles.restoreBtnText, { fontFamily: fonts.regular }]}>
+            {isRestoring ? 'Geri Yükleniyor...' : 'Satın Alımları Geri Yükle'}
+          </Text>
+        </TouchableOpacity>
+        <Text style={[styles.stickyNote, { color: colors.textFaint, fontFamily: fonts.italic }]}>
+          Kart bilgisi güvenle saklanır · Apple ile ödeme
+        </Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: BG,
-  },
-  safeInner: {
-    flex: 1,
-    backgroundColor: BG,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingTop: 4,
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
   headerSpacer: {
-    width: 44,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: 8,
+    width: 26,
   },
   closeBtn: {
     width: 44,
@@ -358,103 +392,77 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headTitle: {
-    fontFamily: fonts.thin,
-    fontSize: 28,
-    color: TEXT,
-    marginTop: 10,
-    textAlign: 'center',
-  },
-  headSubtitle: {
-    fontFamily: fonts.italic,
-    fontSize: 15,
-    color: MUTED,
-    marginTop: 6,
-    textAlign: 'center',
-  },
-  pager: {
-    flex: 1,
-  },
-  page: {
+  scrollContent: {
     paddingHorizontal: 24,
     paddingTop: 8,
+    paddingBottom: 24,
   },
-  pageTitle: {
-    fontFamily: fonts.medium,
-    fontSize: 13,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: ACCENT,
+  headTitle: {
+    fontSize: 24,
     textAlign: 'center',
-    marginBottom: 18,
+    marginTop: 4,
   },
-  dotsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-  },
-  dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: 'rgba(196,149,80,0.25)',
-  },
-  dotActive: {
-    backgroundColor: ACCENT,
-    width: 20,
+  headSubtitle: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 22,
   },
   featureList: {
-    marginTop: 8,
-    marginBottom: 20,
+    gap: 14,
+    marginBottom: 22,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 14,
-    paddingRight: 8,
+    gap: 12,
   },
-  featureCheck: {
-    marginRight: 12,
-    marginTop: 1,
+  featureIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
+    borderWidth: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  featureText: {
+  featureTextWrap: {
     flex: 1,
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    lineHeight: 22,
-    color: TEXT,
+    paddingTop: 2,
+  },
+  featureTitle: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  featureDesc: {
+    fontSize: 12.5,
+    lineHeight: 17,
+    marginTop: 1,
   },
   periodRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   priceHint: {
-    fontFamily: fonts.italic,
     fontSize: 11,
-    color: MUTED,
     textAlign: 'center',
     paddingHorizontal: 8,
+    marginBottom: 20,
   },
   trialBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: 'rgba(196,149,80,0.08)',
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(196,149,80,0.3)',
     marginBottom: 20,
   },
   trialIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: 'rgba(196,149,80,0.1)',
+    width: 46,
+    height: 46,
+    borderRadius: 13,
     borderWidth: 0.5,
-    borderColor: 'rgba(196,149,80,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -464,35 +472,27 @@ const styles = StyleSheet.create({
   },
   trialTitle: {
     fontSize: 15,
-    color: TEXT,
-    fontFamily: fonts.medium,
     letterSpacing: -0.01,
   },
   trialDesc: {
     fontSize: 12,
-    color: MUTED,
-    fontStyle: 'italic',
-    fontFamily: fonts.italic,
     marginTop: 2,
   },
   priceCard: {
     flex: 1,
-    paddingTop: 24,
-    paddingBottom: 18,
+    paddingTop: 22,
+    paddingBottom: 16,
     paddingHorizontal: 16,
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: 'rgba(196,149,80,0.2)',
-    backgroundColor: 'rgba(26,22,18,0.6)',
     position: 'relative',
     overflow: 'hidden',
   },
   priceCardActive: {
-    borderColor: '#C4956A',
-    backgroundColor: 'rgba(196,149,80,0.1)',
-    shadowColor: '#C4956A',
+    borderColor: ACCENT,
+    shadowColor: ACCENT,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 12,
     elevation: 4,
   },
@@ -511,9 +511,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   popularText: {
-    fontFamily: fonts.medium,
     fontSize: 8,
-    color: BG,
+    fontWeight: '600',
+    color: ACCENT_DARK_TEXT,
     letterSpacing: 0.15,
   },
   priceCardTop: {
@@ -522,25 +522,32 @@ const styles = StyleSheet.create({
   },
   planName: {
     fontSize: 11,
-    color: MUTED,
-    fontFamily: fonts.regular,
     letterSpacing: 0.2,
     textTransform: 'uppercase',
     marginBottom: 6,
   },
   priceAmount: {
-    fontSize: 26,
-    color: TEXT,
-    fontFamily: fonts.medium,
+    fontSize: 25,
     letterSpacing: -0.02,
-    lineHeight: 30,
+    lineHeight: 29,
   },
   priceMonthly: {
     fontSize: 12,
-    color: '#C4956A',
-    fontFamily: fonts.regular,
-    fontStyle: 'italic',
+    color: ACCENT,
     marginTop: 6,
+  },
+  savingsBadge: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: `${ACCENT}22`,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  savingsBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: ACCENT,
   },
   mainBtn: {
     backgroundColor: ACCENT,
@@ -550,7 +557,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#C4956A',
+    shadowColor: ACCENT,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -563,27 +570,22 @@ const styles = StyleSheet.create({
   },
   mainBtnText: {
     fontSize: 17,
-    color: '#0A0A08',
-    fontFamily: fonts.medium,
+    color: ACCENT_DARK_TEXT,
+    fontWeight: '600',
     letterSpacing: 0.01,
   },
   mainBtnSub: {
     fontSize: 12,
     color: 'rgba(10,10,8,0.6)',
-    fontFamily: fonts.regular,
   },
   stickyBottom: {
     paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(196,149,80,0.2)',
   },
   stickyNote: {
     fontSize: 11,
-    color: MUTED,
     textAlign: 'center',
-    fontStyle: 'italic',
-    fontFamily: fonts.italic,
     marginTop: 8,
   },
   restoreBtn: {
@@ -595,24 +597,19 @@ const styles = StyleSheet.create({
   restoreBtnText: {
     fontSize: 13,
     color: ACCENT,
-    fontFamily: fonts.regular,
   },
   donateBlock: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
     paddingHorizontal: 12,
   },
   donateLine1: {
-    fontFamily: fonts.italic,
     fontSize: 13,
-    color: MUTED,
     textAlign: 'center',
     marginBottom: 4,
   },
   donateLine2: {
-    fontFamily: fonts.italic,
     fontSize: 13,
-    color: MUTED,
     textAlign: 'center',
     textDecorationLine: 'underline',
   },
@@ -630,19 +627,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   trustItem: {
-    fontFamily: fonts.regular,
     fontSize: 12,
-    color: MUTED,
   },
   trustSep: {
     fontSize: 12,
-    color: MUTED,
   },
   legal: {
-    fontFamily: fonts.regular,
     fontSize: 11,
     lineHeight: 16,
-    color: MUTED,
     textAlign: 'center',
     paddingHorizontal: 8,
   },
