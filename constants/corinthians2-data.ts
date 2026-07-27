@@ -118,7 +118,8 @@ export const CORINTHIANS2_CHAPTER_VERSES: string[][] = [
     "Tanrı'yla birlikte çalışan bizler, O'nun lütfunu boş yere kabul etmemenizi ayrıca rica ediyoruz.",
     "Çünkü Tanrı diyor ki, «Uygun zamanda seni duydum, Kurtuluş günü sana yardım ettim.» Uygun zaman işte şimdidir, kurtuluş günü işte şimdidir.",
     "Hizmetimizin kötülenmemesi için hiçbir konuda hiç kimsenin sürçmesine neden olmadık.",
-    "Tersine Tanrı'nın hizmetkârları olarak olağanüstü dayanmada, sıkıntı, güçlük ve elemlerde, dayak, hapis, karışıklık, emek, uykusuzluk ve açlıkta kendimizi örnek gösteriyoruz.",
+    "Tersine Tanrı'nın hizmetkârları olarak olağanüstü dayanmada, sıkıntı, güçlük ve elemlerde kendimizi örnek gösteriyoruz.",
+    "Dayak, hapis, karışıklık, emek, uykusuzluk ve açlıkta kendimizi örnek gösteriyoruz.",
     "Pak yaşayışta, bilgi, sabır, iyilik, Kutsal Ruh ve içten sevgide; gerçeğin ilanında ve Tanrı'nın gücünde kendimizi örnek gösteriyoruz.",
     "Sağ ve sol ellerimizde doğruluğun silahlarıyla, yücelikte ve onursuzlukta, iyi ünde ve kötü ünde kendimizi her durumda örnek gösteriyoruz.",
     "Aldatanlar sayılıyorsak da dürüst kişileriz.",
@@ -199,7 +200,8 @@ export const CORINTHIANS2_CHAPTER_VERSES: string[][] = [
   ],
   // 2. Korintliler 10 (18 ayet)
   [
-    "Sizinle birlikteyken ürkek, ama aranızda değilken yiğit kesilen ben Pavlus, Mesih'teki alçakgönüllülük ve yumuşaklıkla size rica ediyor, yalvarıyorum: Yanınıza geldiğim zaman, bizi olağan insanlar gibi yaşayanlardan sayan bazılarına karşı güvenle takınmak niyetinde olduğum tavrı aynı cesaretle size karşı takınmaya zorlamayın beni.",
+    "Sizinle birlikteyken ürkek, ama aranızda değilken yiğit kesilen ben Pavlus, Mesih'teki alçakgönüllülük ve yumuşaklıkla size rica ediyor, yalvarıyorum:",
+    "Yanınıza geldiğim zaman, bizi olağan insanlar gibi yaşayanlardan sayan bazılarına karşı güvenle takınmak niyetinde olduğum tavrı aynı cesaretle size karşı takınmaya zorlamayın beni.",
     "Olağan insanlar gibi yaşıyorsak da, insansal güce dayanarak savaşmıyoruz.",
     "Çünkü savaşımızın silahları insansal silahlar değil, kaleleri yıkan tanrısal güce sahip silahlardır.",
     "Safsataları, Tanrı bilgisine karşı diklenen her engeli yıkıyor, her düşünceyi tutsak edip Mesih'e bağımlı kılıyoruz.",
