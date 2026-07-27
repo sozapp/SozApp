@@ -513,6 +513,12 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
       borderTopColor: 'rgba(220,80,60,0.35)',
       paddingTop: 2,
     },
+    sessionZone: {
+      marginTop: 4,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 2,
+    },
     settingRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -1900,7 +1906,7 @@ export default function ProfileScreen() {
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
                 <Pressable
-                  style={styles.row}
+                  style={[styles.row, isPremium && styles.rowLast]}
                   onPress={() => router.push('/change-password')}
                   accessibilityRole="button"
                   accessibilityLabel={t('changePasswordCta')}
@@ -1910,27 +1916,6 @@ export default function ProfileScreen() {
                   </View>
                   <View style={styles.rowBody}>
                     <Text style={styles.rowTitle}>{t('changePasswordCta')}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </Pressable>
-                <Pressable
-                  style={styles.row}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('signOut')}
-                  onPress={async () => {
-                    try {
-                      if (supabase) await supabase.auth.signOut();
-                      router.replace('/auth');
-                    } catch {
-                      /* ignore */
-                    }
-                  }}
-                >
-                  <View style={styles.rowIcon}>
-                    <Ionicons name="log-out-outline" size={18} color={DANGER} />
-                  </View>
-                  <View style={styles.rowBody}>
-                    <Text style={styles.dangerText}>{t('signOut')}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </Pressable>
@@ -1969,6 +1954,32 @@ export default function ProfileScreen() {
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </Pressable>
             )}
+
+            {userEmail ? (
+              <View style={styles.sessionZone}>
+                <Pressable
+                  style={[styles.row, styles.rowLast]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('signOut')}
+                  onPress={async () => {
+                    try {
+                      if (supabase) await supabase.auth.signOut();
+                      router.replace('/auth');
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                >
+                  <View style={styles.rowIcon}>
+                    <Ionicons name="log-out-outline" size={18} color={colors.textMuted} />
+                  </View>
+                  <View style={styles.rowBody}>
+                    <Text style={styles.rowTitle}>{t('signOut')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </Pressable>
+              </View>
+            ) : null}
 
             {userEmail ? (
               <View style={styles.dangerZone}>

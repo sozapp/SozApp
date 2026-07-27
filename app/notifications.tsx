@@ -1,5 +1,5 @@
 import { isRealAccount } from '@/constants/friend-activity';
-import { colors, fonts, borderRadius } from '@/constants/theme';
+import { colors, fonts } from '@/constants/theme';
 import { useTranslation } from '@/context/LanguageContext';
 import { SozAlert } from '@/components/SozAlert';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -16,6 +16,7 @@ import { router } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { GuestWall } from '@/components/GuestWall';
 
 const ACCENT = '#C4956A';
 
@@ -149,14 +150,15 @@ export default function NotificationsScreen() {
             <ActivityIndicator color={ACCENT} />
           </View>
         ) : isGuest ? (
-          <View style={styles.guestBox}>
-            <Text style={[styles.guestText, { color: theme.textMuted }]}>
-              {t('friendFeatureSignInPrompt')}
-            </Text>
-            <Pressable style={styles.authBtn} onPress={goAuth}>
-              <Text style={styles.authBtnText}>{t('signInShort')}</Text>
-            </Pressable>
-          </View>
+          <GuestWall
+            icon="notifications"
+            title={t('guestWallNotifTitle')}
+            description={t('guestWallNotifDesc')}
+            ctaLabel={t('signInShort')}
+            onPress={goAuth}
+            textColor={theme.text}
+            mutedColor={theme.textMuted}
+          />
         ) : isEmpty ? (
           <ScrollView
             style={styles.scroll}
@@ -272,24 +274,6 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   centeredGrow: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
-  guestBox: { padding: 24, alignItems: 'center' },
-  guestText: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  authBtn: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: borderRadius.button,
-  },
-  authBtnText: {
-    fontFamily: fonts.medium,
-    color: colors.white,
-    fontSize: 16,
-  },
   sectionLabel: {
     fontFamily: fonts.medium,
     fontSize: 13,

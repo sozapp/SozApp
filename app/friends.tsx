@@ -39,6 +39,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSafeBack } from '@/hooks/useSafeBack';
+import { GuestWall } from '@/components/GuestWall';
 
 const ACCENT = '#C4956A';
 
@@ -88,6 +89,7 @@ export default function FriendsScreen() {
   const [profileMap, setProfileMap] = useState<Record<string, ProfileMini>>({});
   const [activities, setActivities] = useState<ActivityRow[]>([]);
   const [lastByUser, setLastByUser] = useState<Record<string, ActivityRow>>({});
+  const [weeklyChapterCounts, setWeeklyChapterCounts] = useState<Record<string, number>>({});
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const haptics = useHaptics();
 
@@ -101,6 +103,7 @@ export default function FriendsScreen() {
         setActivities([]);
         setLastByUser({});
         setProfileMap({});
+        setWeeklyChapterCounts({});
         return;
       }
       const { data: authData } = await supabase.auth.getUser();
@@ -111,6 +114,7 @@ export default function FriendsScreen() {
         setFriendsRows([]);
         setActivities([]);
         setLastByUser({});
+        setWeeklyChapterCounts({});
         if (!opts?.soft) setLoading(false);
         return;
       }
@@ -211,6 +215,29 @@ export default function FriendsScreen() {
         }
       }
       setActivities(feed);
+
+      const raceIds = [uid, ...friendIds];
+      const weekCounts: Record<string, number> = {};
+      if (isOnline) {
+        try {
+          const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          const { data, error } = await supabase
+            .from('friend_activity')
+            .select('user_id')
+            .eq('type', 'chapter_read')
+            .in('user_id', raceIds)
+            .gte('created_at', weekStart)
+            .limit(2000);
+          if (!error && data) {
+            for (const row of data as { user_id: string }[]) {
+              weekCounts[row.user_id] = (weekCounts[row.user_id] ?? 0) + 1;
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      setWeeklyChapterCounts(weekCounts);
     } finally {
       if (!opts?.soft) setLoading(false);
     }
@@ -398,6 +425,20 @@ export default function FriendsScreen() {
     () => friendsRows.map((r) => (r.user_id === uid ? r.friend_id : r.user_id)),
     [friendsRows, uid]
   );
+
+  const raceEntries = useMemo(() => {
+    if (!uid) return [];
+    const ids = [uid, ...friendIdsForUnread];
+    return ids
+      .map((id) => ({
+        id,
+        name: id === uid ? t('you') : displayName(id),
+        count: weeklyChapterCounts[id] ?? 0,
+        isSelf: id === uid,
+      }))
+      .sort((a, b) => b.count - a.count);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- displayName okuma anındaki profileMap'i kullanır
+  }, [uid, friendIdsForUnread, weeklyChapterCounts, profileMap, t]);
   const { unreadCounts, reloadUnread } = useUnreadMessageCounts(friendIdsForUnread);
 
   const removeFriend = (row: FriendshipRow, friendName: string) => {
@@ -457,14 +498,15 @@ export default function FriendsScreen() {
           <Text style={[styles.title, { color: theme.text }]}>{t('friends')}</Text>
           <View style={{ width: 28 }} />
         </View>
-        <View style={styles.guestBox}>
-          <Text style={[styles.guestText, { color: theme.textMuted }]}>
-            {t('friendFeatureSignInPrompt')}
-          </Text>
-          <Pressable style={styles.authBtn} onPress={goAuth}>
-            <Text style={styles.authBtnText}>{t('signInShort')}</Text>
-          </Pressable>
-        </View>
+        <GuestWall
+          icon="people"
+          title={t('guestWallFriendsTitle')}
+          description={t('guestWallFriendsDesc')}
+          ctaLabel={t('signInShort')}
+          onPress={goAuth}
+          textColor={theme.text}
+          mutedColor={theme.textMuted}
+        />
       </SafeAreaView>
     );
   }
@@ -539,6 +581,46 @@ export default function FriendsScreen() {
               </Text>
             </Pressable>
           </View>
+
+          {friendsRows.length > 0 && (
+            <View style={[styles.card, { backgroundColor: theme.surface }]}>
+              <View style={styles.raceTitleRow}>
+                <Ionicons name="trophy-outline" size={16} color={ACCENT} />
+                <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0 }]}>
+                  {t('weeklyRaceTitle')}
+                </Text>
+              </View>
+              {raceEntries.every((e) => e.count === 0) ? (
+                <Text style={[styles.empty, { color: theme.textMuted, marginTop: 8 }]}>
+                  {t('weeklyRaceEmpty')}
+                </Text>
+              ) : (
+                raceEntries.map((entry, i) => (
+                  <View key={entry.id} style={styles.raceRow}>
+                    <Text style={[styles.raceRank, { color: theme.textMuted }]}>{i + 1}</Text>
+                    <View style={[styles.avatar, styles.raceAvatar, { backgroundColor: colorForUserId(entry.id) }]}>
+                      <Text style={styles.avatarText}>
+                        {entry.isSelf ? t('you').slice(0, 2).toUpperCase() : initials(entry.name, profileMap[entry.id]?.email ?? null)}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.raceName,
+                        { color: theme.text },
+                        entry.isSelf && styles.raceNameSelf,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {entry.name}
+                    </Text>
+                    <Text style={[styles.raceCount, { color: theme.textMuted }]}>
+                      {t('chaptersCountLabel', { count: entry.count })}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
 
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
@@ -715,24 +797,6 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  guestBox: { padding: 24, alignItems: 'center' },
-  guestText: {
-    fontFamily: fonts.regular,
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  authBtn: {
-    backgroundColor: ACCENT,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: borderRadius.button,
-  },
-  authBtnText: {
-    fontFamily: fonts.medium,
-    color: colors.white,
-    fontSize: 16,
-  },
   card: {
     borderRadius: 14,
     padding: 16,
@@ -921,5 +985,41 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 14,
     fontStyle: 'italic',
+  },
+  raceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  raceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  raceRank: {
+    width: 20,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  raceAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    marginRight: 10,
+    marginLeft: 8,
+  },
+  raceName: {
+    flex: 1,
+    fontFamily: fonts.regular,
+    fontSize: 14.5,
+  },
+  raceNameSelf: {
+    fontFamily: fonts.medium,
+  },
+  raceCount: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
   },
 });

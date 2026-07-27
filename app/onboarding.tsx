@@ -4,6 +4,7 @@ import {
   Step3Features,
   Step4Personalize,
   Step5Ready,
+  StepPermissions,
 } from '@/components/onboarding';
 import { OB } from '@/components/onboarding/onboardingPalette';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -11,7 +12,10 @@ import { SozAlert } from '@/components/SozAlert';
 import { useSozAlert } from '@/hooks/useSozAlert';
 import { useTheme } from '@/hooks/useTheme';
 import { supabase } from '@/constants/supabase';
+import { getAnalyticsEnabled, setAnalyticsEnabled } from '@/constants/analytics';
+import { isAppLockEnabled, setAppLockEnabled } from '@/constants/app-lock';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
@@ -63,7 +67,7 @@ const indicatorStyles = StyleSheet.create({
 
 function StepIndicator({
   step,
-  total = 5,
+  total = 6,
 }: {
   step: number;
   total?: number;
@@ -111,9 +115,67 @@ export default function OnboardingScreen() {
   const [userName, setUserName] = useState('');
   const [confettiStarted, setConfettiStarted] = useState(false);
   const [showFooter, setShowFooter] = useState(true);
+  const [appLockEnabled, setAppLockEnabledState] = useState(false);
+  const [appLockAvailable, setAppLockAvailable] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabledState] = useState(true);
   const { alertConfig, showAlert, hideAlert } = useSozAlert();
   const mainScrollRef = useRef<ScrollView>(null);
   const kimIcinScrollHintDone = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        setAppLockAvailable(compatible && enrolled);
+      } catch {
+        setAppLockAvailable(false);
+      }
+      try {
+        setAppLockEnabledState(await isAppLockEnabled());
+      } catch {
+        setAppLockEnabledState(false);
+      }
+      try {
+        setAnalyticsEnabledState(await getAnalyticsEnabled());
+      } catch {
+        setAnalyticsEnabledState(true);
+      }
+    })();
+  }, []);
+
+  const toggleAppLock = useCallback(
+    async (value: boolean) => {
+      try {
+        if (value) {
+          const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Face ID ile Kilitle',
+            cancelLabel: 'İptal',
+            disableDeviceFallback: false,
+          });
+          if (!result.success) return;
+          await setAppLockEnabled(true);
+          setAppLockEnabledState(true);
+        } else {
+          await setAppLockEnabled(false);
+          setAppLockEnabledState(false);
+        }
+        haptics.selection();
+      } catch {
+        /* ignore */
+      }
+    },
+    [haptics]
+  );
+
+  const toggleAnalytics = useCallback(
+    async (value: boolean) => {
+      setAnalyticsEnabledState(value);
+      await setAnalyticsEnabled(value);
+      haptics.selection();
+    },
+    [haptics]
+  );
 
   const styles = useMemo(() => makeStyles(fonts), [fonts]);
 
@@ -137,7 +199,7 @@ export default function OnboardingScreen() {
   }, []);
 
   useEffect(() => {
-    if (currentStep === 4) setConfettiStarted(true);
+    if (currentStep === 5) setConfettiStarted(true);
   }, [currentStep]);
 
   const canProceed = useMemo(() => {
@@ -152,22 +214,24 @@ export default function OnboardingScreen() {
         return userName.trim().length >= 2;
       case 4:
         return true;
+      case 5:
+        return true;
       default:
         return true;
     }
   }, [currentStep, selectedProfile, userName]);
 
   const goToStep = useCallback((index: number) => {
-    const i = Math.max(0, Math.min(4, index));
+    const i = Math.max(0, Math.min(5, index));
     setCurrentStep(i);
-    setShowFooter(i !== 4);
-    if (i === 4) setConfettiStarted(true);
+    setShowFooter(i !== 5);
+    if (i === 5) setConfettiStarted(true);
     haptics.light();
   }, [haptics]);
 
   const handleNext = useCallback(() => {
     if (!canProceed) return;
-    if (currentStep < 4) goToStep(currentStep + 1);
+    if (currentStep < 5) goToStep(currentStep + 1);
   }, [canProceed, currentStep, goToStep]);
 
   const handleBack = useCallback(() => {
@@ -175,7 +239,7 @@ export default function OnboardingScreen() {
   }, [currentStep, goToStep]);
 
   const skipToEnd = useCallback(() => {
-    goToStep(4);
+    goToStep(5);
   }, [goToStep]);
 
   const requestNotificationPermission = useCallback(async () => {
@@ -264,6 +328,16 @@ export default function OnboardingScreen() {
         return <Step3Features />;
       case 4:
         return (
+          <StepPermissions
+            appLockEnabled={appLockEnabled}
+            onToggleAppLock={(v) => void toggleAppLock(v)}
+            appLockAvailable={appLockAvailable}
+            analyticsEnabled={analyticsEnabled}
+            onToggleAnalytics={(v) => void toggleAnalytics(v)}
+          />
+        );
+      case 5:
+        return (
           <Step5Ready
             hideFooter={hideFooter}
             userName={userName}
@@ -289,7 +363,7 @@ export default function OnboardingScreen() {
         <View style={styles.innerContainer}>
           <View style={styles.header}>
             <StepIndicator step={currentStep} />
-            {currentStep !== 4 ? (
+            {currentStep !== 5 ? (
               <TouchableOpacity
                 style={styles.skipBtn}
                 onPress={skipToEnd}
