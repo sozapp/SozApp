@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEY_TODAY = '@soz/stats/today';
 const KEY_DAILY = '@soz/stats/daily';
 const KEY_BOOKS = '@soz/stats/books';
+const KEY_HOURS = '@soz/stats/hours';
 
 export type TodayStats = {
   date: string;
@@ -49,7 +50,33 @@ export async function recordVerseViews(newVerseIds: string[], bookId: string): P
     const books = (booksRaw != null ? JSON.parse(booksRaw) : {}) as Record<string, number>;
     books[bookId] = (books[bookId] ?? 0) + toAdd.length;
     await AsyncStorage.setItem(KEY_BOOKS, JSON.stringify(books));
+
+    const hoursRaw = await AsyncStorage.getItem(KEY_HOURS);
+    const hours = (hoursRaw != null ? JSON.parse(hoursRaw) : {}) as Record<string, number>;
+    const hourKey = String(new Date().getHours());
+    hours[hourKey] = (hours[hourKey] ?? 0) + toAdd.length;
+    await AsyncStorage.setItem(KEY_HOURS, JSON.stringify(hours));
   } catch (_) {}
+}
+
+/** Kullanıcının en sık okuma yaptığı saati döndürür (0-23), veri yoksa null. */
+export async function getMostActiveHour(): Promise<number | null> {
+  try {
+    const raw = await AsyncStorage.getItem(KEY_HOURS);
+    if (raw == null) return null;
+    const hours = JSON.parse(raw) as Record<string, number>;
+    let bestHour: number | null = null;
+    let bestCount = 0;
+    for (const [hourKey, count] of Object.entries(hours)) {
+      if (count > bestCount) {
+        bestCount = count;
+        bestHour = parseInt(hourKey, 10);
+      }
+    }
+    return bestHour;
+  } catch (_) {
+    return null;
+  }
 }
 
 export async function getDailyStats(): Promise<Record<string, number>> {

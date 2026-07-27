@@ -395,6 +395,27 @@ export function useChurch() {
     [church, refresh]
   );
 
+  const notifyOtherMembers = useCallback(
+    (selfUserId: string, title: string, body: string, data: Record<string, unknown>) => {
+      if (!supabase) return;
+      // Push'u ana işlemi bekletmeden, sessizce dene — grup bildirimi
+      // başarısız olsa bile dua/tamamlama kaydı zaten atılmış olur.
+      void (async () => {
+        for (const m of members) {
+          if (m.userId === selfUserId) continue;
+          try {
+            await supabase.functions.invoke('send-push', {
+              body: { recipientUserId: m.userId, title, body, data },
+            });
+          } catch (e) {
+            console.warn('[Church] push notify skipped:', e);
+          }
+        }
+      })();
+    },
+    [members]
+  );
+
   const sendPrayer = useCallback(
     async (text: string): Promise<ActionResult> => {
       if (!supabase || !church) return { ok: false, error: 'Grup bulunamadı.' };
@@ -409,12 +430,17 @@ export function useChurch() {
           .insert({ group_id: church.id, user_id: user.id, display_name: name, text });
         if (error) return { ok: false, error: error.message };
         await loadPrayers(church.id);
+        const preview = text.trim().length > 60 ? `${text.trim().slice(0, 57).trimEnd()}…` : text.trim();
+        notifyOtherMembers(user.id, `${name} bir dua isteği paylaştı`, preview, {
+          type: 'church_prayer',
+          groupId: church.id,
+        });
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : 'Bir hata oluştu.' };
       }
     },
-    [church, loadPrayers]
+    [church, loadPrayers, notifyOtherMembers]
   );
 
   const toggleMyCompletion = useCallback(async (): Promise<void> => {
@@ -438,11 +464,18 @@ export function useChurch() {
           .insert({ group_id: church.id, user_id: user.id, plan_reference: church.planReference });
       }
       await loadMembers(church.id, church.planReference);
+      if (!alreadyDone) {
+        const name = members.find((m) => m.userId === user.id)?.displayName ?? 'Bir üye';
+        notifyOtherMembers(user.id, 'Haftalık Plan', `${name} bu haftaki planı tamamladı 🎉`, {
+          type: 'church_completion',
+          groupId: church.id,
+        });
+      }
     } catch (e) {
       console.warn('[Church] toggleMyCompletion failed:', e);
       reportError('Church.toggleMyCompletion', e);
     }
-  }, [church, members, loadMembers]);
+  }, [church, members, loadMembers, notifyOtherMembers]);
 
   return {
     church,

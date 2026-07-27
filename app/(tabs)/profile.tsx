@@ -40,7 +40,7 @@ import {
   getNtChaptersReadCount,
   getNewTestamentChapterTotal,
 } from '@/constants/read-history';
-import { getDailyStats } from '@/constants/stats-storage';
+import { getDailyStats, getMostActiveHour } from '@/constants/stats-storage';
 import type { PlanProgress } from '@/constants/storage';
 import { deleteAccount, exportUserData, supabase } from '@/constants/supabase';
 import AmbientMusicModal from '@/components/AmbientMusicModal';
@@ -76,6 +76,8 @@ import {
   scheduleDailyVerseNotification,
   scheduleStreakReminder,
 } from '@/constants/notifications';
+
+const TIME_OPTIONS = ['06:00', '07:00', '08:00', '09:00', '10:00', '20:00', '21:00', '22:00'];
 
 const LANGUAGES: { code: Language; name: string }[] = [
   { code: 'tr', name: 'Türkçe' },
@@ -577,6 +579,22 @@ function makeStyles(colors: ThemeColors, fonts: typeof themeFonts, bottomInset: 
       color: ACCENT,
       fontFamily: fonts.medium,
     },
+    suggestedBadge: {
+      backgroundColor: `${ACCENT}1F`,
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      marginLeft: 8,
+    },
+    suggestedBadgeText: {
+      fontSize: 10.5,
+      fontFamily: fonts.medium,
+      color: ACCENT,
+    },
+    timeOptionLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
     segmentRow: { flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' },
     segmentBtn: {
       paddingVertical: 6,
@@ -794,6 +812,7 @@ export default function ProfileScreen() {
   const [analyticsEnabled, setAnalyticsEnabledState] = useState(true);
   const [reminderTime, setReminderTime] = useState('08:00');
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [suggestedTimeOption, setSuggestedTimeOption] = useState<string | null>(null);
   const [speechSpeed, setSpeechSpeed] = useState('Normal');
   const [lineSpacing, setLineSpacing] = useState<LineSpacingId>('normal');
   const [churchGroupName, setChurchGroupName] = useState<string | null>(null);
@@ -1413,11 +1432,8 @@ export default function ProfileScreen() {
   }, [haptics, showAlert, t]);
 
   const shareProgress = useCallback(() => {
-    Share.share({
-      message: t('shareProgressMsg', { streak: String(streak) }),
-      title: t('shareProgressTitle'),
-    }).catch(() => {});
-  }, [streak, t]);
+    router.push('/year-review');
+  }, [router]);
 
   const initials = useMemo(() => {
     const n = userName.trim() || userEmail?.split('@')[0] || '?';
@@ -1810,7 +1826,23 @@ export default function ProfileScreen() {
             {dailyReminder && (
               <TouchableOpacity
                 style={[styles.settingRow, styles.settingRowBorder]}
-                onPress={() => setShowTimePicker(true)}
+                onPress={() => {
+                  setShowTimePicker(true);
+                  getMostActiveHour()
+                    .then((hour) => {
+                      if (hour == null) {
+                        setSuggestedTimeOption(null);
+                        return;
+                      }
+                      const nearest = TIME_OPTIONS.reduce((best, opt) => {
+                        const optHour = Number(opt.split(':')[0]);
+                        const bestHour = Number(best.split(':')[0]);
+                        return Math.abs(optHour - hour) < Math.abs(bestHour - hour) ? opt : best;
+                      }, TIME_OPTIONS[0]);
+                      setSuggestedTimeOption(nearest);
+                    })
+                    .catch(() => setSuggestedTimeOption(null));
+                }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('reminderTime')}: ${reminderTime}`}
@@ -2436,7 +2468,7 @@ export default function ProfileScreen() {
             <View style={styles.timePickerSheet}>
             <View style={styles.sheetHandle} />
             <Text style={styles.reminderSheetCaption}>{t('reminderTime').toUpperCase()}</Text>
-            {['06:00', '07:00', '08:00', '09:00', '10:00', '20:00', '21:00', '22:00'].map((time) => (
+            {TIME_OPTIONS.map((time) => (
               <TouchableOpacity
                 key={time}
                 style={[
@@ -2462,15 +2494,22 @@ export default function ProfileScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Text
-                  style={[
-                    styles.timeOptionText,
-                    { color: colors.text },
-                    reminderTime === time && styles.timeOptionTextActive,
-                  ]}
-                >
-                  {time}
-                </Text>
+                <View style={styles.timeOptionLeft}>
+                  <Text
+                    style={[
+                      styles.timeOptionText,
+                      { color: colors.text },
+                      reminderTime === time && styles.timeOptionTextActive,
+                    ]}
+                  >
+                    {time}
+                  </Text>
+                  {suggestedTimeOption === time && reminderTime !== time && (
+                    <View style={styles.suggestedBadge}>
+                      <Text style={styles.suggestedBadgeText}>{t('suggestedTime')}</Text>
+                    </View>
+                  )}
+                </View>
                 {reminderTime === time && (
                   <Ionicons name="checkmark" size={18} color={ACCENT} />
                 )}

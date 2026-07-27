@@ -53,6 +53,8 @@ import {
   useFavorites,
   yearsSinceFavorite,
 } from '@/hooks/useFavorites';
+import { getDailyStats } from '@/constants/stats-storage';
+import { WeekStreakRow } from '@/components/WeekStreakRow';
 
 const ACCENT = '#C4956A';
 const ACCENT_LIGHT = '#FFF8EE';
@@ -372,6 +374,10 @@ const makeStyles = (colors: ThemeColors, fonts: AppFonts) => {
       fontSize: 12,
       color: ACCENT,
       fontFamily: fonts.regular,
+    },
+    weekStreakWrap: {
+      marginHorizontal: 16,
+      marginBottom: 12,
     },
     streakZeroCard: {
       marginHorizontal: 16,
@@ -1710,6 +1716,7 @@ export default function HomeScreen() {
   const [userName, setUserName] = useState('');
   const [streak, setStreak] = useState(0);
   const [streakCardDismissed, setStreakCardDismissed] = useState(false);
+  const [weekActivity, setWeekActivity] = useState<boolean[]>(Array(7).fill(false));
   const { isOnline } = useNetwork();
   const [planDay, setPlanDay] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
@@ -2218,6 +2225,15 @@ export default function HomeScreen() {
           else setLastMoodAt(null);
           setReflectionDoneToday(vals[5][1] === 'true');
           setLastRead(await loadLastRead());
+          const daily = await getDailyStats();
+          const today = new Date();
+          const activity = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - (6 - i));
+            const key = d.toISOString().slice(0, 10);
+            return (daily[key] ?? 0) > 0;
+          });
+          setWeekActivity(activity);
         } catch (e) {
           console.warn('Offline mode:', e);
           setStreak(0);
@@ -2227,6 +2243,7 @@ export default function HomeScreen() {
           setLastMoodAt(null);
           setReflectionDoneToday(false);
           setLastRead(null);
+          setWeekActivity(Array(7).fill(false));
         } finally {
           setIsHomeLoading(false);
         }
@@ -2241,6 +2258,24 @@ export default function HomeScreen() {
     setStreakCardDismissed(true);
     AsyncStorage.setItem(STREAK_CARD_DISMISSED_AT_KEY, String(Date.now())).catch(() => {});
   }, []);
+
+  const weekDayLabels = useMemo(() => {
+    const keys = [
+      'weekdayShortSun',
+      'weekdayShortMon',
+      'weekdayShortTue',
+      'weekdayShortWed',
+      'weekdayShortThu',
+      'weekdayShortFri',
+      'weekdayShortSat',
+    ] as const;
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      return t(keys[d.getDay()]);
+    });
+  }, [t]);
 
   const finishTutorial = useCallback(async () => {
     setShowTutorial(false);
@@ -2507,6 +2542,18 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </View>
+
+        {streak > 0 ? (
+          <View style={styles.weekStreakWrap}>
+            <WeekStreakRow
+              colors={colors}
+              accent={ACCENT}
+              activeDays={weekActivity}
+              dayLabels={weekDayLabels}
+              todayIndex={6}
+            />
+          </View>
+        ) : null}
 
         {streak === 0 && !streakCardDismissed ? (
           <Swipeable
