@@ -2,7 +2,8 @@
 export const ACTS_CHAPTER_VERSES: string[][] = [
   // Elçilerin İşleri 1 (26 ayet)
   [
-    "Ey Teofilos, İlk kitabımda İsa'nın yapıp öğretmeye başladığı her şeyi, seçmiş olduğu elçilere Kutsal Ruh aracılığıyla buyruklar verip yukarı alındığı güne dek olanları yazmıştım.",
+    "Ey Teofilos, İlk kitabımda İsa'nın yapıp öğretmeye başladığı her şeyi yazmıştım.",
+    "Seçmiş olduğu elçilere Kutsal Ruh aracılığıyla buyruklar verip yukarı alındığı güne dek olanları da yazmıştım.",
     "İsa, ölüm acısını çektikten sonra birçok inandırıcı kanıtlarla elçilere dirilmiş olduğunu gösterdi. Kırk gün süreyle onlara görünerek Tanrı'nın Egemenliği hakkında konuştu.",
     "Kendileriyle birlikteyken onlara şu buyruğu vermişti: \"Yeruşalim'den ayrılmayın, Baba'nın verdiği ve benden duyduğunuz sözün gerçekleşmesini bekleyin.",
     "Şöyle ki, Yahya suyla vaftiz etti, ama sizler birkaç güne kadar Kutsal Ruh'la vaftiz edileceksiniz.\"",
@@ -15,19 +16,18 @@ export const ACTS_CHAPTER_VERSES: string[][] = [
     "Bundan sonra elçiler, Yeruşalim'den yaklaşık bir kilometre uzaklıktaki Zeytin Dağı'ndan Yeruşalim'e döndüler.",
     "Kente girince kaldıkları evin üst katındaki odaya çıktılar. Petrus, Yuhanna, Yakup, Andreas, Filipus, Tomas, Bartalmay, Matta, Alfay oğlu Yakup, Yurtsever Simun ve Yakup oğlu Yahuda oradaydı.",
     "Bunlar İsa'nın annesi Meryem, öbür kadınlar ve İsa'nın kardeşleriyle tam bir birlik içinde sürekli dua ediyordu.",
-    "O günlerde Petrus, yaklaşık yüz yirmi kardeşten oluşan bir topluluğun ortasında ayağa kalkıp şöyle konuştu: \"Kardeşler, Kutsal Ruh'un, İsa'yı tutuklayanlara kılavuzluk eden Yahuda ile ilgili olarak Davut'un ağzıyla önceden bildirdiği Kutsal Yazı'nın yerine gelmesi gerekiyordu.",
+    "O günlerde Petrus, yaklaşık yüz yirmi kardeşten oluşan bir topluluğun ortasında ayağa kalkıp şöyle konuştu:",
+    "\"Kardeşler, Kutsal Ruh'un, İsa'yı tutuklayanlara kılavuzluk eden Yahuda ile ilgili olarak Davut'un ağzıyla önceden bildirdiği Kutsal Yazı'nın yerine gelmesi gerekiyordu.",
     "Yahuda bizden biri sayılmış ve bu hizmette yerini almıştı.\"",
     "Bu adam, yaptığı kötülüğün karşılığında aldığı ücretle bir tarla satın aldı. Sonra baş aşağı düştü, bedeni yarıldı ve bütün bağırsakları dışarı döküldü.",
     "Yeruşalim'de yaşayan herkes olayı duydu. Tarlaya kendi dillerinde Kan Tarlası anlamına gelen Hakeldema adını verdiler.",
     "\"Nitekim Mezmurlar Kitabı'nda şöyle yazılmıştır\" dedi Petrus. \"'Onun konutu ıssız kalsın, İçinde oturan olmasın.' Ve, 'Onun görevini bir başkası üstlensin.'",
-    "\"Buna göre, Yahya'nın vaftiz döneminden başlayarak Rab İsa'nın aramızdan yukarı alındığı güne değin bizimle birlikte geçirdiği bütün süre boyunca yanımızda bulunan adamlardan birinin, İsa'nın dirilişine tanıklık etmek üzere bize katılması gerekir.\"",
+    "\"Buna göre, Yahya'nın vaftiz döneminden başlayarak Rab İsa'nın aramızdan yukarı alındığı güne değin bizimle birlikte geçirdiği bütün süre boyunca yanımızda bulunan adamlardan biri,",
+    "İsa'nın dirilişine tanıklık etmek üzere bize katılmalıdır.\"",
     "Böylece iki kişiyi, Barsabba denilen ve Yustus diye de bilinen Yusuf ile Mattiya'yı önerdiler.",
-    "Sonra şöyle dua ettiler: \"Ya Rab, sen herkesin yüreğini bilirsin. Yahuda'nın, ait olduğu yere gitmek için bıraktığı bu hizmeti ve elçilik görevini üstlenmek üzere bu iki kişiden hangisini seçtiğini göster bize.\"",
+    "Sonra şöyle dua ettiler: \"Ya Rab, sen herkesin yüreğini bilirsin.",
+    "Yahuda'nın, ait olduğu yere gitmek için bıraktığı bu hizmeti ve elçilik görevini üstlenmek üzere bu iki kişiden hangisini seçtiğini göster bize.\"",
     "Ardından bu iki kişiye kura çektirdiler; kura Mattiya'ya düştü. Böylelikle Mattiya on bir elçiye katıldı.",
-    "Böylece Yusuf adlı Barsabbas (Justus diye de tanınan) ile Mattiya için iki kişi önerdiler.",
-    "Sonra şöyle dua ettiler: \"Ya Rab, herkesin yüreğini bilen sen, bu iki kişiden hangisini seçtiğini göster.",
-    "Senin elçiliğe hizmete ve elçiliğe seçilen Yahuda'nın gittiği yere gitmek için kura çekmesi gereken kişiyi seç.\"",
-    "Böylece onlara kura çektirdiler; kura Mattiya'ya düştü ve o, on bir elçiyle birlikte sayıldı.",
   ],
   // Elçilerin İşleri 2 (47 ayet)
   [
